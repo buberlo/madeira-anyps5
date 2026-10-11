@@ -1,0 +1,169 @@
+{
+  "baselineSources": {
+    "FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp": "a830784558ee0d6e3ba9f3a27ba6364ec516e7ef29947516dbc883d281248328",
+    "FEXCore/include/FEXCore/Core/CoreState.h": "286a1a930b395a45af776c542959fb78956cc552f04ed654e8881f1add50cf70",
+    "Source/Windows/ARM64EC/Module.cpp": "e6704ee2aae0962cddf2e4d9c8348bda9690da364eb696203637cb4a245fa499"
+  },
+  "candidateSources": {
+    "FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp": "5efc88ec30b6a1c6a0216dfb3a38989e9001816a39a89864c4227b97f9bd0ef5",
+    "FEXCore/include/FEXCore/Core/CoreState.h": "99d9a0bc763934cda8a1fa9dad20750d395133eb52f049658ecc9a6dee5a5b13",
+    "Source/Windows/ARM64EC/Module.cpp": "0e7c8ddcb650f9f5387ce85c1e6c5f69922c7d99142529545abaceb2aa547f42"
+  },
+  "cpuAccepted": false,
+  "defaultPatchSeriesChanged": false,
+  "derivation": {
+    "README.md": {
+      "byteIdentical": false,
+      "sourceSha256": "1c84baf699a4d6e509712f9d43c76e3c046fd65272fbb711784b9cfcc5c4a72f"
+    },
+    "candidate.patch": {
+      "byteIdentical": true,
+      "sourceSha256": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6"
+    },
+    "emitter-probe.cpp": {
+      "byteIdentical": true,
+      "sourceSha256": "48d0c610ff3c2d87c3443a2e6f140bcaae51ad1536e63ff5c4edd9844a6d2048"
+    },
+    "extract_harness.py": {
+      "byteIdentical": false,
+      "sourceSha256": "b4accfaf68f460abb122effa06b632764924a376d3507396661bc6c61c5a9c4a"
+    },
+    "frame-offsets-coff.cpp": {
+      "byteIdentical": true,
+      "sourceSha256": "7022b57060c0a175be8899ef58967452a26ebfd69c8ff39ca80cbd1e105baa80"
+    },
+    "frame-offsets.cpp": {
+      "byteIdentical": true,
+      "sourceSha256": "a2a541ac21ccd7228dbae6a5c1d5ebe7663722bd722c2f5d00aec0c619d56e0f"
+    },
+    "local-rebuild-source-snapshot/build_production.py-attempt2.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "142deac81b71e2663f34ade50efc878b60579053aeb2cdc399b42587a57ff349"
+    },
+    "local-rebuild-source-snapshot/build_production.py.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "df8c55020afd2be8125ab7cb71b097318b678ca68d87166ba5530f803307d75f"
+    },
+    "local-rebuild-source-snapshot/make_recipe.py.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49"
+    },
+    "local-rebuild-source-snapshot/make_review.py-attempt2.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "f976613600d6a76c0208c61359d9331631c241c8dce21c61e8b1a8ab15bdaf7c"
+    },
+    "local-rebuild-source-snapshot/make_review.py.snapshot": {
+      "byteIdentical": false,
+      "sourceSha256": "cd50b9b243a227139c0dfab242543562efead82ab51b99a3f9f51d6414b22efe"
+    },
+    "local-rebuild-source-snapshot/prepare_production.py-attempt2.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd"
+    },
+    "local-rebuild-source-snapshot/prepare_production.py.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd"
+    },
+    "local-rebuild-source-snapshot/test_build.py.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "3b7b0648a0bb3c61ab3c017922a2da8fbbb060a65d9266dd63dc87362b830f93"
+    },
+    "local-rebuild-source-snapshot/test_extract.py.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "5cc09debe1eac73f7459fd3486bc7ca5088c624ab2be9045d04c5be082334426"
+    },
+    "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": {
+      "byteIdentical": true,
+      "sourceSha256": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f"
+    },
+    "native-adapter.hpp": {
+      "byteIdentical": true,
+      "sourceSha256": "e6fed06fc8331e0ce492dad5d613912dcd197440316a9c93c62eb0653036d8ce"
+    },
+    "native-cases.cpp": {
+      "byteIdentical": false,
+      "sourceSha256": "a0cf653042561c4010056dc3cc66277397540438fbf5f180a0fc705d9626b4d8"
+    },
+    "native-entry.S": {
+      "byteIdentical": true,
+      "sourceSha256": "c61b82000c13ba13fb6897985e1fc32fc2a199cde79d89450f998eebaa8a9c10"
+    },
+    "qualify_native.py": {
+      "byteIdentical": false,
+      "sourceSha256": "0ec43e500d34b8b1958fa35644ee69b1a80734d7bdee4da01beaa90085b8afb0"
+    },
+    "test_checkpoint.py": {
+      "kind": "new_public_source_adaptation"
+    }
+  },
+  "deviceExecuted": false,
+  "exactPatchSha256": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6",
+  "faultCauseEstablished": false,
+  "fexUpstreamCommit": "14c92681f4d62cf84d901460e0358de09c8847a7",
+  "files": {
+    "README.md": "5232fc0ecebcbd928dc89bb0f2d10a7454c08752c96f0f7fc81808ebaff5dbfd",
+    "candidate.patch": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6",
+    "emitter-probe.cpp": "48d0c610ff3c2d87c3443a2e6f140bcaae51ad1536e63ff5c4edd9844a6d2048",
+    "extract_harness.py": "85d86b0654ddfb99effd7aad561cfdd1108492b60a0a7e45a99a3e9d86c33580",
+    "frame-offsets-coff.cpp": "7022b57060c0a175be8899ef58967452a26ebfd69c8ff39ca80cbd1e105baa80",
+    "frame-offsets.cpp": "a2a541ac21ccd7228dbae6a5c1d5ebe7663722bd722c2f5d00aec0c619d56e0f",
+    "local-rebuild-source-snapshot/build_production.py-attempt2.snapshot": "142deac81b71e2663f34ade50efc878b60579053aeb2cdc399b42587a57ff349",
+    "local-rebuild-source-snapshot/build_production.py.snapshot": "df8c55020afd2be8125ab7cb71b097318b678ca68d87166ba5530f803307d75f",
+    "local-rebuild-source-snapshot/make_recipe.py.snapshot": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49",
+    "local-rebuild-source-snapshot/make_review.py-attempt2.snapshot": "f976613600d6a76c0208c61359d9331631c241c8dce21c61e8b1a8ab15bdaf7c",
+    "local-rebuild-source-snapshot/make_review.py.snapshot": "abc51143a415420dadd28fd2f6c7561871fa03859aafefcd739bf889db15a194",
+    "local-rebuild-source-snapshot/prepare_production.py-attempt2.snapshot": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd",
+    "local-rebuild-source-snapshot/prepare_production.py.snapshot": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd",
+    "local-rebuild-source-snapshot/test_build.py.snapshot": "3b7b0648a0bb3c61ab3c017922a2da8fbbb060a65d9266dd63dc87362b830f93",
+    "local-rebuild-source-snapshot/test_extract.py.snapshot": "5cc09debe1eac73f7459fd3486bc7ca5088c624ab2be9045d04c5be082334426",
+    "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f",
+    "native-adapter.hpp": "e6fed06fc8331e0ce492dad5d613912dcd197440316a9c93c62eb0653036d8ce",
+    "native-cases.cpp": "c684ab93b5cdfd41af6379b402293192329f3094396e414ab0afa83915a47df7",
+    "native-entry.S": "c61b82000c13ba13fb6897985e1fc32fc2a199cde79d89450f998eebaa8a9c10",
+    "qualify_native.py": "f4d3e3c2a665b351be8f47444a9a0cf8ac8160b1def880fca5d782ffcca5b776",
+    "test_checkpoint.py": "733ff62437def87dd48516e7bbc46be57f4ef74fa84d1a76dac2d04c2d2fb42b"
+  },
+  "gameplayAccepted": false,
+  "historicalFirstProductionAttempt": {
+    "cpuidAssertionUnchanged": true,
+    "metadataSuccessorReviewSha256": "c9b8e61c45dc35d36c298158d3cac50c0ad136df03ad0c97f3fe3b37e7056035",
+    "receiptSha256": "7fd764ac6bf5e9589ffdfaeaab419fb848834333ec6df31d9bc5429432d05445",
+    "status": "failed_version_length_assertion_no_acceptance",
+    "versionContract": "EC-link-b5c84c8a7e65"
+  },
+  "historicalNativeEvidence": {
+    "candidateControls": 42,
+    "emitterControls": 12,
+    "emitterReceiptSha256": "c47319b8305376c4addc4ae5c1b363e7fc81e77dadf019677f75a5268f4cc0bb",
+    "joinedCommands": 22,
+    "nativeFrameSizeCandidate": 3904,
+    "nativeFrameSizeOriginal": 3904,
+    "nonIOSControls": 16,
+    "originalAndEffectiveMutantsRejected": 5,
+    "qualificationReceiptSha256": "b31460d5b298d9a831d35e4dcae97f02a6bc3d04c8383fac294ba5d69e3cf5ef",
+    "sourceReviewSha256": "88ab7c9591f0bbdb661f1598ba1a8f9e20a8fcd5be00f4042e947846903c2ca1"
+  },
+  "localRecipeSnapshotsRunnableFromFreshClone": false,
+  "prerequisiteExperimentalFexPatches": [
+    "../native59/patches/fex/0004-ios-loop-top-register-reconstruction.patch",
+    "../native59/patches/fex/0005-ios-native-critical-suspend.patch"
+  ],
+  "privateMapsLogsAssetsIncluded": false,
+  "productionBuildAccepted": false,
+  "publicAddressConstants": "synthetic_substitutions_not_captured_ASLR",
+  "publicFileCount": 21,
+  "publicNativeAdaptationExecuted": false,
+  "publicSourceChecks": {
+    "compilerExecutedForPublicAdaptation": false,
+    "explicitPinnedSourceExtractionPassed": true,
+    "portableControlsPassed": 6
+  },
+  "schemaVersion": 1,
+  "sdkOrCompiledArtifactsIncluded": false,
+  "status": "experimental_source_checkpoint_native_controls_qualified_production_and_runtime_pending",
+  "targetECFrameOffsetsQualified": false,
+  "wineExtractionSources": {
+    "signalSha256": "665ea6fd93e7d8d81db2b57b90143e9bc60be120cd3febd71fe34aab351d80eb",
+    "unwindSha256": "2af72ed56078429857c0f0928186f8439475811bc0fb2fc90ac0ce6e35f14e32"
+  }
+}

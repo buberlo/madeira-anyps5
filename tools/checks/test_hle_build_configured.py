@@ -1,6 +1,9 @@
+from contextlib import chdir
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -9,6 +12,59 @@ SCRIPT = Path(__file__).resolve().parents[2] / 'scripts/build-hle.py'
 spec = importlib.util.spec_from_file_location('build_hle_new', SCRIPT)
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+
+
+@unittest.skipIf(os.name == 'nt', 'Wine executable resolution is used on POSIX hosts')
+class WineExecutable(unittest.TestCase):
+    def executable(self, root):
+        path = root / 'tool path' / 'wine'
+        path.parent.mkdir()
+        path.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        path.chmod(0o700)
+        return path
+
+    def invoke_from_other_directory(self, executable, root):
+        working = root / 'build'
+        working.mkdir()
+        result = subprocess.run([executable, 'cmd', '/c', 'fixture.cmd'], cwd=working,
+                                check=True, capture_output=True, text=True)
+        self.assertEqual(result.stdout, 'cmd\n/c\nfixture.cmd\n')
+
+    def test_relative_slash_path_survives_test_cwd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            expected = self.executable(root)
+            with chdir(root):
+                executable = m.resolve_wine_executable('./tool path/wine')
+            self.assertEqual(executable, str(expected))
+            self.invoke_from_other_directory(executable, root)
+
+    def test_bare_command_with_relative_path_entry_survives_test_cwd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            expected = self.executable(root)
+            with chdir(root), patch.dict(os.environ, {'PATH': 'tool path'}):
+                executable = m.resolve_wine_executable('wine')
+            self.assertEqual(executable, str(expected))
+            self.invoke_from_other_directory(executable, root)
+
+    def test_missing_explicit_path_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp, chdir(tmp):
+            with self.assertRaisesRegex(ValueError, 'not found or not executable'):
+                m.resolve_wine_executable('./missing/wine')
+
+    def test_missing_bare_command_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'PATH': tmp}):
+            with self.assertRaises(ValueError):
+                m.resolve_wine_executable('wine')
+
+    def test_non_executable_explicit_file_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'wine'
+            path.write_text('not executable')
+            path.chmod(0o600)
+            with self.assertRaises(ValueError):
+                m.resolve_wine_executable(str(path))
 
 
 class Configured(unittest.TestCase):

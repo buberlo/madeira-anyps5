@@ -16,7 +16,7 @@ def output(fixture, newline='\n'):
 
 IMPORTED_MARKERS = ('ACTUAL_DRIVER_PATH ' + PRX + '\n'
                     'ACTUAL_DRIVER_CACHE_SOURCE_VERSION ' + SOURCE + '\n'
-                    'ACTUAL_DRIVER_CACHE_FORMAT 22\n')
+                    'ACTUAL_DRIVER_CACHE_FORMAT 28\n')
 
 class Controls(unittest.TestCase):
     def check(self, fixture=m.STANDALONE, stdout=None, stderr=None, result=None, **pins):
@@ -102,8 +102,8 @@ class Controls(unittest.TestCase):
             with self.subTest(markers=markers), self.assertRaises(ValueError): self.check(m.IMPORTED, stderr=markers)
         with self.assertRaises(ValueError): self.check(m.IMPORTED, expected_cache_source=None)
     def test_wrong_missing_duplicate_cache_format_refused(self):
-        line = 'ACTUAL_DRIVER_CACHE_FORMAT 22\n'
-        for markers in (IMPORTED_MARKERS.replace(line,'ACTUAL_DRIVER_CACHE_FORMAT 21\n'), IMPORTED_MARKERS.replace(line,''), IMPORTED_MARKERS+line):
+        line = 'ACTUAL_DRIVER_CACHE_FORMAT 28\n'
+        for markers in (IMPORTED_MARKERS.replace(line,'ACTUAL_DRIVER_CACHE_FORMAT 22\n'), IMPORTED_MARKERS.replace(line,''), IMPORTED_MARKERS+line):
             with self.subTest(markers=markers), self.assertRaises(ValueError): self.check(m.IMPORTED, stderr=markers)
 
 if __name__ == '__main__': unittest.main()

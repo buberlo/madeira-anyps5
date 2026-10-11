@@ -1,0 +1,49 @@
+"""Seal this metadata-only source successor; never prepare or compile FEX."""
+from pathlib import Path
+import hashlib
+import importlib.util
+import json
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+OLD = HERE.parent / 'native-ec-loop-top-continuation-proposal-20261012'
+FAILED = HERE.parent / 'fex-native-ec-link-preservation-full-link-20261012'
+OLD_SHA = '88ab7c9591f0bbdb661f1598ba1a8f9e20a8fcd5be00f4042e947846903c2ca1'
+def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+def make():
+    output = HERE / 'source-review-freeze.json'
+    if output.exists(): raise FileExistsError(output)
+    oldpath = OLD / 'source-review-freeze.json'
+    if sha(oldpath) != OLD_SHA: raise ValueError('Exact unchanged predecessor')
+    old = json.loads(oldpath.read_text())
+    failure = json.loads((FAILED / 'final-receipt.json').read_text())
+    if failure['status'] != 'failed' or failure['error'] != 'Failed actual compiler full187':
+        raise ValueError('Exact first failure retained')
+    log = HERE / 'offline-tests.log'
+    run = subprocess.run([sys.executable, '-I', '-B', '-m', 'unittest', 'discover', '-s', str(HERE), '-p', 'test_metadata.py', '-v'], capture_output=True, timeout=30)
+    log.write_bytes(run.stdout + run.stderr)
+    if run.returncode: raise ValueError('Metadata controls failed')
+    spec = importlib.util.spec_from_file_location('review_fingerprints', HERE / 'prepare_production.py')
+    p = importlib.util.module_from_spec(spec); spec.loader.exec_module(p)
+    inputs = dict(old['inputHashes']); inputs[str(oldpath)] = OLD_SHA
+    for name in ['final-receipt.json', 'arm64ec/full187-command.json', 'arm64ec/full187.stdout', 'arm64ec/full187.stderr', 'arm64ec/build/generated/git_version.h', 'source/FEXCore/Source/Interface/Core/CPUID.cpp']:
+        path = FAILED / name; inputs[str(path)] = sha(path)
+    for path in HERE.rglob('*'):
+        if path.is_file() and path != output: inputs[str(path)] = sha(path)
+    before = {name: p.stamp(name) for name in inputs}
+    for name, digest in inputs.items():
+        if sha(name) != digest or p.stamp(name) != before[name]: raise ValueError('Source drift ' + name)
+    result = dict(old)
+    result.update(status='metadata_only_short_version_successor_production_attempt1_failed_attempt2_pending',
+                  predecessorReviewSha256=OLD_SHA, inputHashes=inputs, inputFingerprints=before,
+                  metadataControls=3, firstProductionAttemptFailed=True,
+                  firstProductionFailureSha256=sha(FAILED / 'final-receipt.json'),
+                  recipePath=str(HERE / 'production-rebuild-recipe.json'),
+                  recipeSha256=sha(HERE / 'production-rebuild-recipe.json'),
+                  buildRunnerPath=str(HERE / 'build_production.py'))
+    output.write_text(json.dumps(result, indent=2) + '\n')
+    print(json.dumps({'path': str(output), 'sha256': sha(output), 'inputs': len(inputs)}))
+
+if __name__ == '__main__': make()

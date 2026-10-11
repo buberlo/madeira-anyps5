@@ -1,0 +1,29 @@
+import importlib.util,json,os,struct,sys,tempfile,unittest
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+s=importlib.util.spec_from_file_location('ec_build',HERE/'build_production.py');b=importlib.util.module_from_spec(s);s.loader.exec_module(b)
+class Gates(unittest.TestCase):
+ def test_real_native_dependency_recipe(self):
+  q=json.loads((HERE/'production-rebuild-recipe.json').read_text());self.assertEqual(len(q['nativeCommands']),50);self.assertEqual(len(q['retainedFexCoreMembers']),9)
+  self.assertEqual([x['affected'] for x in q['nativeArchiveScope']],[50,0,0,0,0,0,0]);self.assertTrue(any('FEX-native-ec-link-' in x for x in q['configure']))
+  self.assertTrue(all('-DFEX_IOS_HOST' not in row['compile'] for row in q['nativeCommands']))
+ def test_target_coff_probe_exact(self):
+  with tempfile.TemporaryDirectory() as d:
+   x=Path(d)/'frame.obj';header=bytearray(60);struct.pack_into('<HH',header,0,0xa641,1);header[20:28]=b'.fexfrm\0';struct.pack_into('<II',header,36,56,60);x.write_bytes(header+struct.pack('<7Q',3904,0,1528,3848,3856,3864,3872));self.assertEqual(b.frame(x)[-1],3872)
+   struct.pack_into('<I',header,36,48);x.write_bytes(header+b'\0'*48)
+   with self.assertRaises(ValueError):b.frame(x)
+ def test_exact_only_new_ec_import(self):
+  old='Import {\n Name: ntdll.dll\n Symbol: A (1)\n}\n'+''.join('Import {\n Name: d%d.dll\n Symbol: A (1)\n}\n'%i for i in range(11))
+  new=old.replace('Symbol: A (1)','Symbol: A (1)\n Symbol: RtlIsEcCode (2)',1);b.import_delta(old,new)
+  with self.assertRaises(ValueError):b.import_delta(old,new.replace('RtlIsEcCode','Other'))
+ def test_joined_child_cap_failure(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);stage=root/'stage'
+   with self.assertRaises(ValueError):b.bounded_command('cap',[sys.executable,'-c',"import sys,time;sys.stdout.write('x'*4096);sys.stdout.flush();time.sleep(5)"],os.environ.copy(),stage,root,timeout=5,cap=2048)
+   q=json.loads((stage/'cap-command.json').read_text());self.assertTrue(q['ownedChildReaped']);self.assertIn('cap',q['error'])
+ def test_joined_child_deadline_failure(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d);stage=root/'stage'
+   with self.assertRaises(ValueError):b.bounded_command('deadline',['/bin/sleep','5'],os.environ.copy(),stage,root,timeout=.1,cap=1024)
+   self.assertTrue(json.loads((stage/'deadline-command.json').read_text())['ownedChildReaped'])
+if __name__=='__main__':unittest.main()

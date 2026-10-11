@@ -8,7 +8,7 @@ STANDALONE = 'agc_unused_barycentric_tests'
 IMPORTED = 'agc_actual_driver_public_tests'
 COUNTS = {STANDALONE: 355, IMPORTED: 538}
 STREAM_MAXIMUM = 1048576
-CACHE_FORMAT = 22
+CACHE_FORMAT = 28
 KNOWN_SKIPPED_CASE_NAMES = (
     'optional_groups_skipped_complete_pair_retains_initialized_output',
     'optional_groups_skipped_complete_pair_output_not_consumed',

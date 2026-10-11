@@ -60,11 +60,17 @@ Six freshly compiled native shader suites pass: placeholder policy, device
 profile, request/cache identity and compatibility, unused barycentrics, LDS
 CPU behavior, and extended public compilation. Graphics test source also passes
 its separate syntax check. The build-helper and result-validator controls pass
-**49 tests**. Failed initial attempts are recorded separately from these passes.
+**54 tests**. Failed initial attempts are recorded separately from these passes.
 
-The fresh complete **47-library Windows HLE build is in progress**. Its linked
-runtime regressions, prepared game package, Windows GPU run and iPad game run
-remain separate qualification steps. The earlier 54-case runtime and 538-case
+The fresh complete **47-library Windows HLE build compiles** with the selected
+test executables. The raw-log fixture passes twelve cases; the next fixture,
+`windows_exception_tests`, terminates with an unhandled `through runtime frames`
+exception from `std::call_once`. The supplied compiler runtime DLLs carry native
+SEH tables while our custom unwinder reads DWARF metadata; a bounded diagnostic
+will identify the first missing frame before a bridge is accepted. The fixture
+and cleanup assertions remain enabled. Full linked-runtime qualification, the
+new prepared game package, Windows GPU run and iPad game run remain separate
+steps. The earlier 54-case runtime and 538-case
 production-driver results belong to the preceding source and are not reused as
 results for this update.
 
@@ -87,3 +93,12 @@ success. [MiniGolf records](MINIGOLF.md).
 
 All builds and tests run locally. GitHub Actions remain disabled. Game data,
 pairing and raw diagnostic captures stay outside Git.
+
+The current patch stack also updates four write-tracking mappings for the new
+explicit GPU argument, fixes one renamed filesystem-test variable without
+changing its timestamp comparison, and moves the optional 60-Hz vblank wait to
+TimedWait’s own absolute nanosecond clock. The normal rational vblank path and
+stop/failure predicate stay intact. The HLE helper resolves the Wine executable
+before changing directories for tests; five executable-path controls cover that
+repair. [Experimental EC continuation snapshot](../experimental/native-ec-continuation/README.md) preserves the narrower FEX candidate and its
+local controls; it remains outside the default patch series.

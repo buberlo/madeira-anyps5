@@ -1,0 +1,37 @@
+"""Emit an inert root build recipe; never copy a checkout or run a build."""
+from pathlib import Path
+import hashlib,json
+HERE=Path(__file__).resolve().parent
+ROOT=HERE.parent.parent
+FULL=ROOT/'build/fex-native-critical-suspend-full-link-20261011'
+NATIVE=ROOT/'build/fex-native-critical-native-archives-proposal-20261011'
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def make():
+ freeze=json.loads((NATIVE/'source-freeze.json').read_text())
+ decision=json.loads((NATIVE/'execution/final-receipt.json').read_text())
+ full=json.loads((FULL/'source-freeze.json').read_text())
+ dest=ROOT/'build/fex-native-ec-link-preservation-full-link-20261012';source=dest/'source';build=dest/'arm64ec/build'
+ old=ROOT/'build/fex-loop-top-suspend-full-link-20261010'
+ configure=[a.replace(str(old/'source'),str(source)).replace(str(old/'arm64ec/build'),str(build)) for a in full['configureTemplate']['argv']]
+ patchsha=sha(HERE/'candidate.patch')
+ configure=[('-DOVERRIDE_HASH='+patchsha[:40]) if a.startswith('-DOVERRIDE_HASH=') else ('-DOVERRIDE_VERSION=FEX-native-ec-link-'+patchsha[:12]) if a.startswith('-DOVERRIDE_VERSION=') else a for a in configure]
+ scopes=[];commands=[];retained=[]
+ for group in freeze['groups']:
+  dependent=[o for o in group['objects'] if any(n.endswith('/FEXCore/Core/CoreState.h') for n in o['dependencies'])]
+  scopes.append({'archive':group['name'],'members':len(group['objects']),'affected':len(dependent),'sources':[o['source'] for o in dependent]})
+  if not dependent:continue
+  assert group['name']=='FEXCore' and len(dependent)==50
+  flags=[a.replace(str(ROOT/'upstreams/FEX'),str(source)) for a in group['flags']]
+  for ordinal,row in enumerate(group['objects']):
+   output=dest/'native/objects'/f'{ordinal}-{row["name"]}'
+   current=NATIVE/'execution/objects'/group['name']/output.name
+   assert str(current) in decision['outputs']
+   if row not in dependent:
+    retained.append({'destination':str(output),'provider':str(current),'sha256':decision['outputs'][str(current)]});continue
+   commands.append({'source':row['source'],'retainedDependencyRowOrdinal':ordinal,'preprocess':[freeze['compiler'],*flags,'-E','-P',str(source/row['source'])],'compile':[freeze['compiler'],*flags,'-MD','-MT',str(output),'-MF',str(output)+'.d','-o',str(output),'-c',str(source/row['source'])]})
+ return {'status':'inert_recipe_not_executed_no_device_claim','sourceDestination':str(source),'baselineSourceManifest':str(FULL/'source-manifest.json'),'baselineSourceManifestSha256':sha(FULL/'source-manifest.json'),'baselineSourceFileCount':6973,'overlay':str(HERE/'candidate'),'overlayFileCount':3,'exactPatch':str(HERE/'candidate.patch'),'exactPatchSha256':sha(HERE/'candidate.patch'),'nativeHarnessReceipt':str(HERE/'native-qualification-attempt3/receipt.json'),'nativeHarnessReceiptSha256':sha(HERE/'native-qualification-attempt3/receipt.json'),'fullBaselineReceipt':str(FULL/'final-receipt.json'),'fullBaselineReceiptSha256':sha(FULL/'final-receipt.json'),'nativeBaselineDecision':str(NATIVE/'execution/final-receipt.json'),'nativeBaselineDecisionSha256':sha(NATIVE/'execution/final-receipt.json'),'nativeDependencyFreeze':str(NATIVE/'source-freeze.json'),'nativeDependencyFreezeSha256':sha(NATIVE/'source-freeze.json'),'configure':configure,'build':['/opt/homebrew/bin/ninja','-C',str(build),'-j','2','-v','arm64ecfex'],'freshArm64ecObjects':187,'exportContract':'all30 retained names/ordinals/forwarders exact','importContract':'retained DLL/symbol map plus ONLY ntdll.dll!RtlIsEcCode; unchanged DLL count expected12','moduleSContract':'CheckCall6021 actual ldr w17/b.hs and exact retained6b3bcc86 object digest','targetFrameProbeSource':str(HERE/'frame-offsets-coff.cpp'),'nativeArchiveScope':scopes,'nativeCommands':commands,'freshNativeObjectCount':50,'freshNativeArchiveCount':1,'nativeReusedArchiveCount':6,'retainedFexCoreMembers':retained,'nativeGeneratedHeaders':freeze['generatedHeaders'],'selectedCurrentArchives':decision['archives'],'madeiraCoreStateConsumer':'Native59 actual FEXBridge.d includes CoreState; fresh Xcode FEXBridge plus every additional actual .d consumer required','requiredChecks':['Exclusive new mirror; replay all6973 original sources+3 overlay hashes/fingerprints','Patch forward equal overlay and reverse exactly restores three originals','Use actual targetCOFF frame offsets: native observed sizeof original/candidate3904 but targetEC not yet compiled','Compile real Dispatcher.cpp in full187 graph; actual realARMEmitter probe currently12 native controls','Freshly compile50 native CoreState dependent objects using exact flags/deps; do not reuse original pre-critical objects','Archive59 ordered members=fresh50+exactcurrent9; global symbols and ordered-member hashes required','Six other current archives require exact per-member input/dependency proof before reuse','Native preprocessing private Windows critical queries remain inactive; preserve lexical aliases and SDK link fingerprints','New physical header/generated route shared by Xcode/native/PE; all dependencies rehashed before/final acceptance','No installed/CPU50/full803/eight/gameplay claim; no canonical or signed58/59 modification']}
+if __name__=='__main__':
+ output=HERE/'production-rebuild-recipe.json'
+ if output.exists():raise FileExistsError(output)
+ output.write_text(json.dumps(make(),indent=2)+'\n')
+ print(output)

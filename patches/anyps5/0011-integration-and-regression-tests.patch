@@ -2621,7 +2621,7 @@ index 1a8234e..8b7168b 100644
      }
  }
 diff --git a/core/libs/prx/libSceAgcDriver/tests/WriteTracking.cpp b/core/libs/prx/libSceAgcDriver/tests/WriteTracking.cpp
-index b924f0d..0daa55c 100644
+index b924f0d..c64e235 100644
 --- a/core/libs/prx/libSceAgcDriver/tests/WriteTracking.cpp
 +++ b/core/libs/prx/libSceAgcDriver/tests/WriteTracking.cpp
 @@ -1,5 +1,6 @@
@@ -2655,8 +2655,8 @@ index b924f0d..0daa55c 100644
 +    CloseHandle(section);
 +    {
 +        GuestAllocations::Mutation mutation;
-+        mutation.Add(memory, length, true, true);
-+        mutation.Add(alias, length, true, true);
++        mutation.Add(memory, length, true, true, true);
++        mutation.Add(alias, length, true, true, true);
 +    }
 +    struct Release {
 +        void* memory;
@@ -2748,8 +2748,8 @@ index b924f0d..0daa55c 100644
 +    CloseHandle(section);
 +    {
 +        GuestAllocations::Mutation mutation;
-+        mutation.Add(memory, length, true, true);
-+        mutation.Add(alias, length, true, true);
++        mutation.Add(memory, length, true, true, true);
++        mutation.Add(alias, length, true, true, true);
 +    }
 +    struct Release {
 +        void* memory; void* alias;

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-10-12",
-  "status": "complete_merged_source_integrated_local_host_and_shader_checks_pass_windows_hle_build_in_progress",
+  "status": "complete_merged_source_compiles47HLE_native_host_shader_checks_pass_linked_runtime_exception_failure_under_review",
   "anyps5": {
     "previousBase": "c963432db05f8b35c62e212b3a36494501522fe2",
     "base": "a11c8f7f70a0ed4e71504a89de69e8cdae687817",
@@ -14,7 +14,7 @@
     "patches": [
       {
         "name": "0001-ipad-runtime-compatibility.patch",
-        "sha256": "54556375d528116843dc6a412b41dee27c4dab90cb7e9a9c3c016ca1a889d6d6"
+        "sha256": "873deb0d52374eb066fad6538e8f3766f72353585e5c448d6f2ddcbcd874f79e"
       },
       {
         "name": "0002-bounded-exception-and-context-bridge.patch",
@@ -54,7 +54,7 @@
       },
       {
         "name": "0011-integration-and-regression-tests.patch",
-        "sha256": "af8d2192a29fdab32e262a728d40018415f3c5c46ab500c3ab73c2ee46504555"
+        "sha256": "9fce0b6c2873dec73ac394317ca9e5872d3fcf2e88095e06e6e9aaaf3f33a184"
       }
     ],
     "requestVersion": 17,
@@ -86,18 +86,31 @@
     "nativeShaderReceiptSha256": "d3a4b2778cde34e0a18cbf126a8b94e20ce3cd9619da8fd529db0876023d6c98",
     "graphicsSyntaxPass": true,
     "graphicsSyntaxReceiptSha256": "d8901e34d2651dad13862656b8681b89862fa0484674eb829603aa24ffad1309",
-    "hleHelperAndResultValidatorControlsPassed": 49
+    "hleHelperAndResultValidatorControlsPassed": 54
   },
   "privateEvidenceDigests": {
-    "sourceProvenance": "ca2a5a39ab3257165f1d339c60ad57f0ddd58065570a35f818121cff7cdc0039",
-    "sourceStackVerification": "aaa367031395b1a19cd91abf8dc22d50a20e1208a569cfd6e0159099eee1c99d",
-    "independentRootStackVerification": "36ff0ca6ac2b0405e26bf6b5dda55e982b48f1a5683b874a2a3a2c26fd418a37",
-    "nestedDependencies": "04327a085e12c521f7c8ac3df7c8c55f6da71154825b09dba47cc08767584bd4"
+    "sourceProvenance": "cf48b8f282f5cb10626b9abe579d042e71bdd86e2e98022c0180bd9471129c20",
+    "sourceStackVerification": "a6494b5a6e384891d2b25ccd2529c761ae9ad060107324f622f8c077dc862bac",
+    "nestedDependencies": "04327a085e12c521f7c8ac3df7c8c55f6da71154825b09dba47cc08767584bd4",
+    "historicalV1IndependentRootStackVerification": "36ff0ca6ac2b0405e26bf6b5dda55e982b48f1a5683b874a2a3a2c26fd418a37",
+    "currentRootSourceVerification": "b01227a83cd8a521e4ac43b53511f59219d38e12556034bfe35f8cbf24a8494b"
   },
   "fresh47ModuleRuntimeQualified": false,
   "nativeWindowsGpuQualified": false,
   "ipadCpuContinuationQualified": false,
   "miniGolfPlayable": false,
   "githubActionsUsed": false,
-  "boundary": "Fresh source and local CPU/compiler checks only. Existing installed Native59 and prior game packages retain their earlier provenance. PC/LR=2 continuation fault remains under investigation. No private game inputs or raw diagnostic paths are published."
+  "boundary": "Fresh source and local CPU/compiler checks only. Existing installed Native59 and prior game packages retain their earlier provenance. PC/LR=2 continuation fault remains under investigation. No private game inputs or raw diagnostic paths are published.",
+  "sourceCorrections": [
+    "GPU-capable WriteTracking mappings passed explicitly",
+    "VideoOut 60Hz waits use TimedWait absolute nanosecond domain and unchanged stop predicate",
+    "Filesystem timestamp assertion retains exact expected value and uses renamed fileTimes variable"
+  ],
+  "fresh47ModuleCompileSucceeded": true,
+  "linkedRuntimeObservation": {
+    "rawLogCasesPassed": 12,
+    "windowsExceptionExit": 3,
+    "firstFailure": "std::runtime_error through runtime frames remained unhandled",
+    "newGamePackageQualified": false
+  }
 }

@@ -3,6 +3,8 @@
 #include "prx/libSceAgcDriver/Graphics/include/ShaderInputState.hpp"
 #include "Optimization/ResourceProgram.hpp"
 #include "CompiledVariant.hpp"
+#include "ShaderDiskCache.hpp"
+#include "ShaderCacheVersion.hpp"
 #include "SceShaders.hpp"
 #include <spirv/unified1/spirv.hpp>
 #include <windows.h>
@@ -122,8 +124,8 @@ AgcDriver::QueueState depthOnly(Fixture& front, unsigned addressMode) {
 }
 
 void staged(unsigned addressMode, unsigned wave) {
-    Fixture front; auto null = builtinNull(); ShaderRegistry registry;
-    registry.emplace(front.snapshot->codeAddress, front.snapshot); registry.emplace(null->codeAddress, null);
+    Fixture front; auto null = builtinNull(); std::shared_ptr<ShaderRegistry> registry;
+    PublishRegisteredShader(registry, front.snapshot); PublishRegisteredShader(registry, null);
     const auto queue = depthOnly(front, addressMode);
     require(AgcDriver::Graphics::PixelProgramSkipped(queue), "unwritten/zero PS was not selected as null");
     require(AgcDriver::Graphics::NullPixelProgramRejection(queue).empty(), "depth-only null PS was rejected");
@@ -133,7 +135,7 @@ void staged(unsigned addressMode, unsigned wave) {
     decoded.pixel = AgcDriver::Graphics::DecodePixelStageInfo(queue.context, mappings, true);
     require(decoded.pixel.interpolatorCount == 0u && decoded.pixel.targetOutputMode == std::array<std::uint8_t, 8>{} &&
             decoded.pixel.targetExportMapping == std::array<std::uint8_t, 8>{}, "null pixel inherited old input/export ABI");
-    DecodeGraphicsPrograms(decoded, queue, registry, false, true);
+    DecodeGraphicsPrograms(decoded, queue, *registry, false, true);
     require(decoded.programs.size() == 2u && decoded.programs.back().snapshot == null && decoded.programs.back().userData.empty(),
             "draw decoder inherited old pixel SGPRs or selected another program");
     const auto stages = PrepareGraphicsStages(decoded, target());
@@ -178,8 +180,8 @@ void lateWave32() {
 }
 
 void negative(unsigned mode) {
-    Fixture front; auto null = builtinNull(); ShaderRegistry registry;
-    registry.emplace(front.snapshot->codeAddress, front.snapshot); registry.emplace(null->codeAddress, null);
+    Fixture front; auto null = builtinNull(); std::shared_ptr<ShaderRegistry> registry;
+    PublishRegisteredShader(registry, front.snapshot); PublishRegisteredShader(registry, null);
     auto queue = depthOnly(front, mode); queue.context[0x8eu] = 0xfu;
     // InitialContextRegisters disables CB0 with COLOR_INVALID; a mask alone is
     // not a writable color target. Preserve this legitimate depth-only control.
@@ -192,7 +194,7 @@ void negative(unsigned mode) {
     require(AgcDriver::Graphics::NullPixelProgramRejection(queue).find("writes color") != std::string::npos,
             "actual null PS color-write guard did not reject");
     DrawDecode decoded{}; decoded.state.stages.path = AgcDriver::Graphics::ShaderPath::Vertex;
-    rejected([&] { DecodeGraphicsPrograms(decoded, queue, registry, false, true); }, "writes color");
+    rejected([&] { DecodeGraphicsPrograms(decoded, queue, *registry, false, true); }, "writes color");
     pass("color_write_address_mode_" + std::to_string(mode) + "_rejected_before_materialize");
 }
 
@@ -214,7 +216,13 @@ int main(int argc, char** argv) {
         const auto count = module ? GetModuleFileNameA(module, path, sizeof(path)) : 0u;
         require(count != 0u && count < sizeof(path) && _stricmp(path, argv[1]) == 0,
                 "fixture loaded a different production PRX");
-        std::cout << "ACTUAL_DRIVER_PATH " << path << '\n';
+        require(ShaderDiskCache::FormatVersion == 28u &&
+                ShaderDiskCache::SourceVersion() == ShaderDiskCache::Generated::SourceVersion,
+                "actual null-pixel driver cache/source identity differs");
+        std::cout << "ACTUAL_DRIVER_PATH " << path << '\n'
+                  << "ACTUAL_DRIVER_CACHE_SOURCE_VERSION " << std::hex;
+        std::cout.width(16); std::cout.fill('0'); std::cout << ShaderDiskCache::SourceVersion() << std::dec << '\n'
+                  << "ACTUAL_DRIVER_CACHE_FORMAT " << ShaderDiskCache::FormatVersion << '\n';
         for (unsigned mode = 0; mode < 4; ++mode) for (const auto wave : {32u, 64u}) staged(mode, wave);
         lateWave32(); negative(0); negative(1); nonNullMissingVariant();
         require(passed == 12u, "actual null-pixel fixture coverage is incomplete");

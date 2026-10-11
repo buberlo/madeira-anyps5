@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "status": "experimental_arm64ec_candidate_compiled_and_frame_probes_pass_native_archive_tail_pending",
+  "base": "14c92681f4d62cf84d901460e0358de09c8847a7",
+  "patchSha256": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6",
+  "freshArm64ecObjects": 187,
+  "oldFrameLayout": [
+    3904,
+    0,
+    1520,
+    3840
+  ],
+  "newFrameLayout": [
+    3904,
+    0,
+    1520,
+    3840,
+    3848,
+    3856,
+    3864
+  ],
+  "exports": 30,
+  "importDllCount": 12,
+  "importSymbolsUnchanged": true,
+  "rtlIsEcCodeAlreadyImportedByBaseline": true,
+  "nativeArchivesRebuilt": false,
+  "appConsumerRebuilt": false,
+  "installed": false,
+  "deviceExecuted": false,
+  "faultCauseEstablished": false,
+  "miniGolfPlayable": false,
+  "githubActionsUsed": false,
+  "failedPostconditionRetained": "The original import gate required an additional symbol, but the existing baseline already imported it. Strict exact import equality is required for the resume.",
+  "privateEvidenceDigests": {
+    "failedAttempt2Receipt": "4fbc87f261a46a48d753917b7187cbde2811ccf9b2fc0844ead02592f26689a0",
+    "productionFreeze": "918622beb63efe3b5ccb1ef15fc216e69f6281af52b8cc3e49ce14de92497735"
+  }
+}

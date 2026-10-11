@@ -1,0 +1,34 @@
+"""Seal source/local-harness evidence only; never build production or query a device."""
+from pathlib import Path
+import hashlib,json,os,shlex,stat
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parent.parent
+FULL=ROOT/'build/fex-native-critical-suspend-full-link-20261011'
+NATIVE=ROOT/'build/fex-native-critical-native-archives-proposal-20261011'
+def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def stamp(p):
+ p=Path(p);s=p.lstat();t=p.resolve(strict=True);z=t.stat()
+ return {'lexical':[s.st_dev,s.st_ino,s.st_mode,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns],'resolved':str(t),'target':[z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns],'linkTarget':os.readlink(p) if p.is_symlink() else None}
+def seal():
+ output=HERE/'source-review-freeze.json'
+ if output.exists():raise FileExistsError(output)
+ files={str(p):sha(p) for p in HERE.rglob('*') if p.is_file() and p.name not in ['source-review-freeze.json']}
+ bindings=json.loads((HERE/'baseline-bindings.json').read_text());files.update(bindings['inputHashes'])
+ for name,h in bindings['candidateHashes'].items():
+  if sha(HERE/'candidate'/name)!=h:raise ValueError('Candidate binding drift')
+ foreign=[FULL/'build.py',FULL/'source-manifest.json',FULL/'source-freeze.json',FULL/'final-receipt.json',NATIVE/'build.py',NATIVE/'source-freeze.json',NATIVE/'execution/final-receipt.json',ROOT/'build/minigolf-native-critical-suspend-candidate-20261011/wine/upstreams/madeira/build/ntdll-unix/signal_arm64_ios.c',ROOT/'upstreams/Wine/dlls/ntdll/unwind.h',Path('CALLER_CLANG_NOT_INCLUDED')]
+ # Bind exact actual diagnostic log, not a cause/CPU acceptance claim.
+ foreign.append(ROOT/'LOCAL_DIAGNOSTIC_EVIDENCE_NOT_PUBLISHED')
+ for p in foreign:files[str(p)]=sha(p)
+ for dep in list((HERE/'native-qualification-attempt3').glob('*.d'))+list((HERE/'offset-emitter-qualification').glob('*.d')):
+  body=dep.read_text().replace('\\\n',' ').split(':',1)[1]
+  for name in shlex.split(body):
+   p=Path(name);p=p if p.is_absolute() else ROOT/p
+   files[str(p)]=sha(p)
+ before={n:stamp(n) for n in files}
+ for name,h in files.items():
+  if sha(name)!=h or stamp(name)!=before[name]:raise ValueError('Source/final evidence drift '+name)
+ qpath=HERE/'native-qualification-attempt3/receipt.json';q=json.loads(qpath.read_text())
+ if q['status']!='native_candidate_non_ios_pass_original_and_four_mutants_rejected' or len(q['commands'])!=22 or not all(c['childReaped'] for c in q['commands']):raise ValueError('Actual native harness')
+ record={'status':'source_and_isolated_native_controls_qualified_production_target_pending_not_runtime_accepted','inputHashes':files,'inputFingerprints':before,'candidateFiles':{str(HERE/'candidate'/r):h for r,h in bindings['candidateHashes'].items()},'candidateChangedSourceCount':3,'nativeQualificationPath':str(qpath),'nativeQualificationSha256':sha(qpath),'nativeCandidateControls':42,'nonIOSControls':16,'originalAndEffectiveMutantsRejected':5,'nativeJoinedCommandCount':22,'realNativeEmitterControls':12,'offsetEmitterReceiptSha256':sha(HERE/'offset-emitter-qualification/receipt.json'),'nativeFrameSizeOriginal':3904,'nativeFrameSizeCandidate':3904,'targetECFrameOffsetsCompiled':False,'productionBuilt':False,'deviceExecuted':False,'runtimeAccepted':False,'cpu50Accepted':False,'canonicalChanged':False,'recipePath':str(HERE/'production-rebuild-recipe.json'),'recipeSha256':sha(HERE/'production-rebuild-recipe.json'),'buildRunnerPath':str(HERE/'build_production.py')}
+ output.write_text(json.dumps(record,indent=2)+'\n');print(json.dumps({'review':str(output),'sha256':sha(output),'inputs':len(files)}))
+if __name__=='__main__':seal()

@@ -1205,7 +1205,7 @@ index 067e019..5cefeba 100644
      LibcAwaitExit_nid_postfix();
  }
 diff --git a/core/libs/prx/libSceVideoOut/src/VideoOutDriver.cpp b/core/libs/prx/libSceVideoOut/src/VideoOutDriver.cpp
-index 5e7b5c1..acc3c1b 100644
+index 5e7b5c1..3d0d74e 100644
 --- a/core/libs/prx/libSceVideoOut/src/VideoOutDriver.cpp
 +++ b/core/libs/prx/libSceVideoOut/src/VideoOutDriver.cpp
 @@ -2,6 +2,8 @@
@@ -1373,13 +1373,13 @@ index 5e7b5c1..acc3c1b 100644
 +        std::fprintf(stderr, "[videoout] APS5_VBLANK_HZ=60; emulated vblank period is 1/60 s\n");
 +        std::fflush(stderr);
 +        using Frame = std::chrono::duration<int64_t, std::ratio<1, 60>>;
-+        const auto start = std::chrono::steady_clock::now();
++        const auto start = TimedWait::NowNanos();
 +        try {
 +            for (int64_t frame = 1; !token.stop_requested(); ++frame) {
-+                const auto next = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(Frame(frame));
++                const auto next = start + static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(Frame(frame)).count());
 +                {
 +                    std::unique_lock lock(flipQueue->mutex);
-+                    flipQueue->changed.wait_until(lock, next, [&] { return token.stop_requested() || flipQueue->failure; });
++                    flipQueue->changed.WaitUntil(lock, next, [&] { return token.stop_requested() || flipQueue->failure; });
 +                    if (token.stop_requested() || flipQueue->failure) return;
 +                }
 +                vblankEnd();
@@ -2956,7 +2956,7 @@ index 0000000..d77edc8
 +    std::puts("PASS offline service failures, immutable error outputs, context lifetime, accessibility and progress dialog lifecycle");
 +}
 diff --git a/core/libs/tests/GuestFilesystem.cpp b/core/libs/tests/GuestFilesystem.cpp
-index b741a61..5c91e4f 100644
+index b741a61..3f5e013 100644
 --- a/core/libs/tests/GuestFilesystem.cpp
 +++ b/core/libs/tests/GuestFilesystem.cpp
 @@ -9,13 +9,19 @@
@@ -3015,7 +3015,7 @@ index b741a61..5c91e4f 100644
      const KernelTimeval past[2]{{1000000000, 0}, {1000000000, 500000}};
      Require(sceKernelFutimes(descriptor, past) == 0);
 -    Require(stat_nid_postfix(sized.string().c_str(), &times) == 0 && times.st_mtim.tv_sec == 1000000000);
-+    Require(stat_nid_postfix(sized.string().c_str(), &fileTimes) == 0 && times.st_mtim.tv_sec == 1000000000);
++    Require(stat_nid_postfix(sized.string().c_str(), &fileTimes) == 0 && fileTimes.st_mtim.tv_sec == 1000000000);
 +    Require(futimes_nid_postfix(descriptor, past) == 0);
 +    Require(stat_nid_postfix(sized.string().c_str(), &fileTimes) == 0 && fileTimes.st_mtim.tv_sec == 1000000000);
      Require(futimes_nid_postfix(descriptor, nullptr) == 0);

@@ -1,0 +1,137 @@
+--- a/Source/Windows/ARM64EC/Module.cpp
++++ b/Source/Windows/ARM64EC/Module.cpp
+@@ -941,6 +941,27 @@
+   return ECContext;
+ }
+ 
++#ifdef FEX_IOS_HOST
++// Preserve the incoming EC link only in the native EnterEC snapshot. Generic
++// JIT/MM snapshots and FillSRA entries have no authoritative live native LR.
++static bool PreserveEnterECNativeLink(FEXCore::Core::InternalThreadState* Thread, const EXCEPTION_RECORD& Rec,
++                                      const ARM64_NT_CONTEXT& Context, ARM64_NT_CONTEXT& GuestContext) {
++  const auto& Frame = *Thread->CurrentFrame;
++  if (Rec.ExceptionCode != 0xe0425355u || Context.Pc != Frame.Pointers.DispatcherLoopTop ||
++      Frame.IosEnterECSuspendTarget == 0 || Frame.IosEnterECSuspendTarget != Frame.State.rip ||
++      Frame.IosEnterECSuspendSP != Context.X23 || Frame.IosEnterECSuspendLR != Context.Lr ||
++      GuestContext.Pc != Frame.State.rip || GuestContext.Sp != Frame.IosEnterECSuspendSP) {
++    return false;
++  }
++  // Pool aliases are checked by their exact PE identity, never by address band.
++  if (!RtlIsEcCode(static_cast<ULONG_PTR>(IosJitReverseTranslate(GuestContext.Pc)))) {
++    return false;
++  }
++  GuestContext.Lr = Frame.IosEnterECSuspendLR;
++  return true;
++}
++#endif
++
+ static void RethrowGuestException(const EXCEPTION_RECORD& Rec, ARM64_NT_CONTEXT& Context) {
+   auto* Thread = GetCPUArea().ThreadState();
+   auto& Fault = Thread->CurrentFrame->SynchronousFaultData;
+@@ -961,6 +982,9 @@
+   }
+ #endif
+   ARM64_NT_CONTEXT GuestContext = StoreStateToPackedECContext(Thread, Context.Fpcr, Context.Fpsr);
++#ifdef FEX_IOS_HOST
++  PreserveEnterECNativeLink(Thread, Rec, Context, GuestContext);
++#endif
+   LogMan::Msg::DFmt("pc: {:X} rip: {:X}", Context.Pc, GuestContext.Pc);
+ 
+   // ml341: same gap as #52 but on the exception path — the reconstructed rip can be a
+--- a/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp
++++ b/FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp
+@@ -141,6 +141,10 @@
+   AbsoluteLoopTopAddressFillSRA = GetCursorAddress<uint64_t>();
+ 
+   FillStaticRegs();
++#if defined(ARCHITECTURE_arm64ec) && defined(FEX_IOS_HOST)
++  // FillStaticRegs first repairs STATE, including direct FillSRA entry.
++  str(ARMEmitter::XReg::zr, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++#endif
+   ldr(RipReg, STATE_PTR(CpuStateFrame, State.rip));
+   (void)cbnz(ARMEmitter::Size::i32Bit, ENTRY_FILL_SRA_SINGLE_INST_REG, &CompileSingleStep);
+ 
+@@ -151,6 +155,9 @@
+ 
+   AbsoluteLoopTopAddressEnterECFillSRA = GetCursorAddress<uint64_t>();
+   ldr(STATE, EC_ENTRY_CPUAREA_REG, CPU_AREA_EMULATOR_DATA_OFFSET);
++#ifdef FEX_IOS_HOST
++  str(ARMEmitter::XReg::zr, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++#endif
+   FillStaticRegs();
+ 
+   ldr(RipReg, STATE_PTR(CpuStateFrame, State.rip));
+@@ -163,6 +170,12 @@
+   AbsoluteLoopTopAddressEnterEC = GetCursorAddress<uint64_t>();
+   // Load ThreadState and write the target PC there
+   ldr(STATE, EC_ENTRY_CPUAREA_REG, CPU_AREA_EMULATOR_DATA_OFFSET);
++#ifdef FEX_IOS_HOST
++  // Invalidate before changing a record: a signal in this prologue must never
++  // adopt an older native return. LR is still the incoming EC link register.
++  str(ARMEmitter::XReg::zr, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++  str(ARMEmitter::XReg::x30, STATE_PTR(CpuStateFrame, IosEnterECSuspendLR));
++#endif
+   str(EC_CALL_CHECKER_PC_REG, STATE_PTR(CpuStateFrame, State.rip));
+ #ifdef FEX_IOS_HOST
+   /* iOS-Madeira ml299 (task #52): witness the value this path writes into State.rip.
+@@ -176,6 +189,11 @@
+   // Swap stacks to the emulator stack
+   ldr(TMP1, EC_ENTRY_CPUAREA_REG, CPU_AREA_EMULATOR_STACK_BASE_OFFSET);
+   add(ARMEmitter::Size::i64Bit, StaticRegisters[X86State::REG_RSP], ARMEmitter::Reg::rsp, 0);
++#ifdef FEX_IOS_HOST
++  str(StaticRegisters[X86State::REG_RSP].X(), STATE_PTR(CpuStateFrame, IosEnterECSuspendSP));
++  // Publish only after both native control values are complete.
++  str(EC_CALL_CHECKER_PC_REG, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++#endif
+   add(ARMEmitter::Size::i64Bit, ARMEmitter::Reg::rsp, TMP1, 0);
+ 
+   ldr(REG_CALLRET_SP, STATE_PTR(CpuStateFrame, State.callret_sp));
+@@ -220,6 +238,11 @@
+ 
+   // Load in our RIP
+   ldr(RipReg, STATE_PTR(CpuStateFrame, State.rip));
++#if defined(ARCHITECTURE_arm64ec) && defined(FEX_IOS_HOST)
++  // Only a signal at the first LoopTop instruction can consume the record.
++  // Clear before bitmap tests, compilation, callbacks, or any later iteration.
++  str(ARMEmitter::XReg::zr, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++#endif
+ 
+ #ifdef ARCHITECTURE_arm64ec
+   // Clobbers TMP1/2
+@@ -354,6 +377,9 @@
+     SpillStaticRegs(TMP1);
+ 
+     ThreadStopHandlerAddress = GetCursorAddress<uint64_t>();
++#if defined(ARCHITECTURE_arm64ec) && defined(FEX_IOS_HOST)
++    str(ARMEmitter::XReg::zr, STATE_PTR(CpuStateFrame, IosEnterECSuspendTarget));
++#endif
+ 
+     PopCalleeSavedRegisters();
+ 
+--- a/FEXCore/include/FEXCore/Core/CoreState.h
++++ b/FEXCore/include/FEXCore/Core/CoreState.h
+@@ -485,12 +485,24 @@
+    * offline. That makes the real bug "the dispatcher is being entered at the wrong address", of
+    * which the State.rip corruption is only the visible consequence. */
+   uint64_t IosLastCallbackLR {};
++#ifdef FEX_IOS_HOST
++  // Published only by EnterEC. The active target is written last and cleared
++  // by every fill entry and immediately after the exact LoopTop capture point.
++  // These are native control values, never x87/MM state.
++  uint64_t IosEnterECSuspendTarget {};
++  uint64_t IosEnterECSuspendSP {};
++  uint64_t IosEnterECSuspendLR {};
++#endif
+ };
+ static_assert(offsetof(CpuStateFrame, State) == 0, "CPUState must be first member in CpuStateFrame");
+ static_assert(offsetof(CpuStateFrame, Pointers) % 8 == 0, "JITPointers need to be aligned to 8 bytes");
+ static_assert(offsetof(CpuStateFrame, Pointers) + sizeof(CpuStateFrame::Pointers) <= 32760, "JITPointers maximum pointer needs to be less "
+                                                                                             "than architecture maximum 32768");
+ 
++#ifdef FEX_IOS_HOST
++static_assert(offsetof(CpuStateFrame, IosEnterECSuspendLR) <= 32760, "EnterEC control record must fit an immediate 64-bit store");
++#endif
++
+ static_assert(std::is_standard_layout<CpuStateFrame>::value, "This needs to be standard layout");
+ static_assert(sizeof(CpuStateFrame::SynchronousFaultData) == 8, "This needs to be 8 bytes");
+ static_assert(alignof(CpuStateFrame::SynchronousFaultDataStruct) == 8, "This needs to be 8 bytes");

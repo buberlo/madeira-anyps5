@@ -1,0 +1,44 @@
+from pathlib import Path
+import hashlib
+import json
+import unittest
+
+HERE = Path(__file__).resolve().parent
+OLD = HERE.parent / 'native-ec-loop-top-continuation-proposal-20261012'
+
+class Metadata(unittest.TestCase):
+    def test_real_version_size_and_exact_hash_identity(self):
+        recipe = json.loads((HERE / 'production-rebuild-recipe.json').read_text())
+        version = next(a.split('=', 1)[1] for a in recipe['configure'] if a.startswith('-DOVERRIDE_VERSION='))
+        patch = hashlib.sha256((HERE / 'candidate.patch').read_bytes()).hexdigest()
+        self.assertEqual(version, 'EC-link-' + patch[:12])
+        self.assertLess(len(version.encode()) + 1, 32)
+        self.assertEqual(recipe['exactPatchSha256'], patch)
+        self.assertEqual(next(a.split('=', 1)[1] for a in recipe['configure'] if a.startswith('-DOVERRIDE_HASH=')), patch[:40])
+        self.assertEqual(len('FEX-native-ec-link-' + patch[:12]) + 1, 32)
+
+    def test_only_runner_metadata_changed_and_prepare_identical(self):
+        old = (OLD / 'build_production.py').read_text()
+        self.assertEqual((HERE / 'build_production.py').read_text(), old.replace("sourceVersion='FEX-native-ec-link-'", "sourceVersion='EC-link-'"))
+        self.assertEqual((HERE / 'prepare_production.py').read_bytes(), (OLD / 'prepare_production.py').read_bytes())
+        for name in ['candidate.patch', 'baseline-bindings.json', 'frame-offsets-coff.cpp']:
+            self.assertEqual((HERE / name).read_bytes(), (OLD / name).read_bytes())
+        for p in (OLD / 'candidate').rglob('*'):
+            if p.is_file(): self.assertEqual((HERE / 'candidate' / p.relative_to(OLD / 'candidate')).read_bytes(), p.read_bytes())
+
+    def test_recipe_only_version_and_attempt_paths_changed(self):
+        old = json.loads((OLD / 'production-rebuild-recipe.json').read_text())
+        new = json.loads((HERE / 'production-rebuild-recipe.json').read_text())
+        out = str(Path(old['sourceDestination']).parent)
+        def change(x):
+            if isinstance(x, str):
+                return x.replace(out, out + '-attempt2').replace(str(OLD / 'candidate'), str(HERE / 'candidate')).replace(str(OLD / 'candidate.patch'), str(HERE / 'candidate.patch')).replace(str(OLD / 'frame-offsets-coff.cpp'), str(HERE / 'frame-offsets-coff.cpp')).replace('-DOVERRIDE_VERSION=FEX-native-ec-link-', '-DOVERRIDE_VERSION=EC-link-')
+            if isinstance(x, list): return [change(v) for v in x]
+            if isinstance(x, dict): return {k: change(v) for k, v in x.items()}
+            return x
+        new.pop('metadataRevision')
+        self.assertEqual(new, change(old))
+        self.assertTrue(new['sourceDestination'].endswith('-attempt2/source'))
+        self.assertEqual((new['freshArm64ecObjects'], new['freshNativeObjectCount'], len(new['retainedFexCoreMembers'])), (187, 50, 9))
+
+if __name__ == '__main__': unittest.main()

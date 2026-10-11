@@ -5,8 +5,9 @@
 The current pin is `a11c8f7f`, adding all 1,721 commits after `c963432d`,
 including the merged Apple GPU changes #1776/#1831/#2015. Eleven reconciled
 patches match 2,130 source files and reverse exactly. All 95 native host/relinker
-tests and six freshly built shader suites pass. The fresh complete Windows HLE
-build is a separate ongoing qualification; earlier runtime results below retain
+tests and six freshly built shader suites pass. All 47 Windows HLE libraries compile; the raw-log fixture passes twelve cases.
+The new `call_once` exception-through-runtime-frames fixture remains unhandled,
+so full linked-runtime qualification is incomplete. Earlier results below retain
 their original source scope. Native59's actual synthetic device diagnostic finds
 an unhandled PC/LR=2 continuation fault before MiniGolf starts.
 [Current source, checks and device boundary](UPSTREAM-REFRESH-20261012.md).

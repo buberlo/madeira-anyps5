@@ -54,6 +54,14 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def resolve_wine_executable(value):
+    # Resolve relative paths and PATH entries before tests change their cwd.
+    executable = shutil.which(value)
+    if executable is None:
+        raise ValueError('Wine executable not found or not executable: ' + value)
+    return str(Path(executable).resolve())
+
+
 def source_commit(source):
     # An exported candidate inside the wrapper repository otherwise inherits
     # the wrapper's Git HEAD/diff and is mislabeled as an AnyPS5 checkout.
@@ -285,6 +293,8 @@ def main():
     additional_tests = choose_additional_tests(source, args.additional_test)
     if os.name != 'nt' and not args.wine:
         parser.error('Set APS5_WINE or --wine to the local Wine executable')
+    if os.name != 'nt':
+        args.wine = resolve_wine_executable(args.wine)
     args.build.mkdir(parents=True, exist_ok=True)
     prepare_codemodel(args.build)
     args.output.parent.mkdir(parents=True, exist_ok=True)

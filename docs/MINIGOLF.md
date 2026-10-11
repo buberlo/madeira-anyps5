@@ -10,8 +10,10 @@ stroke are not established.
 The current source is complete merged AnyPS5 main at `a11c8f7f`, including
 all 1,721 commits after `c963432d` and the merged Apple #1776/#1831/#2015
 implementations. The eleven reconciled patches apply and reverse exactly;
-95 host/relinker tests and six native shader suites pass. Fresh Windows HLE
-libraries and tools are building from this source; the existing prepared
+95 host/relinker tests and six native shader suites pass. All 47 Windows HLE libraries and their selected test targets compile.
+The twelve raw-log cases pass; linked-runtime qualification then stops at
+`windows_exception_tests` when `call_once` throws through runtime DLL frames.
+The existing prepared
 game package is not relabelled as a build of this update.
 [Refresh details](UPSTREAM-REFRESH-20261012.md).
 

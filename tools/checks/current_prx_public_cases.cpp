@@ -1,0 +1,759 @@
+#include "PublicOptionalInterpolationGroupCases.hpp"
+#include "InstrumentationProofCases.hpp"
+#include "SccSkipProofCases.hpp"
+#include "MandatoryDagProofCases.hpp"
+#include "ControlFlow/GraphBuilder.hpp"
+#include "RdnaDecoder/RdnaInstructionDecoder.hpp"
+#include "Translation/ShaderInputInfoBuilder.hpp"
+#include "Translation/FixedFunctionInterpolation.hpp"
+#include "Translation/UnusedBarycentricProof.hpp"
+#include "Optimization/ResourceProgram.hpp"
+#include "Optimization/RequestMemoryView.hpp"
+#include "spirv/unified1/spirv.hpp"
+#include <iostream>
+#include <functional>
+#include <cstdint>
+#include <set>
+#include <functional>
+#include <string>
+#include <stdexcept>
+#include <vector>
+#include "RdnaDecoder/RdnaProgram.hpp"
+#include "ControlFlow/ControlFlowGraph.hpp"
+namespace PublicQuadCases {
+using namespace ShaderRecompiler;
+using Code=std::vector<std::uint32_t>;
+using Change=std::function<void(RdnaProgram&,ControlFlowGraph&)>;
+struct Case {std::string name;Code code;bool expected;Change change{};bool concrete=true;std::set<unsigned> rawRegisters{0,1};};
+inline std::uint32_t mov(unsigned d,unsigned a){return 0x7e000200u|(d<<17u)|a;}
+inline std::uint32_t mov64(unsigned d,unsigned a){return 0xbe800400u|(d<<16u)|a;}
+inline std::uint32_t save(unsigned d,unsigned a){return 0xbe802400u|(d<<16u)|a;}
+inline void out(Code& c,unsigned a=0,unsigned b=1){c.insert(c.end(),{0xf8001c0fu,a|(b<<8u),0xbf810000u});}
+inline void mad(Code& c,unsigned d,unsigned a,unsigned b,unsigned e){c.insert(c.end(),{0xd5410000u|d,a|(b<<9u)|(e<<18u)});}
+inline void sample(Code& c,unsigned d,unsigned xy,unsigned mask=15){c.insert(c.end(),{0xf0800008u|(mask<<8u),xy|(d<<8u)|(2u<<21u)});}
+inline void sample3d(Code& c,unsigned d,unsigned xyz,unsigned mask=15){c.insert(c.end(),{0xf0800010u|(mask<<8u),xyz|(d<<8u)|(2u<<21u)});}
+inline void load8(Code& c,unsigned dst=24,unsigned desc=12){c.insert(c.end(),{0xf42c0000u|(dst<<6u)|(desc>>1u),0xfa000000u});}
+inline void pack(Code& c,unsigned d,unsigned a,unsigned b){c.push_back(0x5e000000u|(d<<17u)|(b<<9u)|(256u+a));}
+// Public synthetic code assembled from the documented instruction encodings.
+// Constants, descriptor bank, destinations and schedules are independent of
+// game bytes. The private complete-request replay is separate evidence.
+inline Code textured(){
+ Code c;load8(c);c.push_back(mov64(106,126));c.push_back(0xbefe0a7eu);
+ mad(c,6,24,258,28);mad(c,7,259,25,29);sample(c,0,6);
+ c.push_back(0xbf8c007fu);pack(c,0,0,1);pack(c,1,2,3);c.push_back(mov64(126,106));out(c);return c;
+}
+inline Code textured3d(){
+ Code c;load8(c);c.push_back(mov64(106,126));c.push_back(0xbefe0a7eu);
+ mad(c,6,24,258,28);mad(c,7,259,25,29);mad(c,8,258,26,30);sample3d(c,0,6);
+ c.push_back(0xbf8c007fu);pack(c,0,0,1);pack(c,1,2,3);c.push_back(mov64(126,106));out(c);return c;
+}
+inline std::vector<Case> cases(){
+ std::vector<Case> all;
+ auto add=[&](std::string n,Code c,bool expected,Change change={},bool concrete=true,std::set<unsigned> raw={0,1}){all.push_back({std::move(n),std::move(c),expected,std::move(change),concrete,std::move(raw)});};
+ add("quad_sample_x8_mad_full_returns_then_entry_export",textured(),true);
+ Code simple{mov64(8,126),0xbefe0a7eu,mov(0,242),mov(1,240),mov64(126,8)};out(simple);
+ add("quad_full_writes_cover_entry_after_restore",simple,true);
+ Code entryThenQuad{mov64(8,126),mov(0,242),mov(1,240),0xbefe0a7eu,mov(7,256),mov64(126,8)};out(entryThenQuad,7,7);
+ add("entry_only_write_does_not_initialize_quad_helpers",entryThenQuad,false);
+ Code quadRead{mov64(8,126),0xbefe0a7eu,mov(7,256),mov64(126,8)};out(quadRead,7,7);
+ add("quad_read_before_write_rejected",quadRead,false);
+ Code onlyFirst{mov64(8,126),0xbefe0a7eu,mov(0,242),mov(7,257),mov64(126,8)};out(onlyFirst,7,7);
+ add("quad_partial_raw_pair_definition_rejected",onlyFirst,false);
+ Code narrowed{mov64(8,126),save(10,106),0xbefe0a7eu,mov(0,242),mov(1,240),mov64(126,8)};out(narrowed);
+ add("narrowed_quad_writes_do_not_cover_entry_restore",narrowed,false);
+ Code sameNarrow=narrowed;sameNarrow.erase(sameNarrow.begin()+5);add("narrowed_quad_same_epoch_writes_are_usable",sameNarrow,true);
+ Code entryCoords{mov(0,242),mov(1,240)};sample(entryCoords,4,0);out(entryCoords,4,5);
+ add("implicit_sample_entry_clean_does_not_cover_helper_coordinates",entryCoords,false);
+ Code quadCoords{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240)};sample(quadCoords,4,0);quadCoords.push_back(mov64(126,106));out(quadCoords,4,5);
+ add("implicit_sample_quad_scoped_coordinates_accepted",quadCoords,true);
+ Code restoredCoords{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240),mov64(126,106)};sample(restoredCoords,4,0);out(restoredCoords,4,5);
+ add("implicit_sample_mask_change_discards_helper_coordinate_proof",restoredCoords,false);
+ Code rawCoords{0xbefe0a7eu};sample(rawCoords,4,0);out(rawCoords,4,5);
+ add("implicit_sample_raw_quad_coordinates_rejected",rawCoords,false);
+ Code partial=textured();for(auto& word:partial)if((word&0xfffff000u)==0xf0800000u){word=(word&~0xf00u)|0x100u;break;}
+ add("sample_one_return_word_does_not_define_raw_j",partial,false);
+ Code repeated{mov64(8,126),0xbefe0a7eu,mov(0,242),mov(1,240),0xbefe0a7eu,mov(7,256),mov64(126,8)};out(repeated,7,7);
+ add("second_quad_expansion_resets_scoped_definitions",repeated,false);
+ Code unknown{mov64(8,126),mov64(126,106),0xbefe0a7eu,mov(0,242),mov(1,240),mov64(126,8)};out(unknown);
+ add("unknown_exec_not_repaired_by_later_quad_expansion",unknown,false);
+ Code zero{mov64(8,126),mov64(126,128),0xbefe0a7eu,mov(0,242),mov(1,240),mov64(126,8)};out(zero);
+ add("empty_quad_write_does_not_cover_restored_entry",zero,false);
+ Code inPlace{mov64(8,126),0xbefe0a7eu};mad(inPlace,0,256,242,240);inPlace.push_back(mov(1,242));inPlace.push_back(mov64(126,8));out(inPlace);
+ add("mad_in_place_reads_raw_before_full_write",inPlace,false);
+ Code third{mov64(8,126),0xbefe0a7eu};mad(third,0,242,240,257);third.push_back(mov(1,242));third.push_back(mov64(126,8));out(third);
+ add("mad_third_raw_source_read_before_write_rejected",third,false);
+ Code definedMad{mov64(8,126),0xbefe0a7eu,mov(0,242),mov(1,240)};mad(definedMad,0,256,242,240);definedMad.push_back(mov64(126,8));out(definedMad);
+ add("mad_reads_previously_quad_defined_raw_source",definedMad,true);
+ for(unsigned slot=0;slot<8;++slot)for(bool high:{false,true}){
+  const unsigned saved=24+slot-(high?1u:0u);Code c{mov64(saved,126)};load8(c);c.insert(c.end(),{mov(0,242),mov(1,240),mov64(126,saved)});out(c);
+  add("x8_invalidates_saved_exec_"+std::string(high?"high":"low")+"_slot_"+std::to_string(slot),c,false,{},false);
+ }
+ Code multiple{0xbf820000u,0xbefe0a7eu,mov(0,242),mov(1,240)};out(multiple);
+ add("wqm_multiple_guest_blocks_remain_outside_proof",multiple,false,{},false);
+ Code divergent{0xbf0a8200u,0xbf850004u,0xbefe0a7eu,mov(0,242),mov(1,240),0xbf820003u,0xbefe0a7eu,mov(0,242),mov(1,240)};out(divergent);
+ add("wqm_divergent_branch_reconvergence_rejected",divergent,false,{},false);
+ const auto base=textured();
+ auto at=[](RdnaProgram& d,RdnaOpcode op)->RdnaInstruction&{for(auto& i:d.instructions)if(i.op==op)return i;throw std::runtime_error("missing public fixture opcode");};
+ add("x8_forged_four_word_metadata_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx8).dataDwordCount=4;},false);
+ add("x8_forged_descriptor_encoding_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx8).source0.reg+=4;},false);
+ add("x8_forged_destination_encoding_rejected",base,false,[at](auto& d,auto&){++at(d,RdnaOpcode::SBufferLoadDwordx8).destination.reg;},false);
+ add("x8_destination_aliases_vcc_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx8).destination.kind=RdnaOperandKind::VccLo;},false);
+ add("mad_fma_opcode_remains_unmodeled",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadF32).op=RdnaOpcode::VFmaF32;},false);
+ add("mad_source_negation_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadF32).source2.negate=true;},false);
+ add("mad_raw_omod_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadF32).rawWords[1]|=1u<<27u;},false);
+ add("mad_partial_destination_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadF32).destination.explicitSdwaDst=true;},false);
+ add("sample_d16_partial_return_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageD16=true;},false);
+ add("sample_a16_address_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageA16=true;},false);
+ add("sample_tfe_extra_status_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).rawWords[0]|=0x10000u;},false);
+ add("sample_raw_d16_metadata_mismatch_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).rawWords[1]|=0x80000000u;},false);
+ add("sample_raw_r128_metadata_mismatch_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).rawWords[0]|=0x8000u;},false);
+ add("sample_nsa_address_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageNsaDwordCount=1;},false);
+ add("sample_explicit_derivative_flags_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageSampleFlags=RdnaImageSampleFlagDerivative;},false);
+ add("sample_forged_coordinate_encoding_rejected",base,false,[at](auto& d,auto&){++at(d,RdnaOpcode::ImageSample).source0.reg;},false);
+ add("sample_forged_destination_encoding_rejected",base,false,[at](auto& d,auto&){++at(d,RdnaOpcode::ImageSample).destination.reg;},false);
+ add("sample_forged_dmask_encoding_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageDmask=3;at(d,RdnaOpcode::ImageSample).dataDwordCount=at(d,RdnaOpcode::ImageSample).dataComponents=2;},false);
+ add("sample_unknown_dimension_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageDimension=RdnaImageDimension::Unknown;},false);
+ add("wqm_non_exec_destination_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SWqmB64).destination.kind=RdnaOperandKind::ScalarRegister;at(d,RdnaOpcode::SWqmB64).destination.reg=4;},false);
+ add("wqm_non_exec_source_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SWqmB64).source0.kind=RdnaOperandKind::VccLo;},false);
+ add("wqm_forged_raw_encoding_rejected",base,false,[at](auto& d,auto&){at(d,RdnaOpcode::SWqmB64).rawWords[0]^=1u;},false);
+ // Plain 3D sampling has three full coordinate reads, including helper lanes.
+ // These public encodings/descriptors are synthetic; no private game words.
+ const auto volume=textured3d();
+ add("volume_sample_x8_three_mad_coordinates_staged",volume,true);
+ Code volumeQuad{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240),mov(2,242)};sample3d(volumeQuad,4,0);volumeQuad.push_back(mov64(126,106));out(volumeQuad,4,5);
+ add("volume_sample_quad_scoped_three_coordinates_staged",volumeQuad,true);
+ Code thirdRaw{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240)};sample3d(thirdRaw,4,0);thirdRaw.push_back(mov64(126,106));out(thirdRaw,4,5);
+ add("volume_third_raw_coordinate_read_rejected",thirdRaw,false,{},true,{2});
+ Code thirdEntry{mov64(106,126),mov(2,242),0xbefe0a7eu,mov(0,242),mov(1,240)};sample3d(thirdEntry,4,0);thirdEntry.push_back(mov64(126,106));out(thirdEntry,4,5);
+ add("volume_third_entry_only_coordinate_does_not_cover_helpers",thirdEntry,false,{},true,{2});
+ add("volume_third_same_quad_epoch_definition_accepted",volumeQuad,true,{},true,{2});
+ Code thirdRestored{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240),mov(2,242),mov64(126,106)};sample3d(thirdRestored,4,0);out(thirdRestored,4,5);
+ add("volume_third_mask_change_discards_helper_epoch",thirdRestored,false,{},true,{2});
+ Code thirdRepeated{mov64(106,126),0xbefe0a7eu,mov(0,242),mov(1,240),mov(2,242),0xbefe0a7eu};sample3d(thirdRepeated,4,0);thirdRepeated.push_back(mov64(126,106));out(thirdRepeated,4,5);
+ add("volume_third_second_wqm_discards_helper_epoch",thirdRepeated,false,{},true,{2});
+ Code thirdNarrow{mov64(106,126),save(10,128),0xbefe0a7eu,mov(0,242),mov(1,240),mov(2,242)};sample3d(thirdNarrow,4,0);thirdNarrow.push_back(mov64(126,106));out(thirdNarrow,2,2);
+ add("volume_narrowed_quad_cannot_cover_restored_entry",thirdNarrow,false,{},true,{2});
+ Code thirdInPlace=thirdRaw;for(unsigned n=0;n+1<thirdInPlace.size();++n)if((thirdInPlace[n]&0xfffff000u)==0xf0800000u){thirdInPlace[n+1]=(thirdInPlace[n+1]&~0xff00u)|(2u<<8u);break;}
+ add("volume_in_place_third_output_reads_raw_before_write",thirdInPlace,false,{},true,{2});
+ add("volume_forged_two_coordinate_metadata_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageAddressComponents=2;},false);
+ add("volume_forged_decoded_2d_dimension_rejected",volume,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageSample);i.imageDimension=RdnaImageDimension::Dim2D;i.imageAddressComponents=2;},false);
+ add("volume_forged_raw_2d_dimension_rejected",volume,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageSample);i.rawWords[0]=(i.rawWords[0]&~0x38u)|8u;},false);
+ add("volume_array_dimension_remains_unmodeled",volume,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageSample);i.imageDimension=RdnaImageDimension::Dim2DArray;i.rawWords[0]=(i.rawWords[0]&~0x38u)|24u;},false);
+ add("volume_third_address_word_overflows_vgpr_bank",volume,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageSample);i.source0.reg=254;i.rawWords[1]=(i.rawWords[1]&~255u)|254u;},false);
+ add("volume_d16_partial_return_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageD16=true;},false);
+ add("volume_a16_coordinates_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageA16=true;},false);
+ add("volume_nsa_coordinates_remain_unmodeled",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).imageNsaDwordCount=1;},false);
+ add("volume_coordinate_modifiers_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).source0.negate=true;},false);
+ add("volume_sampler_descriptor_vcc_alias_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).source2.kind=RdnaOperandKind::VccLo;},false);
+ add("volume_forged_descriptor_encoding_rejected",volume,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageSample).source1.reg=4;},false);
+ Code volumeOne=volume;for(auto& word:volumeOne)if((word&0xfffff000u)==0xf0800000u){word=(word&~0xf00u)|0x100u;break;}
+ add("volume_one_return_word_does_not_define_raw_j",volumeOne,false);
+ Code volumeUnknown=volume;volumeUnknown.insert(volumeUnknown.begin()+3,mov64(126,0));
+ add("volume_unknown_exec_not_repaired_by_wqm",volumeUnknown,false,{},false);
+ Code volumeSplit=volume;volumeSplit.insert(volumeSplit.begin(),0xbf820000u);
+ add("volume_wqm_multiple_cfg_blocks_rejected",volumeSplit,false,{},false);
+ // Four narrow lane-local color-processing effects, using public encodings
+ // and independent constants/register choices. No game request code copied.
+ const auto unary=[](unsigned op,unsigned d,unsigned a){return 0x7e000000u|(d<<17u)|(op<<9u)|(256u+a);};
+ const auto compare=[](Code& c,unsigned a){c.insert(c.end(),{0x7c000000u|(0x0cu<<17u)|(106u<<9u)|249u,0x86060000u|a});};
+ const auto madak=[](Code& c,unsigned d,unsigned a,unsigned b){c.insert(c.end(),{(0x21u<<25u)|(d<<17u)|(b<<9u)|(256u+a),0x3e800000u});};
+ Code laneUnary{mov(0,242),mov(1,240),unary(0x27u,0,0),unary(0x25u,1,1)};out(laneUnary);
+ add("lane_math_log_exp_defined_in_place_staged",laneUnary,true,{},false);
+ Code laneDef{mov(6,242),mov(7,240),unary(0x27u,0,6),unary(0x25u,1,7)};out(laneDef);
+ add("lane_math_unary_complete_word_defines_raw_pair_staged",laneDef,true,{},false);
+ Code laneMad{mov(0,242),mov(1,240)};madak(laneMad,0,0,1);out(laneMad);
+ add("lane_math_madak_exact_literal_reads_defined_words_staged",laneMad,true,{},false);
+ Code laneCmp{mov(0,242),mov(1,240),mov(6,242),0xbeea03f0u};compare(laneCmp,6);out(laneCmp);
+ add("lane_math_full_sdwa_vcc_scalar_compare_staged",laneCmp,true,{},false);
+ Code piecewise{mov64(40,126),mov(0,242),mov(1,240),0xbeea03f0u};compare(piecewise,0);piecewise.push_back(save(106,106));
+ const auto skip=piecewise.size();piecewise.push_back(0);piecewise.push_back(unary(0x27u,0,0));piecewise.push_back(unary(0x25u,0,0));madak(piecewise,0,0,1);
+ const auto merge=piecewise.size();piecewise[skip]=0xbf880000u|(merge-skip-1u);piecewise.push_back(mov64(126,106));piecewise.push_back(mov64(126,40));out(piecewise);
+ add("lane_math_piecewise_exec_masked_complete_words_staged",piecewise,true,{},false);
+ Code logRaw{unary(0x27u,0,0),mov(1,240)};out(logRaw);
+ add("lane_math_log_raw_read_before_write_rejected",logRaw,false,{},false);
+ Code expRaw{mov(0,242),unary(0x25u,1,1)};out(expRaw);
+ add("lane_math_exp_raw_read_before_write_rejected",expRaw,false,{},false);
+ add("lane_math_unary_forged_source_encoding_rejected",laneUnary,false,[at](auto& d,auto&){++at(d,RdnaOpcode::VLogF32).source0.reg;},false);
+ add("lane_math_unary_forged_destination_encoding_rejected",laneUnary,false,[at](auto& d,auto&){++at(d,RdnaOpcode::VLogF32).destination.reg;},false);
+ add("lane_math_unary_forged_raw_opcode_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VLogF32).rawWords[0]^=1u<<9u;},false);
+ add("lane_math_unary_partial_selector_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VLogF32).source0.sdwaSel=2;},false);
+ add("lane_math_unary_dpp_cross_lane_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VLogF32).source0.dpp=true;},false);
+ add("lane_math_unary_absolute_modifier_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VExpF32).source0.absolute=true;},false);
+ add("lane_math_unary_partial_destination_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VExpF32).destination.explicitSdwaDst=true;},false);
+ add("lane_math_unary_extra_source_rejected",laneUnary,false,[at](auto& d,auto&){at(d,RdnaOpcode::VExpF32).sourceCount=2;},false);
+ Code madFirst{mov(1,240)};madak(madFirst,0,0,1);out(madFirst);
+ add("lane_math_madak_first_raw_source_rejected",madFirst,false,{},false);
+ Code madSecond{mov(0,242)};madak(madSecond,1,0,1);out(madSecond);
+ add("lane_math_madak_second_raw_source_rejected",madSecond,false,{},false);
+ add("lane_math_madak_forged_literal_rejected",laneMad,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadakF32).source2.value^=1u;},false);
+ add("lane_math_madak_missing_literal_source_rejected",laneMad,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadakF32).sourceCount=2;},false);
+ add("lane_math_madak_alternate_rounding_opcode_rejected",laneMad,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::VMadakF32);i.opcodeId=0x2du;i.rawWords[0]=(i.rawWords[0]&0x01ffffffu)|(0x2du<<25u);},false);
+ add("lane_math_madak_partial_destination_rejected",laneMad,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadakF32).destination.explicitSdwaDst=true;},false);
+ add("lane_math_madak_dpp_source_rejected",laneMad,false,[at](auto& d,auto&){at(d,RdnaOpcode::VMadakF32).source1.dpp=true;},false);
+ add("lane_math_madak_forged_destination_rejected",laneMad,false,[at](auto& d,auto&){++at(d,RdnaOpcode::VMadakF32).destination.reg;},false);
+ Code cmpRaw{mov(1,240),0xbeea03f0u};compare(cmpRaw,0);cmpRaw.push_back(mov(0,242));out(cmpRaw);
+ add("lane_math_compare_raw_vector_source_rejected",cmpRaw,false,{},false);
+ add("lane_math_compare_exec_destination_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).destination.kind=RdnaOperandKind::ExecLo;},false);
+ add("lane_math_compare_partial_sdwa_source_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).source0.sdwaSel=1;},false);
+ add("lane_math_compare_signed_extension_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).source0.sdwaSext=true;},false);
+ add("lane_math_compare_absolute_modifier_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).source1.absolute=true;},false);
+ add("lane_math_compare_forged_scalar_kind_rejected",laneCmp,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::VCmpNleF32);i.source1.kind=RdnaOperandKind::ScalarRegister;i.source1.reg=8;},false);
+ add("lane_math_compare_forged_sdwa_scalar_destination_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).rawWords[1]|=1u<<15u;},false);
+ add("lane_math_compare_forged_raw_selector_rejected",laneCmp,false,[at](auto& d,auto&){at(d,RdnaOpcode::VCmpNleF32).rawWords[1]^=1u<<16u;},false);
+ add("lane_math_compare_forged_raw_vector_encoding_rejected",laneCmp,false,[at](auto& d,auto&){++at(d,RdnaOpcode::VCmpNleF32).source0.reg;},false);
+ Code overwrittenMask{mov64(106,126),mov(0,242),mov(1,240),mov(6,242)};compare(overwrittenMask,6);overwrittenMask.push_back(mov64(126,106));out(overwrittenMask);
+ add("lane_math_compare_clobbers_saved_vcc_exec_identity",overwrittenMask,false,{},false);
+ Code noCover{mov64(40,126),save(106,128),mov(0,242),mov(1,240),mov64(126,40)};noCover.push_back(unary(0x27u,0,0));out(noCover);
+ add("lane_math_zero_mask_definitions_do_not_cover_restored_entry",noCover,false,{},false);
+ // Three exact public memory-effect forms. Registers/constants/descriptors
+ // are synthetic. Nonstandard raw sets isolate layer/sample dependencies;
+ // they are native proof cases, not invented PixelStage input mappings.
+ const auto load2=[](Code& c,unsigned dst=44,unsigned desc=12,unsigned offset=125){c.insert(c.end(),{0xf4240000u|(dst<<6u)|(desc>>1u),offset<<25u});};
+ const auto arrayLoad=[](Code& c,unsigned dim,unsigned dst,unsigned addr,unsigned mask=15){c.insert(c.end(),{0xf0000000u|(dim<<3u)|(mask<<8u),addr|(dst<<8u)});};
+ Code x2{mov(0,242),mov(1,240)};load2(x2);out(x2);
+ add("array_load_x2_two_complete_scalar_words",x2,true,{},false);
+ for(unsigned slot=0;slot<2;++slot)for(bool high:{false,true}){
+  const unsigned saved=44+slot-(high?1u:0u);Code c{mov64(saved,126)};load2(c);c.insert(c.end(),{mov(0,242),mov(1,240),mov64(126,saved)});out(c);
+  add("array_load_x2_saved_exec_"+std::string(high?"high":"low")+"_slot_"+std::to_string(slot),c,false,{},false);
+ }
+ add("array_load_x2_forged_width_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).dataDwordCount=1;},false);
+ add("array_load_x2_forged_bits_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).dataBits=16;},false);
+ add("array_load_x2_forged_opcode_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).opcodeId=0x0au;},false);
+ add("array_load_x2_forged_family_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).family=RdnaInstructionFamily::SOP2;},false);
+ add("array_load_x2_forged_word_count_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).wordCount=1;},false);
+ add("array_load_x2_forged_descriptor_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).source0.reg+=4;},false);
+ add("array_load_x2_descriptor_bank_overflow_rejected",x2,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::SBufferLoadDwordx2);i.source0.reg=104;i.rawWords[0]=(i.rawWords[0]&~63u)|52u;},false);
+ add("array_load_x2_destination_bank_overflow_rejected",x2,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::SBufferLoadDwordx2);i.destination.reg=105;i.rawWords[0]=(i.rawWords[0]&~0x1fc0u)|(105u<<6u);},false);
+ add("array_load_x2_destination_vcc_alias_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).destination.kind=RdnaOperandKind::VccLo;},false);
+ add("array_load_x2_forged_offset_rejected",x2,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::SBufferLoadDwordx2);i.source1.kind=RdnaOperandKind::ScalarRegister;i.source1.reg=4;},false);
+ add("array_load_x2_forged_immediate_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).memoryOffset=4;},false);
+ add("array_load_x2_partial_destination_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).destination.explicitSdwaDst=true;},false);
+ add("array_load_x2_modified_descriptor_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).source0.absolute=true;},false);
+ // X/Y/layer at v6/v7/v8; the last input aliases the return destination.
+ Code layer{mov(6,128),mov(7,128),mov(8,128)};arrayLoad(layer,5,8,6);out(layer,8,8);
+ add("array_load_layer_alias_defined_before_write",layer,true,{},false,{8});
+ Code layerRaw{mov(6,128),mov(7,128)};arrayLoad(layerRaw,5,8,6);out(layerRaw,8,8);
+ add("array_load_layer_alias_raw_read_before_write_rejected",layerRaw,false,{},false,{8});
+ Code layerSeparate{mov(6,128),mov(7,128)};arrayLoad(layerSeparate,5,12,6);out(layerSeparate,12,12);
+ add("array_load_layer_last_address_raw_dependency_rejected",layerSeparate,false,{},false,{8});
+ Code sparse{mov(8,128),mov(9,128),mov(10,128)};arrayLoad(sparse,5,0,8,9);out(sparse);
+ add("array_load_sparse_dmask_two_full_return_words",sparse,true,{},false,{0,1,8});
+ Code narrow{mov(8,128),mov(9,128),mov(10,128)};arrayLoad(narrow,5,0,8,1);out(narrow);
+ add("array_load_one_return_word_does_not_define_second_raw_word",narrow,false,{},false,{0,1,8});
+ add("array_load_forged_nonarray_metadata_rejected",layer,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.imageDimension=RdnaImageDimension::Dim2D;i.imageAddressComponents=2;},false,{8});
+ add("array_load_raw_cube_alias_rejected",layer,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.rawWords[0]=(i.rawWords[0]&~0x38u)|24u;},false,{8});
+ add("array_load_forged_address_width_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).imageAddressComponents=2;},false,{8});
+ add("array_load_forged_dmask_rejected",layer,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.imageDmask=3;i.dataDwordCount=i.dataComponents=2;},false,{8});
+ add("array_load_forged_destination_rejected",layer,false,[at](auto& d,auto&){++at(d,RdnaOpcode::ImageLoad).destination.reg;},false,{8});
+ add("array_load_forged_address_encoding_rejected",layer,false,[at](auto& d,auto&){++at(d,RdnaOpcode::ImageLoad).source0.reg;},false,{8});
+ add("array_load_descriptor_overflow_rejected",layer,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.source1.reg=100;i.rawWords[1]=(i.rawWords[1]&~0x1f0000u)|(25u<<16u);},false,{8});
+ add("array_load_address_bank_overflow_rejected",layer,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.source0.reg=254;i.rawWords[1]=(i.rawWords[1]&~255u)|254u;},false,{8});
+ add("array_load_raw_d16_partial_return_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).rawWords[1]|=0x80000000u;},false,{8});
+ add("array_load_raw_a16_packed_address_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).rawWords[1]|=0x40000000u;},false,{8});
+ add("array_load_tfe_extra_return_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).rawWords[0]|=0x10000u;},false,{8});
+ add("array_load_modified_address_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).source0.dpp=true;},false,{8});
+ // X/Y/layer/sample at v6..v9. A return beginning at v9 aliases the sample.
+ Code sampleIndex{mov(6,128),mov(7,128),mov(8,128),mov(9,128)};arrayLoad(sampleIndex,7,9,6);out(sampleIndex,9,9);
+ add("array_load_msaa_sample_alias_defined_before_write",sampleIndex,true,{},false,{9});
+ Code sampleRaw{mov(6,128),mov(7,128),mov(8,128)};arrayLoad(sampleRaw,7,9,6);out(sampleRaw,9,9);
+ add("array_load_msaa_sample_alias_raw_read_before_write_rejected",sampleRaw,false,{},false,{9});
+ Code sampleSeparate{mov(6,128),mov(7,128),mov(8,128)};arrayLoad(sampleSeparate,7,12,6);out(sampleSeparate,12,12);
+ add("array_load_msaa_last_sample_dependency_rejected",sampleSeparate,false,{},false,{9});
+ Code sampleLayerRaw{mov(6,128),mov(7,128),mov(9,128)};arrayLoad(sampleLayerRaw,7,12,6);out(sampleLayerRaw,12,12);
+ add("array_load_msaa_layer_dependency_rejected",sampleLayerRaw,false,{},false,{8});
+ add("array_load_msaa_defined_layer_and_sample",sampleIndex,true,{},false,{8,9});
+ add("array_load_msaa_forged_nonarray_metadata_rejected",sampleIndex,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.imageDimension=RdnaImageDimension::Dim2DMsaa;i.imageAddressComponents=3;},false,{9});
+ add("array_load_msaa_forged_three_word_address_rejected",sampleIndex,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).imageAddressComponents=3;},false,{9});
+ add("array_load_msaa_raw_nonarray_dimension_rejected",sampleIndex,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.rawWords[0]=(i.rawWords[0]&~0x38u)|48u;},false,{9});
+ add("array_load_msaa_forged_return_width_rejected",sampleIndex,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).dataDwordCount=3;},false,{9});
+ add("array_load_msaa_final_sample_bank_overflow_rejected",sampleIndex,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.source0.reg=253;i.rawWords[1]=(i.rawWords[1]&~255u)|253u;},false,{9});
+ add("array_load_msaa_return_bank_overflow_rejected",sampleIndex,false,[at](auto& d,auto&){auto& i=at(d,RdnaOpcode::ImageLoad);i.destination.reg=253;i.rawWords[1]=(i.rawWords[1]&~0xff00u)|(253u<<8u);},false,{9});
+ add("array_load_msaa_nsa_metadata_rejected",sampleIndex,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).imageNsaDwordCount=1;},false,{9});
+ add("array_load_msaa_unknown_exec_not_repaired_by_memory",sampleIndex,false,[](auto& d,auto&){auto& i=d.instructions.front();i.op=RdnaOpcode::SMovB64;i.family=RdnaInstructionFamily::SOP1;i.is64Bit=true;i.destination.kind=RdnaOperandKind::ExecLo;i.source0.kind=RdnaOperandKind::ScalarRegister;i.source0.reg=60;i.sourceCount=1;},false,{9});
+ Code layerNarrow{mov64(40,126),save(42,128),mov(8,128),mov64(126,40),mov(6,128),mov(7,128)};arrayLoad(layerNarrow,5,8,6);out(layerNarrow,8,8);
+ add("array_load_narrowed_layer_write_cannot_cover_restored_entry",layerNarrow,false,{},false,{8});
+ Code sampleNarrow{mov64(40,126),save(42,128),mov(9,128),mov64(126,40),mov(6,128),mov(7,128),mov(8,128)};arrayLoad(sampleNarrow,7,9,6);out(sampleNarrow,9,9);
+ add("array_load_msaa_narrowed_sample_write_cannot_cover_restored_entry",sampleNarrow,false,{},false,{9});
+ add("array_load_raw_r128_descriptor_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).rawWords[0]|=0x8000u;},false,{8});
+ add("array_load_raw_nsa_extra_address_rejected",layer,false,[at](auto& d,auto&){at(d,RdnaOpcode::ImageLoad).rawWords[0]|=2u;},false,{8});
+ add("array_load_x2_forged_raw_opcode_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).rawWords[0]^=1u<<18u;},false);
+ add("array_load_x2_forged_raw_destination_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).rawWords[0]^=1u<<6u;},false);
+ add("array_load_x2_reserved_raw_control_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).rawWords[0]|=1u<<13u;},false);
+ add("array_load_x2_forged_source_count_rejected",x2,false,[at](auto& d,auto&){at(d,RdnaOpcode::SBufferLoadDwordx2).sourceCount=1;},false);
+ return all;
+}
+}
+
+using namespace ShaderRecompiler;
+using Code=std::vector<std::uint32_t>;
+namespace PublicColorExportCases {
+using namespace ShaderRecompiler;
+using Code=PublicQuadCases::Code;using Case=PublicQuadCases::Case;using Change=PublicQuadCases::Change;
+inline void emit(Code& code,unsigned target,bool compressed,bool done,bool valid,unsigned enable=15u,
+                 std::array<unsigned,4> sources={0,1,0,1}){
+ code.push_back((0x3eu<<26u)|(target<<4u)|enable|(compressed?0x400u:0u)|(done?0x800u:0u)|(valid?0x1000u:0u));
+ code.push_back(sources[0]|(sources[1]<<8u)|(sources[2]<<16u)|(sources[3]<<24u));
+}
+inline Code toy(unsigned target=3u,bool compressed=true,bool done=true,bool valid=true,unsigned enable=15u,
+                std::array<unsigned,4> sources={0,1,0,1},unsigned definitions=3u){
+ Code code;if(definitions&1u)code.push_back(PublicQuadCases::mov(0,242));if(definitions&2u)code.push_back(PublicQuadCases::mov(1,240));
+ emit(code,target,compressed,done,valid,enable,sources);
+ if(!done)emit(code,0u,true,true,false,4u,{1,1,1,1});
+ code.push_back(0xbf810000u);return code;
+}
+inline auto& exportInstruction(RdnaProgram& program){
+ for(auto& instruction:program.instructions)if(instruction.op==RdnaOpcode::Exp)return instruction;
+ throw std::runtime_error("synthetic export instruction missing");
+}
+inline std::vector<Case> cases(){
+ std::vector<Case> all;
+ auto add=[&](std::string name,Code code,bool expected,Change change={}){all.push_back({std::move(name),std::move(code),expected,std::move(change)});};
+ add("mrt_export_color0_compressed_done1_vm1_accepted",toy(0u,true,true,true),true);
+ add("mrt_export_color1_compressed_done1_vm1_accepted",toy(1u,true,true,true),true);
+ add("mrt_export_color2_compressed_done1_vm1_accepted",toy(2u,true,true,true),true);
+ add("mrt_export_color3_compressed_done0_vm0_accepted",toy(3u,true,false,false),true);
+ add("mrt_export_color3_compressed_done0_vm1_accepted",toy(3u,true,false,true),true);
+ add("mrt_export_color3_compressed_done1_vm0_accepted",toy(3u,true,true,false),true);
+ add("mrt_export_color3_compressed_done1_vm1_accepted",toy(3u,true,true,true),true);
+ add("mrt_export_color4_compressed_done1_vm1_accepted",toy(4u,true,true,true),true);
+ add("mrt_export_color5_compressed_done1_vm1_accepted",toy(5u,true,true,true),true);
+ add("mrt_export_color6_compressed_done1_vm1_accepted",toy(6u,true,true,true),true);
+ add("mrt_export_color7_compressed_done1_vm1_accepted",toy(7u,true,true,true),true);
+ add("mrt_export_color0_plain_full_channels_accepted",toy(0u,false,true,true),true);
+ add("mrt_export_color1_plain_full_channels_accepted",toy(1u,false,true,true),true);
+ add("mrt_export_color2_plain_full_channels_accepted",toy(2u,false,true,true),true);
+ add("mrt_export_color3_plain_full_channels_accepted",toy(3u,false,true,true),true);
+ add("mrt_export_color4_plain_full_channels_accepted",toy(4u,false,true,true),true);
+ add("mrt_export_color5_plain_full_channels_accepted",toy(5u,false,true,true),true);
+ add("mrt_export_color6_plain_full_channels_accepted",toy(6u,false,true,true),true);
+ add("mrt_export_color7_plain_full_channels_accepted",toy(7u,false,true,true),true);
+ Code allTargets{PublicQuadCases::mov(0,242),PublicQuadCases::mov(1,240)};
+ for(unsigned target=8u;target--;)emit(allTargets,target,true,target==0u,target==7u);
+ allTargets.push_back(0xbf810000u);
+ add("mrt_export_eight_targets_independent_done_vm_sequence_accepted",allTargets,true);
+ add("mrt_export_enabled_packed_pair0_channel1_disabled_other_raw_accepted",toy(3u,true,true,true,1u,{0,1,0,1},1u),true);
+ add("mrt_export_enabled_packed_pair0_channel2_disabled_other_raw_accepted",toy(3u,true,true,true,2u,{0,1,0,1},1u),true);
+ add("mrt_export_enabled_packed_pair1_channel4_disabled_other_raw_accepted",toy(3u,true,true,true,4u,{0,1,0,1},2u),true);
+ add("mrt_export_enabled_packed_pair1_channel8_disabled_other_raw_accepted",toy(3u,true,true,true,8u,{0,1,0,1},2u),true);
+ add("mrt_export_enabled_packed_first_pair_raw_rejected",toy(3u,true,true,true,1u,{0,1,0,1},2u),false);
+ add("mrt_export_enabled_packed_second_pair_raw_rejected",toy(3u,true,true,true,4u,{0,1,0,1},1u),false);
+ add("mrt_export_enabled_plain_channel0_raw_rejected",toy(3u,false,true,true,1u,{0,1,1,1},2u),false);
+ add("mrt_export_only_plain_channel0_defined_disabled_others_raw_accepted",toy(3u,false,true,true,1u,{1,0,0,0},2u),true);
+ add("mrt_export_enabled_plain_channel1_raw_rejected",toy(3u,false,true,true,2u,{1,0,1,1},2u),false);
+ add("mrt_export_only_plain_channel1_defined_disabled_others_raw_accepted",toy(3u,false,true,true,2u,{0,1,0,0},2u),true);
+ add("mrt_export_enabled_plain_channel2_raw_rejected",toy(3u,false,true,true,4u,{1,1,0,1},2u),false);
+ add("mrt_export_only_plain_channel2_defined_disabled_others_raw_accepted",toy(3u,false,true,true,4u,{0,0,1,0},2u),true);
+ add("mrt_export_enabled_plain_channel3_raw_rejected",toy(3u,false,true,true,8u,{1,1,1,0},2u),false);
+ add("mrt_export_only_plain_channel3_defined_disabled_others_raw_accepted",toy(3u,false,true,true,8u,{0,0,0,1},2u),true);
+ Code narrow{PublicQuadCases::mov64(40,126),PublicQuadCases::save(106,128),PublicQuadCases::mov(0,242),PublicQuadCases::mov(1,240),PublicQuadCases::mov64(126,40)};
+ Code narrowPacked=narrow;emit(narrowPacked,6u,true,true,false);narrowPacked.push_back(0xbf810000u);
+ Code narrowPlain=narrow;emit(narrowPlain,4u,false,true,true);narrowPlain.push_back(0xbf810000u);
+ add("mrt_export_narrowed_packed_writes_restored_entry_rejected",narrowPacked,false);
+ add("mrt_export_narrowed_plain_writes_restored_entry_rejected",narrowPlain,false);
+ Code unknownExec{PublicQuadCases::mov64(126,106),PublicQuadCases::mov(0,242),PublicQuadCases::mov(1,240)};
+ emit(unknownExec,7u,true,false,true);emit(unknownExec,0u,true,true,false);unknownExec.push_back(0xbf810000u);
+ add("mrt_export_vm_done_do_not_repair_unknown_exec_rejected",unknownExec,false);
+ add("mrt_export_zero_enabled_outside_admitted_form_rejected",toy(3u,true,true,true,0u),false);
+ add("mrt_export_forged_family_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.family=RdnaInstructionFamily::VOP1;});
+ add("mrt_export_forged_word_count_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.wordCount=1;});
+ add("mrt_export_forged_opcode_id_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.opcodeId=4;});
+ add("mrt_export_forged_target_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportTarget=4;});
+ add("mrt_export_forged_enable_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportEnableMask=7;});
+ add("mrt_export_forged_compressed_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportIsCompressed=false;i.sourceCount=4;});
+ add("mrt_export_forged_done_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportIsLast=false;});
+ add("mrt_export_forged_vm_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportValidMask=false;});
+ add("mrt_export_forged_source_count_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.sourceCount=4;});
+ add("mrt_export_forged_source0_raw_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);++i.source0.reg;});
+ add("mrt_export_forged_source1_raw_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);++i.source1.reg;});
+ add("mrt_export_forged_source2_raw_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);++i.source2.reg;});
+ add("mrt_export_forged_source3_raw_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);++i.source3.reg;});
+ add("mrt_export_forged_source_kind_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source0.kind=RdnaOperandKind::ScalarRegister;});
+ add("mrt_export_forged_source_modifier_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source0.negate=true;});
+ add("mrt_export_forged_source_dpp_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source1.dpp=true;});
+ add("mrt_export_forged_source_partial_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source0.explicitSdwaDst=true;i.source0.sdwaSel=4;});
+ add("mrt_export_forged_unused_source_modifier_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source3.absolute=true;});
+ add("mrt_export_forged_destination_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.destination.kind=RdnaOperandKind::VectorRegister;i.destination.reg=2;});
+ add("mrt_export_forged_destination2_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.destination2.kind=RdnaOperandKind::VectorRegister;i.destination2.reg=2;});
+ add("mrt_export_forged_clamp_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.clampResult=true;});
+ add("mrt_export_forged_is64_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.is64Bit=true;});
+ add("mrt_export_forged_prefix_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.rawWords[0]^=1u<<26u;});
+ add("mrt_export_forged_reserved_bits_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.rawWords[0]|=1u<<13u;});
+ add("mrt_export_forged_enable_overflow_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportEnableMask=16;});
+ add("mrt_export_forged_source_none_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source1.kind=RdnaOperandKind::None;});
+ add("mrt_export_forged_source_range_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.source0.reg=256;});
+ add("mrt_export_forged_raw_source_only_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.rawWords[1]^=1u<<24u;});
+ add("mrt_export_forged_target_non_mrt_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportTarget=9;i.opcodeId=9;i.rawWords[0]=(i.rawWords[0]&~0x3f0u)|(9u<<4u);});
+ add("mrt_export_forged_target_compressed_mrtz_rejected",toy(),false,[](auto& d,auto&){auto& i=exportInstruction(d);i.exportTarget=8;i.opcodeId=8;i.rawWords[0]=(i.rawWords[0]&~0x3f0u)|(8u<<4u);});
+ return all;
+}
+} // namespace PublicColorExportCases
+static unsigned passes=0;
+void need(bool b,const std::string& s){if(!b)throw std::runtime_error(s);}
+std::uint32_t vmov(unsigned dst,unsigned src){return 0x7e000200u|(dst<<17u)|src;}
+std::uint32_t smov(unsigned dst,unsigned src){return 0xbe800300u|(dst<<16u)|src;}
+std::uint32_t smov64(unsigned dst,unsigned src){return 0xbe800400u|(dst<<16u)|src;}
+std::uint32_t saveexec(unsigned dst,unsigned src){return 0xbe802400u|(dst<<16u)|src;}
+void branch(Code& c,unsigned opcode,std::size_t target){const auto here=c.size();c.push_back(0xbf800000u|(opcode<<16u)|(static_cast<std::uint32_t>(static_cast<int>(target)-static_cast<int>(here)-1)&0xffffu));}
+void output(Code& c,unsigned lo=0,unsigned hi=1){c.push_back(0xf8001c0fu);c.push_back(lo|(hi<<8u));c.push_back(0xbf810000u);}
+Code loop(){Code c{smov64(4,126),smov(0,128)};const auto at=c.size();c.push_back(vmov(0,129));c.push_back(vmov(1,130));c.push_back(0x81008100u);c.push_back(0xbf0a8300u);branch(c,5,at);c.push_back(smov64(126,4));output(c);return c;}
+struct PixelRequest {
+ const Code& code;
+ const std::array<std::uint32_t,1> caps{spv::CapabilityShader};
+ RecompileRequest request{};
+ PixelRequest(const Code& c,unsigned inputs=0):code(c){
+  ShaderPixelStageInfo p{};p.inputAddr=PixelInputBit(PixelInput::PerspectiveCenter);p.hasPerspectiveCenterVgpr=true;p.interpolatorCount=inputs;p.targetOutputMode[0]=4;
+  request.shader={ShaderStage::Fragment,0x800000u,c,0,{}};request.context.waveSize=64;request.context.pixel=p;
+  request.target.vulkanVersion=0x00401000u;request.target.spirvVersion=0x00010300u;request.target.subgroupSize=64;request.target.supportedCapabilities=caps;
+  request.layout.pushConstantSizeBytes=128;request.useCache=true;
+ }
+};
+bool sameBinding(const DescriptorBinding& a,const DescriptorBinding& b){
+ return a.kind==b.kind&&a.role==b.role&&a.descriptorSet==b.descriptorSet&&a.binding==b.binding&&a.count==b.count&&a.guestDescriptor==b.guestDescriptor&&a.readOnly==b.readOnly&&a.imageShape==b.imageShape&&a.samplerDepthCompare==b.samplerDepthCompare&&a.imageWritten==b.imageWritten&&a.imageDepthCompare==b.imageDepthCompare&&a.imageAtomic==b.imageAtomic&&a.imageAtomic64==b.imageAtomic64&&a.bufferAtomic==b.bufferAtomic&&a.bufferWritten==b.bufferWritten&&a.bufferRead==b.bufferRead&&a.samplerUnnormalized==b.samplerUnnormalized&&a.samplerIntegerBorder==b.samplerIntegerBorder&&a.imageUnnormalized==b.imageUnnormalized&&a.imageUnnormalizedBaseLevel==b.imageUnnormalizedBaseLevel&&a.imageSamplers==b.imageSamplers&&a.imageLogicalSamples==b.imageLogicalSamples&&a.imageNativeSamples==b.imageNativeSamples;
+}
+bool sameBindings(const std::vector<DescriptorBinding>& a,const std::vector<DescriptorBinding>& b){
+ return a.size()==b.size()&&std::equal(a.begin(),a.end(),b.begin(),sameBinding);
+}
+void stage(const RecompileRequest& r){
+ const auto prepared=PrepareShader(r);need(static_cast<bool>(prepared),"no staged shader handle");
+ const auto& artifact=GetPreparedArtifact(*prepared);need(!artifact.spirv.Words().empty(),"empty staged SPIR-V");
+ need(MatchesPreparedShader(r,*prepared),"prepared static ABI no longer matches");
+ RequestMemoryView memory(r.context.memory);const auto runtime=memory.MakeRuntime(r.context.userData,r.shader.codeAddress);
+ const auto capture=CaptureResources(r,runtime,*prepared);const auto staged=MaterializeShader(r,*capture,*prepared);
+ const auto captured=Recompile(r,*capture);const auto regular=Recompile(r);
+ need(!staged->spirv.Words().empty()&&!regular.spirv.Words().empty(),"empty materialized SPIR-V");
+ std::cout<<"stage_ids artifact="<<artifact.variantId<<" staged="<<staged->variantId<<" captured="<<captured->variantId<<" regular="<<regular.variantId<<"\n";
+ need(artifact.variantId!=0&&artifact.variantId==staged->variantId,"prepared materialization lost artifact identity");
+ need(std::equal(staged->spirv.Words().begin(),staged->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end())&&std::equal(captured->spirv.Words().begin(),captured->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end()),"equivalent final-stage SPIR-V differs");
+ need(sameBindings(staged->bindings,regular.bindings)&&sameBindings(captured->bindings,regular.bindings),"equivalent final-stage binding closure differs");
+}
+void check(const std::string& name,const Code& code,bool expected,std::function<void(RdnaProgram&,ControlFlowGraph&)> change={}){
+ auto decoded=RdnaInstructionDecoder{}.Decode(code);auto cfg=GraphBuilder{}.Build(decoded);if(change)change(decoded,cfg);
+ if(UnusedBarycentricProof::Prove(decoded,cfg,{0,1})!=expected){std::cerr<<RdnaProgramToString(decoded)<<"\n"<<GraphToString(cfg);for(const auto& i:decoded.instructions)std::cerr<<"pc="<<i.programCounter<<" enum="<<static_cast<unsigned>(i.op)<<" sourceCount="<<i.sourceCount<<" is64="<<i.is64Bit<<" footprint="<<static_cast<bool>(UnusedBarycentricProof::EffectsFor(i))<<"\n";throw std::runtime_error(name+" wrong proof result");}
+ if(!change){PixelRequest p(code);bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){if(expected)throw std::runtime_error(name+" staged failure: "+e.what());need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());}need(accepted==expected,name+" wrong staged result");}
+ ++passes;std::cout<<"PASS "<<name<<"\n";
+}
+void checkMrtZ(const std::string& name,const Code& code,bool expected){
+ const auto decoded=RdnaInstructionDecoder{}.Decode(code);const auto cfg=GraphBuilder{}.Build(decoded);
+ need(UnusedBarycentricProof::Prove(decoded,cfg,{0,1})==expected,name+" wrong MRTZ proof result");
+ PixelRequest p(code);auto& pixel=*p.request.context.pixel;
+ // This is the public conservative-Z fixture's actual input layout: center
+ // I/J in v0/v1 and PositionZ in v2, with no native barycentric capability.
+ pixel.inputAddr|=PixelInputBit(PixelInput::PositionZ);pixel.posZ=true;
+ pixel.depthExportEnable=true;pixel.targetOutputMode.fill(0);
+ bool accepted=false;
+ try{
+  stage(p.request);accepted=true;
+  if(expected){
+   const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
+   bool depthReplacing=false,depthOutput=false;std::uint32_t depthVariable=0;
+   for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
+    const auto op=static_cast<spv::Op>(words[at]&0xffffu);
+    if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModeDepthReplacing)depthReplacing=true;
+    if(op==spv::OpDecorate&&words[at+2]==spv::DecorationBuiltIn&&words[at+3]==spv::BuiltInFragDepth)depthVariable=words[at+1];
+    if(op==spv::OpStore&&depthVariable&&words[at+1]==depthVariable)depthOutput=true;
+   }
+   need(depthReplacing&&depthOutput,name+" did not retain the actual fragment-depth export");
+  }
+ }catch(const std::exception& e){
+  if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
+  need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
+ }
+ need(accepted==expected,name+" wrong MRTZ staged result");
+ ++passes;std::cout<<"PASS "<<name<<"\n";
+}
+void checkOrderedMessage(const std::string& name,const Code& code,bool ordered){
+ const auto decoded=RdnaInstructionDecoder{}.Decode(code);const auto cfg=GraphBuilder{}.Build(decoded);
+ need(UnusedBarycentricProof::Prove(decoded,cfg,{0,1}),name+" wrong exact-message proof result");
+ PixelRequest p(code);p.request.context.pixel->orderedPixelShader=ordered;
+ const std::array<std::uint32_t,2> capabilities{spv::CapabilityShader,spv::CapabilityFragmentShaderPixelInterlockEXT};
+ p.request.target.supportedCapabilities=capabilities;
+ stage(p.request);
+ const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
+ bool capability=false,mode=false;unsigned begins=0,ends=0;
+ for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
+  const auto op=static_cast<spv::Op>(words[at]&0xffffu);
+  if(op==spv::OpCapability&&words[at+1]==spv::CapabilityFragmentShaderPixelInterlockEXT)capability=true;
+  if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModePixelInterlockOrderedEXT)mode=true;
+  if(op==spv::OpBeginInvocationInterlockEXT)++begins;
+  if(op==spv::OpEndInvocationInterlockEXT)++ends;
+ }
+ need(capability==ordered&&mode==ordered&&begins==(ordered?1u:0u)&&ends==(ordered?1u:0u),name+" altered stage-controlled pixel interlock");
+ if(ordered){
+  p.request.target.supportedCapabilities=std::span<const std::uint32_t>(capabilities.data(),1);
+  bool rejected=false;try{stage(p.request);}catch(const std::exception& e){need(std::string(e.what()).find("fragmentShaderPixelInterlock")!=std::string::npos,name+" lost the capability diagnostic");rejected=true;}
+  need(rejected,name+" accepted an ordered shader without the interlock capability");
+ }
+ ++passes;std::cout<<"PASS "<<name<<"\n";
+}
+// Public synthetic scalar-buffer color: four independently selected F32
+// constants are loaded from a fresh guest buffer, packed into two whole U32
+// VGPR words, and exported. This code is not copied from a game request.
+Code bufferPack(unsigned firstSource=4){return {0xf4280100u,0xfa000000u,0xbf8c007fu,
+ 0xd52f0000u,firstSource|((firstSource+1u)<<9u),0xd52f0001u,6u|(7u<<9u),
+ 0xf8001c0fu,0x100u,0xbf810000u};}
+void checkBufferPack(const std::string& name,const Code& code,bool expected,
+                     std::function<void(RdnaProgram&,ControlFlowGraph&)> change={}){
+ auto decoded=RdnaInstructionDecoder{}.Decode(code);auto cfg=GraphBuilder{}.Build(decoded);if(change)change(decoded,cfg);
+ need(UnusedBarycentricProof::Prove(decoded,cfg,{0,1})==expected,name+" wrong scalar-buffer/packed result");
+ if(!change){
+  PixelRequest p(code);const std::array<std::uint32_t,2> capabilities{spv::CapabilityShader,spv::CapabilityInt64};
+  p.request.target.supportedCapabilities=capabilities;const std::array<std::uint32_t,4> constants{0x3e800000u,0x3f000000u,0x3f400000u,0x3f800000u};
+  const std::array<std::uint32_t,4> descriptor{0x910000u,0u,16u,0x31016facu};
+  const std::array<MemoryRegion,1> memory{{{0x910000u,std::as_bytes(std::span(constants))}}};
+  p.request.context.userData=descriptor;p.request.context.memory=memory;
+  bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){
+   if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
+   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
+  }need(accepted==expected,name+" wrong scalar-buffer/packed staged result");
+ }++passes;std::cout<<"PASS "<<name<<"\n";
+}
+void checkQuad(const PublicQuadCases::Case& item){
+ auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+ if(item.change)item.change(decoded,cfg);
+ need(UnusedBarycentricProof::Prove(decoded,cfg,item.rawRegisters)==item.expected,item.name+" wrong quad proof decision");
+ // Nonstandard raw sets isolate the third-coordinate proof. They are direct
+ // decoder/CFG tests, not a fabricated ShaderPixelStageInfo register mapping.
+ if(!item.change&&item.rawRegisters==std::set<unsigned>{0,1}){
+  PixelRequest pixel(item.code);auto& p=*pixel.request.context.pixel;
+  p.inputAddr|=PixelInputBit(PixelInput::PositionX)|PixelInputBit(PixelInput::PositionY);p.posX=p.posY=true;
+  // This is an explicitly synthetic compiler profile. It is not a report of
+  // enabled features on an Apple GPU or a successful physical image access.
+  const std::array<std::uint32_t,13> capabilities{
+   spv::CapabilityShader,spv::CapabilityInt64,spv::CapabilityGroupNonUniform,spv::CapabilityGroupNonUniformBallot,
+   spv::CapabilityPhysicalStorageBufferAddresses,spv::CapabilityStorageBuffer8BitAccess,
+   spv::CapabilitySampledImageArrayDynamicIndexing,spv::CapabilityShaderNonUniform,
+   spv::CapabilityRuntimeDescriptorArray,spv::CapabilitySampledImageArrayNonUniformIndexing,
+   spv::CapabilityStorageImageArrayNonUniformIndexing,spv::CapabilityStorageBufferArrayNonUniformIndexing,
+   spv::CapabilityImageQuery,
+  };
+  const std::array<std::string_view,3> extensions{"SPV_KHR_physical_storage_buffer","SPV_KHR_8bit_storage","SPV_EXT_descriptor_indexing"};
+  std::array<std::uint32_t,16> userData{
+   0x200000u,56u<<20u,3u<<14u,0xfacu|(9u<<28u),0u,0u,0u,0u,
+   0u,0u,0u,0u,
+   0x920000u,0u,32u,0x31016facu,
+  };
+  const std::array<std::uint32_t,8> values{0x3f000000u,0x3f400000u,0x3f800000u,0x3e800000u,0x3f000000u,0x3e800000u,0x3f800000u,0u};
+  const std::array<MemoryRegion,1> memory{{{0x920000u,std::as_bytes(std::span(values))}}};
+  for(const auto& instruction:decoded.instructions)if(instruction.op==RdnaOpcode::ImageSample&&instruction.imageDimension==RdnaImageDimension::Dim3D){
+   // Real synthetic 3D descriptor shape; do not stage 3D code against a 2D view.
+   userData[3]=(userData[3]&0x0fffffffu)|(10u<<28u);break;
+  }
+  pixel.request.context.userData=userData;pixel.request.context.memory=memory;
+  pixel.request.target.supportedCapabilities=capabilities;pixel.request.target.supportedExtensions=extensions;
+  pixel.request.target.bdaAbiVersion=1;
+  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& e){
+   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+e.what());
+   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+e.what());
+  }need(accepted==item.expected,item.name+" wrong staged outcome");
+ }
+ ++passes;std::cout<<"PASS "<<item.name<<"\n";
+}
+
+// New color-export cases use all eight explicitly synthetic output modes.
+// The retained234 cases keep their original code and profile unchanged.
+void checkColorExport(const PublicColorExportCases::Case& item){
+ auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+ if(item.change)item.change(decoded,cfg);
+ need(UnusedBarycentricProof::Prove(decoded,cfg,item.rawRegisters)==item.expected,item.name+" wrong color export proof decision");
+ if(!item.change){
+  PixelRequest pixel(item.code);pixel.request.context.pixel->targetOutputMode.fill(4u);
+  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& error){
+   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+error.what());
+   need(std::string(error.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+error.what());
+  }need(accepted==item.expected,item.name+" wrong color export staged result");
+ }++passes;std::cout<<"PASS "<<item.name<<"\n";
+}
+
+int main(int argc,char** argv){try{
+ const auto positive=loop();check("independent_uniform_counter_loop_before_raw_overwrite",positive,true);
+ Code prefetch=positive;prefetch.insert(prefetch.begin(),0xbfa00002u);check("decoded_immediate_prefetch_has_no_register_effect",prefetch,true);
+ check("prefetch_register_operand_rejected",prefetch,false,[](auto& d,auto&){d.instructions[0].source0.kind=RdnaOperandKind::VectorRegister;d.instructions[0].source0.reg=0;});
+ {PixelRequest host32(positive);host32.request.target.subgroupSize=32;stage(host32.request);++passes;std::cout<<"PASS explicitly_synthetic_host_subgroup32_profile\n";}
+ Code overlappingCopy=positive;overlappingCopy.insert(overlappingCopy.begin()+2,{smov64(5,4),smov64(4,5)});check("overlapping_mask_copy_snapshots_source",overlappingCopy,true);
+ Code smem=positive;smem.insert(smem.begin()+7,{0xf40800c0u,0xfa000000u});check("wide_smem_load_clobbers_saved_pair",smem,false);
+ Code before{vmov(7,256),vmov(0,129),vmov(1,130)};output(before);check("read_before_full_write",before,false);
+ Code subset{smov64(4,126),saveexec(106,0),vmov(0,129),vmov(1,130),smov64(126,4)};output(subset);check("subset_writes_then_entry_restore",subset,false);
+ Code sameSubset{saveexec(106,0),vmov(0,129),vmov(1,130)};output(sameSubset);check("same_exec_epoch_full_writes",sameSubset,true);
+ Code clobber=positive;clobber.insert(clobber.begin()+7,smov(5,128));check("saved_high_half_clobber",clobber,false);
+ Code low=positive;low.insert(low.begin()+7,smov(4,128));check("saved_low_half_clobber",low,false);
+ Code overlap=positive;overlap.insert(overlap.begin()+7,smov64(3,128));check("overlapping_pair_clobber",overlap,false);
+ // A branch dependent on scalar entry data: only one incoming path writes v0.
+ Code diamond{smov64(4,126),0xbf0a8200u,0xbf850003u,vmov(0,129),vmov(1,130),0xbf820001u,vmov(1,130)};output(diamond);check("one_predecessor_keeps_raw_input",diamond,false);
+ // Both branch paths snapshot EXEC then overwrite both raw registers. No raw
+ // input survives either path, including reconvergence and saved-mask restore.
+ Code fork{0xbf0a8200u,0xbf850004u,smov64(4,126),vmov(0,129),vmov(1,130),0xbf820003u,smov64(4,126),vmov(0,130),vmov(1,131),smov64(126,4)};output(fork);check("both_path_exec_capture_reconverges",fork,true);
+ // Mutable decoded controls test the verifier's fail-closed footprint/range
+ // contract. The unmodified forms above still exercise real decode+staging.
+ Code image{vmov(0,129),vmov(1,130),0xf0000f10u,0x00040802u};output(image);
+ check("image_load_d16_partial_return",image,false,[](auto& d,auto&){d.instructions[2].imageD16=true;});
+ check("image_load_tfe_status_return",image,false,[](auto& d,auto&){d.instructions[2].rawWords[0]|=0x10000u;});
+ check("image_load_nsa_address",image,false,[](auto& d,auto&){d.instructions[2].imageNsaDwordCount=1;});
+ check("dpp_crosslane_operand",positive,false,[](auto& d,auto&){d.instructions[2].source0.dpp=true;});
+ check("partial_sdwa_destination",positive,false,[](auto& d,auto&){d.instructions[2].destination.explicitSdwaDst=true;d.instructions[2].destination.sdwaSel=0;});
+ check("unmodeled_readlane_opcode",positive,false,[](auto& d,auto&){d.instructions[2].op=RdnaOpcode::VReadlaneB32;});
+ check("unmodeled_relative_opcode",positive,false,[](auto& d,auto&){d.instructions[2].op=RdnaOpcode::VMovreldB32;});
+ check("malformed_scalar_family",positive,false,[](auto& d,auto&){d.instructions[1].family=RdnaInstructionFamily::VOP1;});
+ check("invalid_export_valid_mask",positive,false,[](auto& d,auto&){d.instructions[d.instructions.size()-2].exportValidMask=false;});
+ check("missing_cfg_instruction_range",positive,false,[](auto&,auto& cfg){++cfg.blocks[0].instructionBegin;});
+ check("wrong_cfg_branch_target",positive,false,[](auto& d,auto&){d.instructions[6].branchTarget+=4;});
+ check("unknown_implicit_effect",positive,false,[](auto& d,auto&){d.instructions[2].op=RdnaOpcode::Invalid;});
+ check("backedge_saved_high_clobber",positive,false,[](auto& d,auto&){d.instructions[4].destination.reg=5;});
+ Code disabled{vmov(1,129),0xf8001c0cu,0x0100u,0xbf810000u};check("disabled_compressed_export_pair_does_not_observe_raw_v0",disabled,true);
+ checkMrtZ("mrtz_position_z_does_not_observe_center_inputs",{0xf8001881u,2u,0xbf810000u},true);
+ checkMrtZ("mrtz_full_entry_overwrite_removes_raw_depth_source",{vmov(0,129),0xf8001881u,0u,0xbf810000u},true);
+ checkMrtZ("mrtz_raw_center_i_depth_source_rejected",{0xf8001881u,0u,0xbf810000u},false);
+ checkMrtZ("mrtz_raw_center_j_depth_source_rejected",{0xf8001881u,1u,0xbf810000u},false);
+ checkMrtZ("compressed_mrtz_remains_unmodeled",{0xf8001c81u,2u,0xbf810000u},false);
+ const Code orderedMessage{0x7e0e02f2u,0xbf900007u,0xf800180fu,0x07070707u,0xbf810000u};
+ checkOrderedMessage("exact_ordered_message_preserves_interlock_and_capability_gate",orderedMessage,true);
+ checkOrderedMessage("exact_ordered_message_does_not_enable_unordered_interlock",orderedMessage,false);
+ Code rawMessage=orderedMessage;rawMessage[3]=0u;check("exact_ordered_message_does_not_erase_raw_center_reads",rawMessage,false);
+ Code allocateMessage=orderedMessage;allocateMessage[1]=0xbf900009u;check("mesh_allocation_message_remains_unmodeled",allocateMessage,false);
+ Code payloadMessage=orderedMessage;payloadMessage[1]=0xbf900107u;check("ordered_message_payload_bits_remain_unmodeled",payloadMessage,false);
+ Code haltMessage=orderedMessage;haltMessage[1]=0xbf910007u;check("halt_message_remains_unmodeled",haltMessage,false);
+ check("ordered_message_forged_vector_immediate_rejected",orderedMessage,false,[](auto& d,auto&){d.instructions[1].source0.kind=RdnaOperandKind::VectorRegister;d.instructions[1].source0.reg=0;});
+ check("ordered_message_forged_scalar_destination_rejected",orderedMessage,false,[](auto& d,auto&){d.instructions[1].destination.kind=RdnaOperandKind::ScalarRegister;d.instructions[1].destination.reg=5;});
+ check("ordered_message_forged_exec_destination_rejected",orderedMessage,false,[](auto& d,auto&){d.instructions[1].destination.kind=RdnaOperandKind::ExecLo;});
+ check("ordered_message_mismatched_opcode_rejected",orderedMessage,false,[](auto& d,auto&){d.instructions[1].opcodeId=0x11u;});
+ const auto scalarColors=bufferPack();
+ checkBufferPack("scalar_buffer_four_words_pack_two_full_vgprs_staged",scalarColors,true);
+ Code rawPacked=scalarColors;rawPacked[4]=256u|(5u<<9u);checkBufferPack("packed_in_place_raw_center_source_is_read_before_write",rawPacked,false);
+ Code rawPackedSecond=scalarColors;rawPackedSecond[4]=4u|(257u<<9u);checkBufferPack("packed_second_raw_center_source_is_read_before_write",rawPackedSecond,false);
+ Code partialPacked=scalarColors;partialPacked.insert(partialPacked.begin()+3,{smov64(8,126),saveexec(106,0)});partialPacked.insert(partialPacked.end()-3,smov64(126,8));
+ checkBufferPack("packed_subset_overwrites_do_not_cover_entry_restore",partialPacked,false);
+ Code scopedPacked=scalarColors;scopedPacked.insert(scopedPacked.begin()+3,saveexec(106,0));checkBufferPack("packed_full_word_writes_in_same_exec_epoch",scopedPacked,true);
+ Code loadLow{smov64(8,126),0xf4280140u,0xfa000000u,vmov(0,129),vmov(1,130),smov64(126,8)};output(loadLow);
+ checkBufferPack("scalar_buffer_fourth_destination_clobbers_saved_exec_low",loadLow,false);
+ Code loadHigh=loadLow;loadHigh[1]=0xf4280180u;checkBufferPack("scalar_buffer_fourth_destination_clobbers_saved_exec_high",loadHigh,false);
+ Code loadAlias{smov64(2,126),0xf4280000u,0xfa000000u,vmov(0,129),vmov(1,130),smov64(126,2)};output(loadAlias);
+ checkBufferPack("scalar_buffer_destination_descriptor_alias_invalidates_saved_exec",loadAlias,false);
+ checkBufferPack("scalar_buffer_vector_descriptor_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].source0.kind=RdnaOperandKind::VectorRegister;d.instructions[0].source0.reg=0;});
+ checkBufferPack("scalar_buffer_vcc_descriptor_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].source0.kind=RdnaOperandKind::VccLo;});
+ checkBufferPack("scalar_buffer_vector_offset_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].source1.kind=RdnaOperandKind::VectorRegister;d.instructions[0].source1.reg=0;});
+ checkBufferPack("scalar_buffer_forged_wider_write_metadata_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].dataDwordCount=8;});
+ checkBufferPack("scalar_buffer_forged_narrow_data_bits_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].dataBits=16;});
+ checkBufferPack("scalar_buffer_mismatched_opcode_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[0].opcodeId=0x0bu;});
+ checkBufferPack("vop3_packed_partial_destination_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[2].destination.explicitSdwaDst=true;d.instructions[2].destination.sdwaSel=4;});
+ checkBufferPack("vop3_packed_source_modifier_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[2].source0.negate=true;});
+ checkBufferPack("vop3_packed_unused_raw_modifier_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[2].rawWords[0]|=0x400u;});
+ checkBufferPack("vop3_packed_mismatched_opcode_rejected",scalarColors,false,[](auto& d,auto&){d.instructions[2].opcodeId=0x311u;});
+ // Existing straight P1/P2 guard behavior: a complete public synthetic pair
+ // remains admitted and an incomplete pair remains rejected by the old body.
+ Code interp{0xc8100000u,0xc8110001u,0xf800180fu,0x04040404u,0xbf810000u};
+ auto decoded=RdnaInstructionDecoder{}.Decode(interp);auto cfg=GraphBuilder{}.Build(decoded);PixelRequest p(interp,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+ ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);++passes;std::cout<<"PASS unchanged_complete_P1_P2_guard\n";
+ decoded.instructions[1].op=RdnaOpcode::VMovB32;bool rejected=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);}catch(const std::exception&){rejected=true;}need(rejected,"incomplete P1/P2 accepted");++passes;std::cout<<"PASS unchanged_incomplete_P1_P2_guard\n";
+ for(const auto& item:PublicInstrumentationProofCases::cases())check(item.name,item.code,item.expected,item.change);
+ for(const auto& item:PublicInstrumentationProofCases::pairCases()){
+  auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+  PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+  bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
+  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected proof failure");}
+  need(validated==item.expected,item.name+" incorrect P1/P2 guard");
+  bool staged=false;try{stage(p.request);staged=true;}
+  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");}
+  need(staged==item.expected,item.name+" incorrect staged P1/P2 guard");
+  ++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+ for(const auto& item:PublicQuadCases::cases())checkQuad(item);
+ for(const auto& item:PublicColorExportCases::cases())checkColorExport(item);
+ // Preserve all 355 existing ordered cases, then qualify the narrow SCC skip proof.
+ for(const auto& item:PublicSccSkipProofCases::cases()){
+  auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+  if(item.change)item.change(decoded,cfg);
+  PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+  bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
+  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
+  need(validated==item.expected,item.name+" incorrect SCC skip guard");
+  // Mutated decoder/CFG metadata controls are guard-only; exact encoded controls
+  // additionally execute production Prepare/Capture/Materialize and Recompile.
+  if(!item.change){
+   bool staged=false;try{stage(p.request);staged=true;}
+   catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");}
+   need(staged==item.expected,item.name+" incorrect staged SCC skip guard");
+  }
+  ++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+
+ // Preserve all401 ordered production cases, then qualify mandatory forward interpolation groups.
+ for(const auto& item:PublicMandatoryDagProofCases::cases()){
+  if(!item.decodeRejection.empty()){
+   bool rejected=false;try{(void)RdnaInstructionDecoder{}.Decode(item.code);}
+   catch(const std::runtime_error& e){rejected=std::string(e.what())==item.decodeRejection;}
+   need(rejected,item.name+" exact decode rejection missing");
+   ++passes;std::cout<<"PASS "<<item.name<<"\n";continue;
+  }
+  auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+  if(item.change)item.change(decoded,cfg);
+  PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+  bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
+  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
+  need(validated==item.expected,item.name+" incorrect mandatory DAG guard");
+  // Mutated metadata controls qualify the exact decoder/CFG guard only.
+  // Every encoded non-overflow case also calls production staged APIs.
+  if(!item.change){
+   const std::array<std::uint32_t,13> capabilities{
+    spv::CapabilityShader,spv::CapabilityInt64,spv::CapabilityGroupNonUniform,spv::CapabilityGroupNonUniformBallot,
+    spv::CapabilityPhysicalStorageBufferAddresses,spv::CapabilityStorageBuffer8BitAccess,
+    spv::CapabilitySampledImageArrayDynamicIndexing,spv::CapabilityShaderNonUniform,
+    spv::CapabilityRuntimeDescriptorArray,spv::CapabilitySampledImageArrayNonUniformIndexing,
+    spv::CapabilityStorageImageArrayNonUniformIndexing,spv::CapabilityStorageBufferArrayNonUniformIndexing,spv::CapabilityImageQuery,
+   };
+   const std::array<std::string_view,3> extensions{"SPV_KHR_physical_storage_buffer","SPV_KHR_8bit_storage","SPV_EXT_descriptor_indexing"};
+   // Synthetic Color2DArray RGBA descriptor at s8..s15 and sampler s24..s27,
+   // matching the public NSA encoding's scalar operands. No game data.
+   std::array<std::uint32_t,28> userData{};
+   userData[8]=0x200000u;userData[9]=56u<<20u;userData[10]=3u<<14u;
+   userData[11]=0xfacu|(13u<<28u);
+   p.request.context.userData=userData;
+   p.request.target.supportedCapabilities=capabilities;p.request.target.supportedExtensions=extensions;
+   p.request.target.bdaAbiVersion=1;
+   bool staged=false;try{stage(p.request);staged=true;}
+   catch(const std::runtime_error& e){
+    if(item.expected)throw std::runtime_error(item.name+" unexpected staged failure: "+e.what());
+    need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");
+   }
+   need(staged==item.expected,item.name+" incorrect staged mandatory DAG result");
+  }
+  ++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+
+
+ // Complete optional groups use one immutable original SGPR for M0. Outputs
+ // that can contain interpolation are read only when initialized on all paths.
+ for(const auto& item:PublicOptionalInterpolationGroupCases::cases()){
+  auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+  if(item.change)item.change(decoded,cfg);
+  PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+  bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
+  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected optional-group guard failure");}
+  need(validated==item.expected,item.name+" incorrect optional-group guard");
+  if(!item.change){
+   const std::array<std::uint32_t,13> capabilities{
+    spv::CapabilityShader,spv::CapabilityInt64,spv::CapabilityGroupNonUniform,spv::CapabilityGroupNonUniformBallot,
+    spv::CapabilityPhysicalStorageBufferAddresses,spv::CapabilityStorageBuffer8BitAccess,
+    spv::CapabilitySampledImageArrayDynamicIndexing,spv::CapabilityShaderNonUniform,
+    spv::CapabilityRuntimeDescriptorArray,spv::CapabilitySampledImageArrayNonUniformIndexing,
+    spv::CapabilityStorageImageArrayNonUniformIndexing,spv::CapabilityStorageBufferArrayNonUniformIndexing,spv::CapabilityImageQuery,
+   };
+   const std::array<std::string_view,3> extensions{"SPV_KHR_physical_storage_buffer","SPV_KHR_8bit_storage","SPV_EXT_descriptor_indexing"};
+   // Wholly synthetic scalar-buffer descriptor at s52..s55. All its 16 words
+   // are available, including oversized-load negative cases; no game resources.
+   std::array<std::uint32_t,56> userData{};
+   userData[52]=0x930000u;userData[54]=64u;userData[55]=0x31016facu;
+   const std::array<std::uint32_t,16> values{};
+   const std::array<MemoryRegion,1> memory{{{0x930000u,std::as_bytes(std::span(values))}}};
+   p.request.context.userData=userData;p.request.context.memory=memory;
+   p.request.target.supportedCapabilities=capabilities;p.request.target.supportedExtensions=extensions;p.request.target.bdaAbiVersion=1;
+   bool staged=false;try{stage(p.request);staged=true;}
+   catch(const std::runtime_error& e){
+    if(item.expected)throw std::runtime_error(item.name+" unexpected optional-group staged failure: "+e.what());
+    need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected optional-group staged rejection");
+   }
+   need(staged==item.expected,item.name+" incorrect optional-group staged result");
+  }
+  ++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+
+ std::cout<<"TOTAL_PASS "<<passes<<"\n";return 0;
+ }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<"\n";return 1;}}

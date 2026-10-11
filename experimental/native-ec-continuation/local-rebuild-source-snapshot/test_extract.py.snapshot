@@ -1,0 +1,34 @@
+"""Small extraction/immutability controls, not runtime acceptance tests."""
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+
+HERE=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location('extract_native_link',HERE/'extract_harness.py')
+e=importlib.util.module_from_spec(spec);spec.loader.exec_module(e)
+
+class Extraction(unittest.TestCase):
+ def test_definition_not_earlier_call(self):
+  text='void Caller() { NtSetContextThread(1,2); }\nNTSTATUS WINAPI NtSetContextThread( int a, int b ) { return a+b; }\n'
+  self.assertTrue(e.function(text,'NtSetContextThread').startswith('NTSTATUS WINAPI'))
+ def test_missing_definition_refuses(self):
+  with self.assertRaises(ValueError):e.function('void C() { F(); }','F')
+ def test_unclosed_definition_refuses(self):
+  with self.assertRaises(ValueError):e.function('static int F() {','F')
+ def test_real_production_extraction_and_original_delta(self):
+  with tempfile.TemporaryDirectory() as d:
+   out=Path(d)/'new'; text=e.generate(out)
+   helper=e.function((HERE/'candidate'/e.MODULE).read_text(),'PreserveEnterECNativeLink')
+   self.assertIn(helper,text)
+   old=(out/'original.cpp').read_text()
+   self.assertNotIn('PreserveEnterECNativeLink',old)
+   self.assertIn('memcpy( frame->x + 19, context->X + 19',text)
+   self.assertIn('frame->lr    = context->Lr;',text)
+   self.assertIn('arm_ctx->Lr   = ec_ctx->Lr;',text)
+   self.assertIn('ec_ctx->Lr    = arm_ctx->Lr;',text)
+ def test_output_exclusive(self):
+  with tempfile.TemporaryDirectory() as d:
+   with self.assertRaises(FileExistsError):e.generate(Path(d))
+
+if __name__=='__main__':unittest.main()

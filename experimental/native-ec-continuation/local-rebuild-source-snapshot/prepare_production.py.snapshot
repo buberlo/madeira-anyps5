@@ -1,0 +1,65 @@
+"""Prepare an exclusive reviewed checkout/command plan. No compiler or device calls."""
+from pathlib import Path
+import argparse,hashlib,json,os,shutil,stat
+HERE=Path(__file__).resolve().parent
+ROOT=HERE.parent.parent
+FULL=ROOT/'build/fex-native-critical-suspend-full-link-20261011'
+NATIVE=ROOT/'build/fex-native-critical-native-archives-proposal-20261011'
+def sha(p):
+ h=hashlib.sha256()
+ with Path(p).open('rb') as f:
+  for b in iter(lambda:f.read(1<<20),b''):h.update(b)
+ return h.hexdigest()
+def stamp(p):
+ p=Path(p);s=p.lstat();t=p.resolve(strict=True);z=t.stat()
+ if not stat.S_ISREG(z.st_mode):raise ValueError('Nonregular target '+str(p))
+ return {'lexical':[s.st_dev,s.st_ino,s.st_mode,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns],'resolved':str(t),'target':[z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns],'linkTarget':os.readlink(p) if p.is_symlink() else None}
+def merge(target,source):
+ for name,digest in source.items():
+  if name in target and target[name]!=digest:raise ValueError('Provider conflict '+name)
+  target[name]=digest
+def prepare(expected):
+ reviewpath=HERE/'source-review-freeze.json'
+ if len(expected)!=64 or sha(reviewpath)!=expected:raise ValueError('Exact reviewed source required')
+ review=json.loads(reviewpath.read_text());recipepath=HERE/'production-rebuild-recipe.json';recipe=json.loads(recipepath.read_text())
+ dest=Path(recipe['sourceDestination']);out=dest.parent
+ if out.exists():raise FileExistsError('Exclusive new build root required '+str(out))
+ inputs={str(reviewpath):expected};merge(inputs,review['inputHashes'])
+ for frozen in [FULL/'source-freeze.json',NATIVE/'source-freeze.json']:
+  merge(inputs,json.loads(frozen.read_text())['inputs']);merge(inputs,{str(frozen):sha(frozen)})
+ decision=json.loads((NATIVE/'execution/final-receipt.json').read_text())
+ for key in ['inputHashes','actualCompileDependencies','outputs']:merge(inputs,decision[key])
+ source=json.loads((FULL/'source-manifest.json').read_text())['files']
+ if len(source)!=6973:raise ValueError('Full baseline source count')
+ for rel,digest in source.items():merge(inputs,{str(FULL/'source'/rel):digest})
+ before={name:stamp(name) for name in inputs}
+ for name,digest in inputs.items():
+  if sha(name)!=digest or stamp(name)!=before[name]:raise ValueError('Initial provider drift '+name)
+ out.mkdir()
+ record={'status':'failed_preparation','sourceReviewSha256':expected,'inputHashes':inputs,'inputFingerprints':before}
+ try:
+  for rel,digest in source.items():
+   target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(FULL/'source'/rel,target)
+   if sha(target)!=digest:raise ValueError('Baseline copy '+rel)
+  overlay=json.loads((HERE/'baseline-bindings.json').read_text())['candidateHashes']
+  for rel,digest in overlay.items():
+   target=dest/rel;shutil.copy2(HERE/'candidate'/rel,target)
+   if sha(target)!=digest:raise ValueError('Overlay copy '+rel)
+  source.update(overlay)
+  generated=json.loads((NATIVE/'source-freeze.json').read_text())['generatedHeaders']
+  for rel,digest in generated.items():
+   target=dest/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(NATIVE/'execution/source'/rel,target)
+   if sha(target)!=digest:raise ValueError('Generated header copy '+rel)
+  for name,digest in inputs.items():
+   if sha(name)!=digest or stamp(name)!=before[name]:raise ValueError('Final provider drift '+name)
+  if sha(reviewpath)!=expected:raise ValueError('Final exact source review')
+  record.update(status='prepared_fresh6973_overlay3_generated5_not_compiled',sourceFiles=source,generatedHeaders=generated,recipe=recipe,recipeSha256=sha(recipepath),compilerExecuted=False,deviceActions=False)
+ except BaseException as error:
+  record['error']=str(error);raise
+ finally:
+  (out/'production-source-freeze.json').write_text(json.dumps(record,indent=2)+'\n')
+ return out/'production-source-freeze.json'
+if __name__=='__main__':
+ parser=argparse.ArgumentParser();parser.add_argument('--prepare',action='store_true');parser.add_argument('--expected-source-review-sha256');args=parser.parse_args()
+ if not args.prepare:print('inert; no checkout, build or device action')
+ else:print(prepare(args.expected_source_review_sha256 or ''))
