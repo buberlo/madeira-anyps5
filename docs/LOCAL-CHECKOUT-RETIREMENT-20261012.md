@@ -19,3 +19,7 @@ A compact private archive retains helper sources, bounded configuration/diagnost
 The new native source and submodule object stores must be independent of the retired checkout. A connectivity check and the absence of borrowed object stores are required before deletion. No source state, asset contents, pairing material, raw shader or personal save file is published in this document.
 
 All work remains local. GitHub Actions stay disabled. The physical iPad's installed app and data are not removed by deleting this Mac checkout.
+
+## Completed removal
+
+The old local checkout has been removed. The source checkpoint was freshly cloned from GitHub before removal. The handoff and its archives were verified, and the native runner/FEX Git object connectivity was checked again after deletion. Removal increased available disk space by **56.13 GB** at the measured boundary; other active projects can change free space afterward. The retained private handoff is about 2.74 GB, consolidating inputs and recovery data rather than keeping the repeated Wine packages. [Sanitized completed-operation record](evidence/local-checkout-retirement-20261012.json).
