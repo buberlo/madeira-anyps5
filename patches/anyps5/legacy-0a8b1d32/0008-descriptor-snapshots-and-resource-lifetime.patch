@@ -1,0 +1,1536 @@
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/GuestTextureResource.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/GuestTextureResource.hpp
+index 4ccd6a4..0045da8 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/GuestTextureResource.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/GuestTextureResource.hpp
+@@ -58,7 +58,9 @@ enum class TextureDimension {
+     k2DArray,
+     kCube,
+     k3D,
+-    k1DArray
++    k1DArray,
++    k2DMsaa,
++    k2DMsaaArray
+ };
+ 
+ struct GuestTextureResource {
+@@ -86,6 +88,9 @@ struct GuestTextureResource {
+     bool dccPipeAligned = false;
+     std::uint32_t minLod = 0;
+     std::uint32_t allocatedMipCount = 0;
++    // Stored fragment/sample-index count; T# does not encode coverage count.
++    std::uint32_t samples = 1;
++    std::uint32_t fragments = 1;
+ };
+ 
+ float EffectiveMinLod(const GuestTextureResource& resource);
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/InitialDescriptorWrites.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/InitialDescriptorWrites.hpp
+new file mode 100644
+index 0000000..b873052
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/InitialDescriptorWrites.hpp
+@@ -0,0 +1,97 @@
++#ifndef CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_INITIALDESCRIPTORWRITES_HPP
++#define CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_INITIALDESCRIPTORWRITES_HPP
++
++#include <vulkan/vulkan.h>
++#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++#include <memory>
++#include <span>
++#include <stdexcept>
++#include <utility>
++#include <vector>
++
++namespace AgcDriver::Graphics {
++
++// Diagnostic experiment only. The default path neither saves descriptor infos
++// nor changes how a draw's read-only buffer snapshots are bound.
++inline bool ExplicitDrawDescriptorsEnabled() noexcept {
++    static const bool enabled = [] {
++        const char* value = std::getenv("APS5_EXPLICIT_DRAW_DESCRIPTORS");
++        return value != nullptr && std::strcmp(value, "1") == 0;
++    }();
++    return enabled;
++}
++
++class InitialDescriptorWrites {
++public:
++    explicit InitialDescriptorWrites(std::span<const VkWriteDescriptorSet> writes) {
++        entries.reserve(writes.size());
++        for (const auto& write : writes) {
++            if (write.sType != VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET || write.pNext != nullptr ||
++                write.descriptorCount == 0 || write.pTexelBufferView != nullptr)
++                throw std::runtime_error("unsupported initial draw descriptor write");
++            Entry entry{write.dstBinding, write.dstArrayElement, write.descriptorCount, write.descriptorType};
++            switch (write.descriptorType) {
++                case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
++                    if (write.pBufferInfo == nullptr || write.pImageInfo != nullptr)
++                        throw std::runtime_error("initial draw buffer descriptor has invalid infos");
++                    entry.buffers.assign(write.pBufferInfo, write.pBufferInfo + write.descriptorCount);
++                    break;
++                case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
++                case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
++                case VK_DESCRIPTOR_TYPE_SAMPLER:
++                    if (write.pImageInfo == nullptr || write.pBufferInfo != nullptr)
++                        throw std::runtime_error("initial draw image descriptor has invalid infos");
++                    entry.images.assign(write.pImageInfo, write.pImageInfo + write.descriptorCount);
++                    break;
++                default:
++                    throw std::runtime_error("initial draw descriptor type is unsupported");
++            }
++            entries.push_back(std::move(entry));
++        }
++    }
++
++    // Returned pointers refer to this immutable owner, not the returned vector.
++    // Keep the owner alive until vkUpdateDescriptorSets has consumed every write.
++    std::vector<VkWriteDescriptorSet> ForSet(VkDescriptorSet set) const {
++        if (set == VK_NULL_HANDLE) throw std::runtime_error("initial draw descriptors need a destination set");
++        std::vector<VkWriteDescriptorSet> writes;
++        writes.reserve(entries.size());
++        for (const auto& entry : entries) {
++            VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
++            write.dstSet = set;
++            write.dstBinding = entry.binding;
++            write.dstArrayElement = entry.arrayElement;
++            write.descriptorCount = entry.count;
++            write.descriptorType = entry.type;
++            write.pBufferInfo = entry.buffers.empty() ? nullptr : entry.buffers.data();
++            write.pImageInfo = entry.images.empty() ? nullptr : entry.images.data();
++            writes.push_back(write);
++        }
++        return writes;
++    }
++
++    std::size_t Size() const noexcept { return entries.size(); }
++
++private:
++    struct Entry {
++        std::uint32_t binding;
++        std::uint32_t arrayElement;
++        std::uint32_t count;
++        VkDescriptorType type;
++        std::vector<VkDescriptorBufferInfo> buffers;
++        std::vector<VkDescriptorImageInfo> images;
++    };
++    std::vector<Entry> entries;
++};
++
++inline std::unique_ptr<InitialDescriptorWrites> CaptureInitialDrawDescriptors(
++    std::span<const VkWriteDescriptorSet> writes) {
++    if (!ExplicitDrawDescriptorsEnabled()) return {};
++    return std::make_unique<InitialDescriptorWrites>(writes);
++}
++
++}
++
++#endif
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/Resources.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/Resources.hpp
+index 8830f78..142f461 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/Resources.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/Resources.hpp
+@@ -81,13 +81,25 @@ public:
+     RenderTarget(const RenderTarget&) = delete;
+     RenderTarget& operator=(const RenderTarget&) = delete;
+     VkImage Image() const;
+-    VkImageView View() const;
++    // Every group is a distinct framebuffer attachment; none is a resolve image.
++    VkImageView View(std::uint32_t group = 0) const;
++    VkFormat Format() const { return format; }
++    VkExtent2D Extent() const { return extent; }
++    VkDevice Device() const { return context.device; }
++    VkImageView SampledView() const { return sampledView; }
++    VkSampleCountFlagBits NativeSamples() const { return nativeSamples; }
++    std::uint32_t Groups() const { return layers; }
+ 
+ private:
+     void release() noexcept;
+     Context context;
++    VkFormat format = VK_FORMAT_UNDEFINED;
++    VkExtent2D extent{};
+     VkImage image = VK_NULL_HANDLE;
+-    VkImageView view = VK_NULL_HANDLE;
++    std::array<VkImageView, 2> views{};
++    VkImageView sampledView = VK_NULL_HANDLE;
++    VkSampleCountFlagBits nativeSamples = VK_SAMPLE_COUNT_1_BIT;
++    std::uint32_t layers = 1;
+     VkDeviceMemory memory = VK_NULL_HANDLE;
+ };
+ 
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp
+index dbfdf15..1291430 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp
+@@ -5,6 +5,7 @@
+ #include "prx/libSceAgcDriver/Graphics/include/BdaResources.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Texture.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Sampler.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/InitialDescriptorWrites.hpp"
+ #include "Recompiler.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Shaders.hpp"
+ #include <array>
+@@ -67,6 +68,7 @@ public:
+         std::size_t poolIndex = 0;
+         bool updateAfterBind = false;
+     };
++    // Large sets receive an owned dedicated pool; ordinary and update-after-bind chains are separate.
+     SetAllocation Allocate(VkDescriptorSetLayout layout, std::span<const VkDescriptorPoolSize> sizes, bool updateAfterBind = false);
+     void Free(const SetAllocation& allocation) noexcept;
+     // APS5_PROFILE_DRAW counters: layouts served from the map / created, sets allocated, pools opened.
+@@ -152,12 +154,24 @@ public:
+     bool WritesOverlap(std::uint64_t address, std::size_t bytes) const { return guestMemory.WritesOverlap(address, bytes); }
+     // Whether a region the recorded work reads in place through a host import overlaps the range.
+     bool ReadsOverlap(std::uint64_t address, std::size_t bytes) const;
++    // Conservative shader input/attachment alias check, including copied snapshots.
++    bool ReadsGuestRange(std::uint64_t address, std::size_t bytes) const;
+     // The recorder's hazard tracker inputs (Recorder::NoteAccess): the written elements' guest
+     // ranges, the regions read in place, and the storage images with whether each is written.
+     const std::vector<std::pair<std::uint64_t, std::uint64_t>>& GpuWrites() const { return guestMemory.Writes(); }
+     std::vector<std::pair<std::uint64_t, std::uint64_t>> InPlaceReads() const { return guestMemory.InPlaceReads(); }
+     std::vector<std::pair<VkImage, bool>> StorageImages() const;
+     std::vector<std::pair<std::uint64_t, std::uint64_t>> DeviceReads() const { return guestMemory.DeviceReads(); }
++    // Whether a use writes guest memory beyond a draw's attachments (storage images, written or
++    // copied buffers, an address-based build's unknown writes), or reads `image` (a view of it
++    // sampled, or the image itself bound): a recorded draw's render pass may only be continued by
++    // a draw for which neither holds (Draw.cpp).
++    bool WritesMemory() const;
++    // Guest-side effects, retaining conservative rejection of address-based
++    // leases. A host BDA/fault diagnostic still requires NeedsCompletion and
++    // CheckFault; excluding that completion is safe only after the caller has
++    // proved the shader's diagnostic is canonical and repeatable.
++    bool WritesGuestMemory() const;
+     bool ReadsImage(const StorageTexture* image) const;
+     const std::vector<std::uint32_t>& LayoutKey() const { return layoutKey; }
+     // Debug aid: each bound guest resource with the fraction of sampled bytes that are nonzero.
+@@ -283,6 +297,10 @@ private:
+         std::vector<std::size_t> imageAllocations;
+     };
+ 
++    // Optional owned copies of the initial set writes. Resource owners below
++    // retain every referenced buffer/image/sampler; only the infos are copied.
++    std::unique_ptr<InitialDescriptorWrites> initialDescriptorWrites;
++
+     // A host-imported buffer region the set reads in place, with its import's identity at build time.
+     struct DirectRegion {
+         std::uint64_t begin;
+@@ -427,6 +445,7 @@ private:
+     std::vector<VkDescriptorBufferInfo> descriptorBuffers;
+     std::vector<VkDescriptorImageInfo> descriptorImages;
+     std::vector<VkWriteDescriptorSet> descriptorWrites;
++    std::vector<VkDescriptorBufferInfo> allocationDescriptors;
+     // Guest buffer elements bound read-only: each use of this object skips that many pending-write
+     // notes (counted in MarkGpuWrites for the [buffers] line).
+     std::size_t readOnlyBuffers = 0;
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/Shaders.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/Shaders.hpp
+index a7e8bd9..45839a8 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/Shaders.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/Shaders.hpp
+@@ -33,10 +33,15 @@ inline std::uint32_t StagePushOffset(std::uint32_t cursor, ShaderRecompiler::Sha
+     return fixedSlots && stage == ShaderRecompiler::ShaderStage::Fragment ? PipelinePushSlotBytes : cursor;
+ }
+ 
++// Driver-owned factories can identify immutable compiled code for a pipeline
++// without admitting transient guest resources to the resource/recipe caches.
++enum class PipelineShaderIdentity : std::uint8_t { None, ColorResolveFragment };
++
+ struct CompiledShader {
+     ShaderRecompiler::ShaderStage stage;
+     const ShaderRecompiler::RecompileResult* program;
+     std::uint32_t pushConstantOffset;
++    PipelineShaderIdentity pipelineIdentity = PipelineShaderIdentity::None;
+ };
+ 
+ inline VkShaderStageFlagBits VulkanStage(ShaderRecompiler::ShaderStage stage) {
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/SplitDrawShaderValidation.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/SplitDrawShaderValidation.hpp
+new file mode 100644
+index 0000000..ed85e0e
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/SplitDrawShaderValidation.hpp
+@@ -0,0 +1,28 @@
++#ifndef CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_SPLITDRAWSHADERVALIDATION_HPP
++#define CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_SPLITDRAWSHADERVALIDATION_HPP
++
++#include "prx/libSceAgcDriver/Graphics/include/Shaders.hpp"
++#include <string>
++
++namespace AgcDriver::Graphics {
++
++// Conservative shader-only prerequisite for repeating one vertex/fragment draw
++// into disjoint native sample groups. Empty means this static prerequisite passed.
++// Run ordinary pipeline/SPIR-V validation first. A pass DOES NOT prove that
++// resource reads cannot alias the attachments or writes of another pass; the draw
++// path must separately prove dynamic alias/feedback freedom, preserve sample
++// locations, depth/stencil, queries, and target lifetime before enabling a split.
++// This is not called for ordinary single-sample rendering.
++std::string SplitDrawShaderRejection(std::span<const CompiledShader> shaders);
++
++// The same prerequisite for the internally generated rectangle pipeline. The
++// original guest vertex/fragment programs must pass the ordinary static guard.
++// Both intermediate stages, including all their resource metadata, must match
++// a fresh BuildRectListShaders result for these programs and the actual target.
++// Only that canonical factory's private fault diagnostic may be repeated; this
++// does not admit arbitrary guest tessellation or relax dynamic resource checks.
++std::string SplitRectListShaderRejection(std::span<const CompiledShader> shaders,
++                                       const ShaderRecompiler::SpirvTarget& target);
++
++}
++#endif
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/Texture.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/Texture.hpp
+index 9f4c776..899e118 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/Texture.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/Texture.hpp
+@@ -25,6 +25,7 @@ namespace AgcDriver::Graphics {
+ class ResidentColor;
+ class CommandBatch;
+ class StorageTexture;
++class RenderTarget;
+ struct HostImport;
+ 
+ // The Vulkan format storage images of a guest format use (sRGB formats store as their UNORM form).
+@@ -92,6 +93,8 @@ public:
+     VkImageLayout Layout() const { return layout; }
+     VkDeviceSize AllocationBytes() const { return allocationBytes; }
+     VkFormat ViewFormat() const { return viewFormat; }
++    std::uint32_t LogicalSamples() const { return logicalSamples; }
++    std::uint32_t NativeSamples() const { return nativeSamples; }
+     // Whether this texture is a view of a storage image (no snapshot of its own).
+     bool ViewsStorageImage() const { return storageSource != nullptr; }
+     const StorageTexture* StorageSource() const { return storageSource.get(); }
+@@ -131,6 +134,9 @@ private:
+     std::uint64_t copiedVersion = 0;
+     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+     std::uint32_t copyWidth = 0, copyHeight = 0, copyLevels = 0, copyLayers = 0, copyElementBytes = 0;
++    std::unique_ptr<RenderTarget> sampleOwner;
++    std::uint32_t logicalSamples = 1;
++    std::uint32_t nativeSamples = 1;
+ };
+ 
+ VkFormat AttachmentProxyFormat(const Context& context, VkFormat format);
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/TextureCache.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/TextureCache.hpp
+index 012c5d0..d066ce4 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/TextureCache.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/TextureCache.hpp
+@@ -23,6 +23,7 @@ private:
+         std::uint64_t generation = 0;
+     };
+     void trim();
++    static std::uint64_t BudgetBytes();
+     Context context;
+     std::list<Entry> entries;
+     std::uint64_t retainedBytes = 0;
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/GuestTextureResource.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/GuestTextureResource.cpp
+index 8fea5ae..e243f95 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/GuestTextureResource.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/GuestTextureResource.cpp
+@@ -1,4 +1,5 @@
+ #include <cstdio>
++#include "GroupedMsaa.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/GuestTextureResource.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Context.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/TextureTiling.hpp"
+@@ -43,6 +44,8 @@ TextureDimension resolveDimension(std::uint32_t raw) {
+         case 11: return TextureDimension::kCube;
+         case 12: return TextureDimension::k1DArray;
+         case 13: return TextureDimension::k2DArray;
++        case 14: return TextureDimension::k2DMsaa;
++        case 15: return TextureDimension::k2DMsaaArray;
+         default: throw std::runtime_error("AGC graphics: guest texture descriptor uses an unsupported image type " + std::to_string(raw));
+     }
+ }
+@@ -110,7 +113,7 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> words)
+     Require(!cornerSample, "guest texture descriptor uses corner sampling which is not implemented");
+     Require(!prtDefColor, "guest texture descriptor uses a partially resident default color which is not implemented");
+     Require(arrayPitch == 0, "guest texture descriptor uses a nonzero array pitch which is not implemented");
+-    Require(!msaaDepth, "guest texture descriptor uses MSAA which is not implemented");
++    Require(!msaaDepth, "guest texture descriptor uses multisampled depth sampling which is not implemented");
+     static_cast<void>(maxUncompBlkSize);
+     static_cast<void>(maxCompBlkSize);
+     // Surfaces are always written uncompressed here (render targets and storage images bypass DCC), so
+@@ -125,6 +128,14 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> words)
+     }
+     Require(bcSwizzle <= 5u, "guest texture descriptor uses a reserved BC swizzle");
+ 
++    const bool multisampled = typeRaw == 14u || typeRaw == 15u;
++    const auto fragments = multisampled ? ShaderRecompiler::TextureFragmentCount(words[3], words[5]) : 1u;
++    if (multisampled) {
++        Require(minLod == 0u, "multisampled texture cannot use a minimum LOD");
++        Require(!metaCompress && !writeCompress && metaAddr == 0u, "compressed multisampled texture sampling is not implemented");
++        Require(tileModeRaw == 0x1bu, "multisampled color texture needs the R64KB_X layout");
++        lastLevel = 0u;
++    }
+     Require(baseLevel <= lastLevel, "guest texture descriptor has a base mip level past its last mip level");
+ 
+ 
+@@ -151,6 +162,7 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> words)
+         case TextureDimension::k1D:
+             Require(height == 1 && depth == 0 && baseArray == 0, "guest 1D texture descriptor has a nonzero height, depth or base array");
+             break;
++        case TextureDimension::k2DMsaa:
+         case TextureDimension::k2D:
+             Require(depth == 0 && baseArray == 0, "guest 2D texture descriptor has a nonzero depth or base array");
+             break;
+@@ -158,6 +170,9 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> words)
+             // word4 DEPTH holds the depth minus one; BASE_ARRAY has no meaning for volumes.
+             Require(baseArray == 0, "guest 3D texture descriptor has a nonzero base array");
+             break;
++        case TextureDimension::k2DMsaaArray:
++            Require(baseArray == 0u && depth == 0u, "multisampled array texture sampling currently supports only one logical layer");
++            [[fallthrough]];
+         case TextureDimension::k2DArray:
+             Require(baseArray <= depth, "guest 2D array texture descriptor has a base array past its last array slice");
+             break;
+@@ -184,8 +199,9 @@ GuestTextureResource DecodeTextureResource(std::span<const std::uint32_t> words)
+     result.height = height;
+     result.depthOrLastArray = depth;
+     result.baseArray = baseArray;
+-    result.mipCount = maxMip + 1u;
+-    result.allocatedMipCount = maxMip + 1u;
++    result.mipCount = multisampled ? 1u : maxMip + 1u;
++    result.allocatedMipCount = result.mipCount;
++    result.samples = result.fragments = fragments;
+     result.baseLevel = baseLevel;
+     result.lastLevel = lastLevel;
+     result.tileMode = tileMode;
+@@ -224,6 +240,10 @@ bool MatchesGuestDimension(ShaderRecompiler::DescriptorImageShape shape, Texture
+         case ShaderRecompiler::DescriptorImageShape::ImageCube: return dimension == TextureDimension::kCube;
+         case ShaderRecompiler::DescriptorImageShape::Image3D: return dimension == TextureDimension::k3D;
+         case ShaderRecompiler::DescriptorImageShape::Image1DArray: return dimension == TextureDimension::k1DArray;
++        case ShaderRecompiler::DescriptorImageShape::Image2DMsaa: return dimension == TextureDimension::k2DMsaa;
++        // A grouped non-array guest image also binds as a multisampled host array.
++        // The caller must additionally check imageNativeSamples against that view.
++        case ShaderRecompiler::DescriptorImageShape::Image2DMsaaArray: return dimension == TextureDimension::k2DMsaaArray || dimension == TextureDimension::k2DMsaa;
+     }
+     throw std::runtime_error("AGC graphics: MatchesGuestDimension encountered an unknown descriptor image shape");
+ }
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/Resources.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/Resources.cpp
+index 7002686..17c5d80 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/Resources.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/Resources.cpp
+@@ -266,66 +266,6 @@ void FillDeviceFunctions(const Context& context, DeviceFunctions& functions) {
+     functions.getFenceStatus = context.Function<PFN_vkGetFenceStatus>("vkGetFenceStatus");
+ }
+ 
+-RenderTarget::RenderTarget(const Context& context, const ColorTarget& target, bool blending) : context(context) {
+-    VkFormatProperties properties{};
+-    context.formatProperties(context.physical, target.format, &properties);
+-    const VkFormatFeatureFlags required = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT | (blending ? VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT : 0u);
+-    Require((properties.optimalTilingFeatures & required) == required, "render-target format does not support required operations");
+-    constexpr auto usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+-    VkImageFormatProperties supported{};
+-    Check(context.imageFormatProperties(context.physical, target.format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, usage, 0, &supported), "vkGetPhysicalDeviceImageFormatProperties");
+-    Require(target.extent.width <= supported.maxExtent.width && target.extent.height <= supported.maxExtent.height && (supported.sampleCounts & VK_SAMPLE_COUNT_1_BIT) != 0 && target.bytes <= supported.maxResourceSize, "render target exceeds device image limits");
+-    Require(target.extent.width <= context.limits.maxFramebufferWidth && target.extent.height <= context.limits.maxFramebufferHeight, "render target exceeds framebuffer limits");
+-    try {
+-        VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+-        info.imageType = VK_IMAGE_TYPE_2D;
+-        info.format = target.format;
+-        info.extent = {target.extent.width, target.extent.height, 1};
+-        info.mipLevels = 1;
+-        info.arrayLayers = 1;
+-        info.samples = VK_SAMPLE_COUNT_1_BIT;
+-        info.tiling = VK_IMAGE_TILING_OPTIMAL;
+-        info.usage = usage;
+-        info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+-        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+-        Check(context.Function<PFN_vkCreateImage>("vkCreateImage")(context.device, &info, nullptr, &image), "vkCreateImage");
+-        VkMemoryRequirements requirements{};
+-        context.Function<PFN_vkGetImageMemoryRequirements>("vkGetImageMemoryRequirements")(context.device, image, &requirements);
+-        VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+-        allocation.allocationSize = requirements.size;
+-        allocation.memoryTypeIndex = context.MemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+-        Check(context.Function<PFN_vkAllocateMemory>("vkAllocateMemory")(context.device, &allocation, nullptr, &memory), "vkAllocateMemory render target");
+-        Check(context.Function<PFN_vkBindImageMemory>("vkBindImageMemory")(context.device, image, memory, 0), "vkBindImageMemory");
+-        VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+-        viewInfo.image = image;
+-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+-        viewInfo.format = target.format;
+-        viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+-        Check(context.Function<PFN_vkCreateImageView>("vkCreateImageView")(context.device, &viewInfo, nullptr, &view), "vkCreateImageView");
+-    } catch (...) {
+-        release();
+-        throw;
+-    }
+-}
+-
+-RenderTarget::~RenderTarget() {
+-    release();
+-}
+-
+-void RenderTarget::release() noexcept {
+-    if (view) context.Function<PFN_vkDestroyImageView>("vkDestroyImageView")(context.device, view, nullptr);
+-    if (image) context.Function<PFN_vkDestroyImage>("vkDestroyImage")(context.device, image, nullptr);
+-    if (memory) context.Function<PFN_vkFreeMemory>("vkFreeMemory")(context.device, memory, nullptr);
+-}
+-
+-VkImage RenderTarget::Image() const {
+-    return image;
+-}
+-
+-VkImageView RenderTarget::View() const {
+-    return view;
+-}
+-
+ CommandBatch::CommandBatch(const Context& context) : context(context) {
+     // Records into the device's one command pool and submits to its queue: device-lock work only.
+     GuestMemory::AssertGpuLockHeld("CommandBatch");
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
+index b6f7cad..7fedd19 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
+@@ -5,6 +5,8 @@
+ #include "prx/libSceAgcDriver/Graphics/include/DepthSurface.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Recorder.hpp"
+ #include <algorithm>
+ #include <atomic>
+@@ -401,7 +403,7 @@ bool SampledFromStorageEligible(const Context& context, std::uint32_t format, st
+ }
+ 
+ bool SampledFromStorageEligible(const Context& context, const GuestTextureResource& resource, std::uint64_t guestBytes) {
+-    return SampledFromStorageEligible(context, resource.format, resource.baseAddress, guestBytes);
++    return resource.samples == 1u && SampledFromStorageEligible(context, resource.format, resource.baseAddress, guestBytes);
+ }
+ 
+ // Whether a sampled texture over a fast-cleared, storage-eligible surface views the cleared storage
+@@ -548,7 +550,7 @@ std::shared_ptr<Texture> cachedTexture(const Context& context, std::span<const s
+     // memory first.
+     const bool depthCopy = depthCompare && guestBytes >= DepthCopyMinBytes() && Texture::DepthCopyFormat(ResolveTextureFormat(resource.format)) != VK_FORMAT_UNDEFINED && resource.dimension != TextureDimension::k3D;
+     auto source = StorageTexture::FindPending(address, guestBytes);
+-    if (source != nullptr && (depthCompare ? !depthCopy || !Texture::CanDepthCopyFrom(*source, resource) : !Texture::CanCopyFrom(*source, resource))) source.reset();
++    if (source != nullptr && (resource.samples != 1u || (depthCompare ? !depthCopy || !Texture::CanDepthCopyFrom(*source, resource) : !Texture::CanCopyFrom(*source, resource)))) source.reset();
+     if (source != nullptr && MetadataMoved(*source, resource)) source.reset();
+     std::optional<DccKeys> keys;
+     bool clearThroughKeys = false;
+@@ -1070,6 +1072,7 @@ ShaderResources::ShaderResources(const Context& context, const ShaderRecompiler:
+ 
+ ShaderResources::ShaderResources(const Context& context, std::span<const CompiledShader> shaders, const ColorTarget& target, std::uint32_t colorAttachments, std::uint64_t indexAddress, std::size_t indexBytes, std::span<const GuestMemorySnapshot> snapshots) : context(context), guestMemory(context) {
+     drawBuild = true;
++    ValidateImageDescriptorPolicy(context);
+     prepareAddressBindings(shaders, snapshots);
+     build(shaders, &target, colorAttachments, indexAddress, indexBytes);
+ }
+@@ -1087,6 +1090,7 @@ bool UsesAddressTables(const CompiledShader& compute) {
+ }
+ 
+ ShaderResources::ShaderResources(const Context& context, const CompiledShader& compute, std::span<const GuestMemorySnapshot> snapshots, bool deferred, std::uint64_t dispatchThreads) : context(context), guestMemory(context), dispatchThreads(dispatchThreads), deferredCompute(compute), deferredSnapshots(snapshots) {
++    ValidateImageDescriptorPolicy(context);
+     Require(compute.stage == ShaderRecompiler::ShaderStage::Compute, "compute resources require a compute shader");
+     // Every use of a compute build is a recorded dispatch that calls MarkGpuWrites, which staged
+     // buffers need (a synchronous draw's use would not).
+@@ -1135,7 +1139,52 @@ void ShaderResources::build(std::span<const CompiledShader> shaders, const Color
+ 
+ namespace {
+ 
++// APS5_PROFILE_DRAW: the [resources] phase totals. Each thread accumulates its builds' phases in
++// arrays of its own and merges them into the shared totals every 1000 of its builds (and when it
++// ends), so no build takes the shared mutex per phase; the totals lag by up to 999 builds per
++// worker.
++std::uint32_t SetDescriptorLimit(const Context& context, VkDescriptorType type, bool updateAfterBind) {
++    if (updateAfterBind) Require(context.storageBufferUpdateAfterBind, "storage buffer update-after-bind is unavailable");
++    switch (type) {
++    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
++        return updateAfterBind ? context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageBuffers : context.limits.maxDescriptorSetStorageBuffers;
++    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return updateAfterBind ? std::min(context.limits.maxDescriptorSetSampledImages, context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindSampledImages) : context.limits.maxDescriptorSetSampledImages;
++    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: return updateAfterBind ? std::min(context.limits.maxDescriptorSetStorageImages, context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageImages) : context.limits.maxDescriptorSetStorageImages;
++    case VK_DESCRIPTOR_TYPE_SAMPLER: return updateAfterBind ? std::min(context.limits.maxDescriptorSetSamplers, context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindSamplers) : context.limits.maxDescriptorSetSamplers;
++    default: throw std::runtime_error("AGC graphics: descriptor set uses an unsupported descriptor type " + std::to_string(type));
++    }
++}
++
++void ValidateDescriptorLayout(const Context& context, std::span<const VkDescriptorSetLayoutBinding> bindings, bool updateAfterBind) {
++    if (updateAfterBind) Require(context.storageBufferUpdateAfterBind, "storage buffer update-after-bind is unavailable");
++    const auto maxResources = updateAfterBind ? context.descriptorIndexingLimits.maxPerStageUpdateAfterBindResources : context.limits.maxPerStageResources;
++    const auto maxBuffers = updateAfterBind ? context.descriptorIndexingLimits.maxPerStageDescriptorUpdateAfterBindStorageBuffers : context.limits.maxPerStageDescriptorStorageBuffers;
++    std::map<VkDescriptorType, std::uint64_t> totals;
++    std::map<std::pair<VkShaderStageFlags, VkDescriptorType>, std::uint64_t> stageTotals;
++    std::map<VkShaderStageFlags, std::uint64_t> resources;
++    for (const auto& binding : bindings) {
++        Require(binding.descriptorCount != 0, "empty descriptor binding");
++        const auto total = totals[binding.descriptorType] += binding.descriptorCount;
++        Require(total <= SetDescriptorLimit(context, binding.descriptorType, updateAfterBind), "descriptor set exceeds the device's per-set descriptor limit");
++        for (unsigned bit = 0; bit < 32; ++bit) {
++            const VkShaderStageFlags stage = VkShaderStageFlags(1u) << bit;
++            if ((binding.stageFlags & stage) == 0) continue;
++            const auto count = stageTotals[{stage, binding.descriptorType}] += binding.descriptorCount;
++            const auto all = resources[stage] += binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ? 0u : binding.descriptorCount;
++            Require(all <= maxResources, "shader descriptors exceed per-stage resource limits");
++            switch (binding.descriptorType) {
++            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: Require(count <= maxBuffers, "shader descriptors exceed per-stage limits"); break;
++            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: Require(count <= context.limits.maxPerStageDescriptorSampledImages && (!updateAfterBind || count <= context.descriptorIndexingLimits.maxPerStageDescriptorUpdateAfterBindSampledImages), "shader sampled-image descriptors exceed per-stage limits"); break;
++            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: Require(count <= context.limits.maxPerStageDescriptorStorageImages && (!updateAfterBind || count <= context.descriptorIndexingLimits.maxPerStageDescriptorUpdateAfterBindStorageImages), "shader storage-image descriptors exceed per-stage limits"); break;
++            case VK_DESCRIPTOR_TYPE_SAMPLER: Require(count <= context.limits.maxPerStageDescriptorSamplers && (!updateAfterBind || count <= context.descriptorIndexingLimits.maxPerStageDescriptorUpdateAfterBindSamplers), "shader sampler descriptors exceed per-stage limits"); break;
++            default: Require(false, "unsupported descriptor layout type");
++            }
++        }
++    }
++}
++
+ VkDescriptorSetLayout CreateSetLayout(const Context& context, std::span<const VkDescriptorSetLayoutBinding> bindings, bool updateAfterBind) {
++    ValidateDescriptorLayout(context, bindings, updateAfterBind);
+     std::vector<VkDescriptorBindingFlags> flags;
+     for (const auto& binding : bindings) flags.push_back(updateAfterBind && binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ? VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT : 0);
+     VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO};
+@@ -1152,6 +1201,7 @@ VkDescriptorSetLayout CreateSetLayout(const Context& context, std::span<const Vk
+ }
+ 
+ VkDescriptorPool CreateSetPool(const Context& context, std::span<const VkDescriptorPoolSize> sizes, bool updateAfterBind) {
++    for (const auto& size : sizes) Require(size.descriptorCount <= SetDescriptorLimit(context, size.type, updateAfterBind), "descriptor set exceeds the device's per-set descriptor limit");
+     VkDescriptorPoolCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+     info.flags = updateAfterBind ? VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT : 0;
+     info.maxSets = 1;
+@@ -1162,10 +1212,6 @@ VkDescriptorPool CreateSetPool(const Context& context, std::span<const VkDescrip
+     return pool;
+ }
+ 
+-// APS5_PROFILE_DRAW: the [resources] phase totals. Each thread accumulates its builds' phases in
+-// arrays of its own and merges them into the shared totals every 1000 of its builds (and when it
+-// ends), so no build takes the shared mutex per phase; the totals lag by up to 999 builds per
+-// worker.
+ constexpr std::size_t BuildPhaseCount = static_cast<std::size_t>(ShaderResources::BuildPhase::Count);
+ constexpr std::array<const char*, BuildPhaseCount> BuildPhaseNames{"bindings", "precollect", "guest memory upload", "descriptors", "stage A", "images", "bda", "stage B"};
+ 
+@@ -1242,27 +1288,6 @@ double ShaderResources::phase(BuildPhase which) {
+ 
+ namespace {
+ 
+-void ValidateDescriptorLayout(const Context& context, std::span<const VkDescriptorSetLayoutBinding> bindings, bool updateAfterBind) {
+-    const auto maxStageResources = updateAfterBind ? context.descriptorIndexingLimits.maxPerStageUpdateAfterBindResources : context.limits.maxPerStageResources;
+-    std::map<VkDescriptorType, std::uint64_t> heapTotals;
+-    std::map<std::pair<VkShaderStageFlags, VkDescriptorType>, std::uint64_t> stageTotals;
+-    std::map<VkShaderStageFlags, std::uint64_t> stageResources;
+-    for (const auto& layout : bindings) {
+-        heapTotals[layout.descriptorType] += layout.descriptorCount;
+-        for (std::uint32_t bit = 0u; bit < 32u; ++bit) {
+-            const auto stage = VkShaderStageFlags{1u} << bit;
+-            if ((layout.stageFlags & stage) == 0u) continue;
+-            const auto count = stageTotals[{stage, layout.descriptorType}] += layout.descriptorCount;
+-            const auto all = stageResources[stage] += layout.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ? 0u : layout.descriptorCount;
+-            Require(all <= maxStageResources, "typed heaps exceed per-stage resource capacity");
+-            if (layout.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) Require(count <= context.limits.maxPerStageDescriptorSampledImages, "typed heaps exceed per-stage sampled image capacity");
+-            if (layout.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) Require(count <= context.limits.maxPerStageDescriptorStorageImages, "typed heaps exceed per-stage storage image capacity");
+-            if (layout.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER) Require(count <= context.limits.maxPerStageDescriptorSamplers, "typed heaps exceed per-stage sampler capacity");
+-        }
+-    }
+-    Require(heapTotals[VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE] <= context.limits.maxDescriptorSetSampledImages && heapTotals[VK_DESCRIPTOR_TYPE_STORAGE_IMAGE] <= context.limits.maxDescriptorSetStorageImages && heapTotals[VK_DESCRIPTOR_TYPE_SAMPLER] <= context.limits.maxDescriptorSetSamplers, "typed heaps exceed descriptor set capacity");
+-}
+-
+ void ValidateRuntimeResources(const CompiledShader& shader, std::span<const std::uint32_t> words) {
+     Require(shader.program != nullptr, "missing compiled shader");
+     const auto& program = *shader.program;
+@@ -1320,7 +1345,7 @@ void ShaderResources::buildPrepare(std::span<const CompiledShader> shaders, cons
+             const auto requireStageLimits = [&] {
+                 if (stageStorageBuffers <= context.limits.maxPerStageDescriptorStorageBuffers && stageResources <= context.limits.maxPerStageResources) return;
+                 const auto& limits = context.descriptorIndexingLimits;
+-                Require(stageStorageBuffers <= limits.maxPerStageDescriptorUpdateAfterBindStorageBuffers && stageResources <= limits.maxPerStageUpdateAfterBindResources, "shader descriptors exceed per-stage limits");
++                Require(context.storageBufferUpdateAfterBind && stageStorageBuffers <= limits.maxPerStageDescriptorUpdateAfterBindStorageBuffers && stageResources <= limits.maxPerStageUpdateAfterBindResources, "shader descriptors exceed per-stage limits");
+                 updateAfterBind = true;
+             };
+             for (const auto& binding : shader.program->bindings) {
+@@ -1391,7 +1416,7 @@ void ShaderResources::buildPrepare(std::span<const CompiledShader> shaders, cons
+             }
+         }
+         if (storageBuffers > context.limits.maxDescriptorSetStorageBuffers) {
+-            Require(storageBuffers <= context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageBuffers, "pipeline descriptors exceed device limits");
++            Require(context.storageBufferUpdateAfterBind && storageBuffers <= context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageBuffers, "pipeline descriptors exceed device limits");
+             updateAfterBind = true;
+         }
+         timing.bindingsMs = phase(BuildPhase::Bindings);
+@@ -1412,7 +1437,6 @@ void ShaderResources::buildPrepare(std::span<const CompiledShader> shaders, cons
+         if (context.descriptorCache != nullptr && !noLayoutCache) {
+             _layout = context.descriptorCache->Layout(layoutKey, description, updateAfterBind);
+         } else {
+-            ValidateDescriptorLayout(context, description, updateAfterBind);
+             _layout = CreateSetLayout(context, description, updateAfterBind);
+             ownsLayout = true;
+         }
+@@ -1485,6 +1509,7 @@ void ShaderResources::buildComplete() {
+                 bufferCount += binding.allocations.size();
+                 if (binding.layout.descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) imageCount += binding.layout.descriptorCount;
+             }
++            allocationDescriptors.resize(allocations.size());
+             auto& buffers = descriptorBuffers;
+             auto& images = descriptorImages;
+             buffers.reserve(bufferCount);
+@@ -1492,9 +1517,12 @@ void ShaderResources::buildComplete() {
+             auto& writes = descriptorWrites;
+             writes.reserve(bindings.size());
+             const auto absentImage = [this](std::uint32_t binding) {
++                ValidateImageDescriptorPolicy(context);
++                if (context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull)
++                    return VkDescriptorImageInfo{VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL};
++                Require(context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders, "null image allocation requires native-null or typed-placeholder policy");
+                 constexpr auto bindingCount = static_cast<std::uint32_t>(ShaderRecompiler::RuntimeAbi::Binding::Count);
+-                const auto view = context.nullDescriptors ? VK_NULL_HANDLE : context.placeholderImages->View(binding % bindingCount);
+-                return VkDescriptorImageInfo{VK_NULL_HANDLE, view, VK_IMAGE_LAYOUT_GENERAL};
++                return VkDescriptorImageInfo{VK_NULL_HANDLE, context.placeholderImages->View(binding % bindingCount), VK_IMAGE_LAYOUT_GENERAL};
+             };
+             for (const auto& binding : bindings) {
+                 VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+@@ -1506,7 +1534,8 @@ void ShaderResources::buildComplete() {
+                     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                         write.pBufferInfo = buffers.data() + buffers.size();
+                         for (const auto index : binding.allocations) {
+-                            buffers.push_back(descriptor(allocations[index]));
++                            allocationDescriptors[index] = descriptor(allocations[index]);
++                            buffers.push_back(allocationDescriptors[index]);
+                         }
+                         break;
+                     case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+@@ -1534,7 +1563,9 @@ void ShaderResources::buildComplete() {
+                 }
+                 writes.push_back(write);
+             }
++            ValidateImageDescriptorWrites(context, writes);
+             context.Resolved(&DeviceFunctions::updateDescriptorSets, "vkUpdateDescriptorSets")(context.device, static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
++            initialDescriptorWrites = CaptureInitialDrawDescriptors(writes);
+         }
+         for (const auto& allocation : allocations) {
+             if (allocation.adjustment == 0) continue;
+@@ -1689,6 +1720,12 @@ void VisitContentKey(const CompiledShader& shader, bool dataWords, bool movableB
+         packBits(binding.samplerIntegerBorder);
+         packBits(binding.imageUnnormalized);
+         packBits(binding.imageUnnormalizedBaseLevel);
++        // Compact typed heaps retain the selected guest/native MSAA mapping as
++        // part of a materialized resource identity, independently of shader code.
++        visit(static_cast<std::uint32_t>(binding.imageLogicalSamples.size()));
++        for (const auto samples : binding.imageLogicalSamples) visit(samples);
++        visit(static_cast<std::uint32_t>(binding.imageNativeSamples.size()));
++        for (const auto samples : binding.imageNativeSamples) visit(samples);
+         // Read-only elements are bound without a write set: an object built for one written set
+         // must not serve a build with another (the variant implies it, this makes it explicit).
+         packBits(binding.bufferWritten);
+@@ -2620,6 +2657,7 @@ DescriptorCache::~DescriptorCache() {
+ VkDescriptorSetLayout DescriptorCache::Layout(std::span<const std::uint32_t> key, std::span<const VkDescriptorSetLayoutBinding> bindings, bool updateAfterBind) {
+     std::lock_guard lock(mutex);
+     std::vector<std::uint32_t> keyCopy(key.begin(), key.end());
++    keyCopy.push_back(updateAfterBind ? 1u : 0u);
+     if (const auto found = layouts.find(keyCopy); found != layouts.end()) {
+         ++stats.layoutHits;
+         return found->second;
+@@ -2632,16 +2670,6 @@ VkDescriptorSetLayout DescriptorCache::Layout(std::span<const std::uint32_t> key
+ }
+ 
+ namespace {
+-std::uint32_t SetDescriptorLimit(const VkPhysicalDeviceLimits& limits, VkDescriptorType type) {
+-    switch (type) {
+-        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: return limits.maxDescriptorSetStorageBuffers;
+-        case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return limits.maxDescriptorSetSampledImages;
+-        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: return limits.maxDescriptorSetStorageImages;
+-        case VK_DESCRIPTOR_TYPE_SAMPLER: return limits.maxDescriptorSetSamplers;
+-        default: throw std::runtime_error("AGC graphics: descriptor set uses an unsupported descriptor type " + std::to_string(type));
+-    }
+-}
+-
+ // What one chain pool holds; a set needing more of any type gets a dedicated pool.
+ constexpr std::uint32_t ChainPoolSets = 1024;
+ constexpr std::array<VkDescriptorPoolSize, 4> ChainPoolSizes{{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096}, {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024}, {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024}, {VK_DESCRIPTOR_TYPE_SAMPLER, 512}}};
+@@ -2651,8 +2679,7 @@ constexpr std::array<VkDescriptorPoolSize, 4> ChainPoolCreateSizes{{{VK_DESCRIPT
+ DescriptorCache::SetAllocation DescriptorCache::Allocate(VkDescriptorSetLayout layout, std::span<const VkDescriptorPoolSize> sizes, bool updateAfterBind) {
+     bool fits = true;
+     for (const auto& size : sizes) {
+-        const auto limit = updateAfterBind && size.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ? context.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageBuffers : SetDescriptorLimit(context.limits, size.type);
+-        Require(size.descriptorCount <= limit, "descriptor set exceeds the device's per-set descriptor limit");
++        Require(size.descriptorCount <= SetDescriptorLimit(context, size.type, updateAfterBind), "descriptor set exceeds the device's per-set descriptor limit");
+         const auto capacity = std::find_if(ChainPoolSizes.begin(), ChainPoolSizes.end(), [&](const auto& item) { return item.type == size.type; });
+         if (capacity == ChainPoolSizes.end() || size.descriptorCount > capacity->descriptorCount) fits = false;
+     }
+@@ -2940,7 +2967,7 @@ void ShaderResources::addImageBinding(const ShaderRecompiler::DescriptorBinding&
+     const bool sampledHeap = localBinding >= ShaderRecompiler::RuntimeAbi::FirstImageBinding && localBinding < ShaderRecompiler::RuntimeAbi::FirstStorageImageBinding;
+     const bool storageHeap = localBinding >= ShaderRecompiler::RuntimeAbi::FirstStorageImageBinding && localBinding < static_cast<std::uint32_t>(ShaderRecompiler::RuntimeAbi::Binding::Samplers);
+     Require((binding.kind == ShaderRecompiler::DescriptorKind::SampledImage && sampledHeap) || (binding.kind == ShaderRecompiler::DescriptorKind::StorageImage && storageHeap) || (binding.kind == ShaderRecompiler::DescriptorKind::Sampler && heap == ShaderRecompiler::RuntimeAbi::Binding::Samplers), "resource class disagrees with typed descriptor heap");
+-    Require(binding.kind == ShaderRecompiler::DescriptorKind::Sampler || context.nullDescriptors || context.placeholderImages != nullptr, "typed image heaps require nullDescriptor or placeholder images");
++    ValidateGuestImageDescriptors(context, binding, flags);
+     if (binding.kind == ShaderRecompiler::DescriptorKind::StorageImage) {
+         // Storage images are guest textures the shader writes (looked up in stage B).
+         Require(binding.role == ShaderRecompiler::DescriptorRole::GuestImages, "storage image binding has a non-image role");
+@@ -3173,6 +3200,11 @@ void ShaderResources::resolveImageBinding(const ShaderRecompiler::DescriptorBind
+             RequireNonSeamlessCube(resource.dimension == TextureDimension::kCube, binding.imageSamplers[element], shaderSamplers);
+             const bool firstLayer = binding.imageShape == ShaderRecompiler::DescriptorImageShape::Image2D && resource.dimension == TextureDimension::k2DArray;
+             if (!firstLayer && !MatchesGuestDimension(*binding.imageShape, resource.dimension)) throw std::runtime_error("AGC graphics: guest texture dimension disagrees with the shader's declared image shape (shape " + std::to_string(static_cast<int>(*binding.imageShape)) + ", dimension " + std::to_string(static_cast<int>(resource.dimension)) + ")");
++            if (resource.samples > 1u) {
++                Require(binding.imageLogicalSamples.size() == binding.count && binding.imageNativeSamples.size() == binding.count &&
++                        binding.imageLogicalSamples[element] == resource.samples && binding.imageNativeSamples[element] == std::min(resource.samples,4u),
++                        "sampled MSAA descriptor does not match grouped shader specialization");
++            }
+             const VkComponentMapping components = ViewComponents(resource);
+             const auto guestBytes = record != nullptr && record->decoded ? record->guestBytes : DescribeSurface(resource).guestBytes;
+             std::shared_ptr<Texture> texture;
+@@ -3184,6 +3216,7 @@ void ShaderResources::resolveImageBinding(const ShaderRecompiler::DescriptorBind
+             }
+             if (texture == nullptr) texture = cachedTexture(context, words, resource, components, guestBytes, depthCompare);
+             bool baseLevel = false;
++            Require(texture->LogicalSamples() == resource.samples && texture->NativeSamples() == std::min(resource.samples,4u), "sampled MSAA view count differs from compiled shader");
+             if (element < binding.imageUnnormalized.size() && binding.imageUnnormalized[element]) {
+                 const auto range = texture->SampledViewRange(firstLayer);
+                 const bool exactAtBase = element < binding.imageUnnormalizedBaseLevel.size() && binding.imageUnnormalizedBaseLevel[element];
+@@ -3236,6 +3269,7 @@ void ShaderResources::resolveImageBinding(const ShaderRecompiler::DescriptorBind
+         const auto resource = record != nullptr && record->decoded ? record->resource : DecodeTextureResource(words);
+         const bool firstLayer = binding.imageShape == ShaderRecompiler::DescriptorImageShape::Image2D && resource.dimension == TextureDimension::k2DArray;
+         if (binding.imageShape.has_value() && !firstLayer && !MatchesGuestDimension(*binding.imageShape, resource.dimension)) throw std::runtime_error("AGC graphics: guest storage texture dimension disagrees with the shader's declared image shape (shape " + std::to_string(static_cast<int>(*binding.imageShape)) + ", dimension " + std::to_string(static_cast<int>(resource.dimension)) + ")");
++        Require(resource.samples == 1u, "multisample storage image operations are not implemented");
+         const auto mip = std::min(resource.baseLevel + mipOffset, resource.mipCount - 1u);
+         Require(resource.minLod <= mip * 256u, "guest storage texture descriptor clamps its minimum LOD above the level it addresses, which is not implemented");
+         const auto guestBytes = record != nullptr && record->decoded ? record->guestBytes : DescribeSurface(resource).guestBytes;
+@@ -3423,27 +3457,61 @@ std::shared_ptr<ShaderResources::DrawBindings> ShaderResources::PrepareDrawBindi
+     std::vector<VkDescriptorPoolSize> sizes;
+     for (const auto& [type, count] : counts) sizes.push_back({type, count});
+     result->cache = context.descriptorCache;
+-    result->allocation = result->cache->Allocate(_layout, sizes);
++    result->allocation = result->cache->Allocate(_layout, sizes, updateAfterBind);
+     Require(result->allocation.set != VK_NULL_HANDLE, "draw snapshot descriptor allocation failed");
+-    auto buffers = descriptorBuffers;
+-    auto writes = descriptorWrites;
++    const auto update = context.Resolved(&DeviceFunctions::updateDescriptorSets, "vkUpdateDescriptorSets");
++    if (ExplicitDrawDescriptorsEnabled()) {
++        Require(initialDescriptorWrites != nullptr && initialDescriptorWrites->Size() == bindings.size(),
++                "explicit draw descriptors lack the complete initial write plan");
++        const auto initialWrites = initialDescriptorWrites->ForSet(result->allocation.set);
++        ValidateImageDescriptorWrites(context, initialWrites);
++        update(context.device, static_cast<std::uint32_t>(initialWrites.size()), initialWrites.data(), 0, nullptr);
++        static std::atomic<bool> reported{false};
++        if (!reported.exchange(true, std::memory_order_relaxed))
++            std::fprintf(stderr, "[draw-descriptors] explicit initial writes replayed bindings=%zu read_only_snapshots=%zu\n",
++                initialWrites.size(), result->snapshots.size());
++    } else {
++        std::vector<VkCopyDescriptorSet> copies;
++        for (const auto& binding : bindings) {
++            VkCopyDescriptorSet copy{VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET};
++            copy.srcSet = _set;
++            copy.srcBinding = binding.layout.binding;
++            copy.dstSet = result->allocation.set;
++            copy.dstBinding = binding.layout.binding;
++            copy.descriptorCount = binding.layout.descriptorCount;
++            copies.push_back(copy);
++        }
++        update(context.device, 0, nullptr, static_cast<std::uint32_t>(copies.size()), copies.data());
++    }
+     std::vector<std::size_t> snapshotIndices(allocations.size(), selected.size());
+     for (std::size_t index = 0; index < selected.size(); ++index) snapshotIndices[selected[index]] = index;
+-    for (std::size_t index = 0; index < bindings.size(); ++index) {
+-        const auto& binding = bindings[index];
+-        auto& write = writes[index];
+-        write.dstSet = result->allocation.set;
+-        if (binding.allocations.empty()) continue;
+-        const auto offset = static_cast<std::size_t>(write.pBufferInfo - descriptorBuffers.data());
+-        write.pBufferInfo = buffers.data() + offset;
+-        for (std::size_t element = 0; element < binding.allocations.size(); ++element) {
+-            const auto snapshotIndex = snapshotIndices[binding.allocations[element]];
+-            if (snapshotIndex == selected.size()) continue;
+-            const auto& snapshot = result->snapshots[snapshotIndex];
+-            buffers[offset + element] = {snapshot.buffer->Handle(), 0, snapshot.buffer->Bytes().size()};
++    std::size_t infoCount = 0;
++    for (const auto& binding : bindings) infoCount += binding.allocations.size();
++    std::vector<VkDescriptorBufferInfo> infos;
++    infos.reserve(infoCount);
++    std::vector<VkWriteDescriptorSet> writes;
++    for (const auto& binding : bindings) {
++        if (std::none_of(binding.allocations.begin(), binding.allocations.end(),
++                [&](std::size_t index) { return snapshotIndices[index] != selected.size(); })) continue;
++        const auto first = infos.size();
++        for (const auto index : binding.allocations) {
++            const auto snapshotIndex = snapshotIndices[index];
++            if (snapshotIndex == selected.size()) infos.push_back(allocationDescriptors[index]);
++            else {
++                const auto& snapshot = result->snapshots[snapshotIndex];
++                infos.push_back({snapshot.buffer->Handle(), 0, snapshot.buffer->Bytes().size()});
++            }
+         }
+-    }
+-    context.Resolved(&DeviceFunctions::updateDescriptorSets, "vkUpdateDescriptorSets")(context.device, static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
++        VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
++        write.dstSet = result->allocation.set;
++        write.dstBinding = binding.layout.binding;
++        write.dstArrayElement = 0;
++        write.descriptorCount = static_cast<std::uint32_t>(binding.allocations.size());
++        write.descriptorType = binding.layout.descriptorType;
++        write.pBufferInfo = infos.data() + first;
++        writes.push_back(write);
++    }
++    update(context.device, static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
+     recorder.Keep(result);
+     for (const auto& snapshot : result->snapshots) recorder.KeepBytes(snapshot.buffer.get(), snapshot.buffer->Bytes().size());
+     return result;
+@@ -3510,6 +3578,27 @@ void ShaderResources::WriteBackBuffers() {
+     guestMemory.WriteBack();
+ }
+ 
++bool ShaderResources::WritesMemory() const {
++    return NeedsCompletion() || WritesGuestMemory();
++}
++
++bool ShaderResources::WritesGuestMemory() const {
++    return HoldsLease() || HasCopiedWrites() || !guestMemory.Writes().empty() ||
++        std::any_of(storageWritten.begin(), storageWritten.end(), [](bool written) { return written; });
++}
++
++bool ShaderResources::ReadsGuestRange(std::uint64_t address, std::size_t bytes) const {
++    const auto overlaps=[&](std::uint64_t begin,std::uint64_t size) {
++        if (bytes == 0 || size == 0) return false;
++        // Subtractions avoid wrapping either end of the address range.
++        return begin >= address ? begin-address < bytes : address-begin < size;
++    };
++    if (HoldsLease()) return true; // Address-based reads have no complete descriptor bound.
++    for (const auto& allocation:allocations) if (allocation.guest && overlaps(allocation.address,allocation.size)) return true;
++    for (const auto& range:describedRanges) if (overlaps(range.address,range.bytes) || (range.dccAddress != 0 && overlaps(range.dccAddress,1u))) return true;
++    return ReadsOverlap(address,bytes);
++}
++
+ bool ShaderResources::ReadsOverlap(std::uint64_t address, std::size_t bytes) const {
+     const auto reads = guestMemory.InPlaceReads();
+     return std::any_of(reads.begin(), reads.end(), [&](const auto& range) { return address < range.second && range.first < address + bytes; });
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderValidation.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderValidation.cpp
+index c5d9168..d4c55b5 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderValidation.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderValidation.cpp
+@@ -2,12 +2,16 @@
+ #include "prx/libSceAgcDriver/Graphics/include/Pipeline.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/PipelineSpecialization.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/VertexInput.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/SplitDrawShaderValidation.hpp"
+ #include <spirv/unified1/spirv.hpp>
++#include <spirv/unified1/GLSL.std.450.h>
+ #include <algorithm>
++#include <bit>
+ #include <map>
+ #include <optional>
+ #include <set>
+ #include <string>
++#include <tuple>
+ #include <vector>
+ 
+ namespace AgcDriver::Graphics {
+@@ -83,6 +87,62 @@ struct Module {
+         return location + 1;
+     }
+ 
++    void UniformDescriptor(std::uint32_t typeId, const ShaderRecompiler::DescriptorBinding& binding) const {
++        using Kind = ShaderRecompiler::DescriptorKind;
++        using Shape = ShaderRecompiler::DescriptorImageShape;
++        Require(binding.count != 0, "uniform descriptor binding count must be nonzero");
++        const auto& outer = Type(typeId);
++        if ((outer[0] & 0xffffu) == spv::OpTypeArray) {
++            Require(outer.size() == 4, "malformed uniform descriptor array");
++            const auto count = constants.find(outer[3]);
++            Require(count != constants.end() && count->second == binding.count,
++                    "uniform descriptor array length disagrees with recompiler binding count");
++            typeId = outer[2];
++        } else {
++            Require(binding.count == 1, "non-array uniform descriptor must have a binding count of one");
++        }
++        const auto& type = Type(typeId);
++        const auto op = static_cast<spv::Op>(type[0] & 0xffffu);
++        // The runtime binds images and samplers separately. OpTypeSampledImage
++        // is valid for intermediate OpSampledImage results, not a descriptor
++        // requiring VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER.
++        Require(op != spv::OpTypeSampledImage, "combined sampled image descriptors are unsupported");
++        if (binding.kind == Kind::Sampler) {
++            Require(op == spv::OpTypeSampler && type.size() == 2,
++                    "SPIR-V descriptor type disagrees with recompiler binding metadata");
++            Require(binding.role == ShaderRecompiler::DescriptorRole::GuestSamplers && !binding.imageShape,
++                    "sampler descriptor role or image shape disagrees with recompiler metadata");
++            return;
++        }
++        Require((binding.kind == Kind::SampledImage || binding.kind == Kind::StorageImage) &&
++                op == spv::OpTypeImage && (type.size() == 9 || type.size() == 10),
++                "SPIR-V descriptor type disagrees with recompiler binding metadata");
++        Require(binding.role == ShaderRecompiler::DescriptorRole::GuestImages,
++                "image descriptor role disagrees with recompiler metadata");
++        Require(type[4] <= 2 && type[5] <= 1 && type[6] <= 1 &&
++                type[7] == (binding.kind == Kind::SampledImage ? 1u : 2u),
++                "SPIR-V descriptor type disagrees with sampled/storage image metadata");
++        const auto& scalar = Type(type[2]);
++        Require(((scalar[0] & 0xffffu) == spv::OpTypeFloat && scalar.size() == 3) ||
++                ((scalar[0] & 0xffffu) == spv::OpTypeInt && scalar.size() == 4),
++                "image sampled type is not a scalar numerical type");
++        Require(binding.imageShape.has_value(), "image shape is absent from recompiler binding metadata");
++        std::uint32_t dim = spv::Dim2D, arrayed = 0, multisampled = 0;
++        switch (*binding.imageShape) {
++            case Shape::Image1D: dim = spv::Dim1D; break;
++            case Shape::Image2D: break;
++            case Shape::Image2DArray: arrayed = 1; break;
++            case Shape::ImageCube: dim = spv::DimCube; break;
++            case Shape::Image3D: dim = spv::Dim3D; break;
++            case Shape::Image1DArray: dim = spv::Dim1D; arrayed = 1; break;
++            case Shape::Image2DMsaa: multisampled = 1; break;
++            case Shape::Image2DMsaaArray: multisampled = arrayed = 1; break;
++            default: throw std::runtime_error("AGC graphics: unsupported descriptor image shape");
++        }
++        Require(type[3] == dim && type[5] == arrayed && type[6] == multisampled,
++                "SPIR-V image shape disagrees with recompiler binding metadata");
++    }
++
+     void Builtin(std::uint32_t value, std::uint32_t type, std::uint32_t storage, ShaderRecompiler::ShaderStage stage, const VkPhysicalDeviceSubgroupProperties& subgroup) {
+         using Stage = ShaderRecompiler::ShaderStage;
+         const bool vertex = stage == Stage::Vertex || stage == Stage::Local;
+@@ -136,7 +196,7 @@ struct Module {
+     }
+ };
+ 
+-Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing, bool imageInt64Atomics, bool geometryShader, bool sampleRateShading, bool bufferInt64Atomics) {
++Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing, bool imageInt64Atomics, bool geometryShader, bool sampleRateShading, bool bufferInt64Atomics, bool multisampleArrayImage) {
+     using Stage = ShaderRecompiler::ShaderStage;
+     Require(compiled.program != nullptr, "missing compiled shader");
+     const auto& shader = *compiled.program;
+@@ -232,6 +292,7 @@ Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysi
+                     capability == spv::CapabilityImage1D ||
+                     capability == spv::CapabilityImageGatherExtended ||
+                     capability == spv::CapabilityImageQuery ||
++                    (multisampleArrayImage && capability == spv::CapabilityImageMSArray) ||
+                     (fragment && geometryShader && capability == spv::CapabilityGeometry) ||
+                     (fragment && sampleRateShading && capability == spv::CapabilitySampleRateShading) ||
+                     capability == spv::CapabilityImageMSArray ||
+@@ -366,6 +427,12 @@ Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysi
+             case spv::OpTypeRuntimeArray:
+             case spv::OpTypeStruct:
+             case spv::OpTypePointer:
++            case spv::OpTypeImage:
++            case spv::OpTypeSampler:
++            case spv::OpTypeSampledImage:
++                Require(op != spv::OpTypeImage || count == 9 || count == 10, "malformed SPIR-V image type");
++                Require(op != spv::OpTypeSampler || count == 2, "malformed SPIR-V sampler type");
++                Require(op != spv::OpTypeSampledImage || count == 3, "malformed SPIR-V sampled image type");
+                 Require(count >= 2 && module.types.emplace(instruction[1], std::vector<std::uint32_t>(instruction.begin(), instruction.end())).second, "invalid or duplicate SPIR-V type");
+                 break;
+             case spv::OpVariable:
+@@ -499,6 +566,7 @@ Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysi
+             const auto capacity = ShaderRecompiler::RuntimeAbi::HeapCapacity(heap);
+             const auto count = module.constants.find(type[3]);
+             Require(binding->count != 0u && binding->count <= capacity && count != module.constants.end() && count->second == binding->count, "typed heap array length disagrees with compact binding");
++            module.UniformDescriptor(typeId, *binding);
+         } else {
+             Require(variable.storage == spv::StorageClassStorageBuffer && decoration.set && decoration.binding, "unsupported or unbound shader resource");
+             const auto key = std::make_pair(*decoration.set, *decoration.binding);
+@@ -547,7 +615,7 @@ Module Inspect(const CompiledShader& compiled, const State& state, const VkPhysi
+ 
+ }
+ 
+-std::set<std::uint32_t> ValidateShaders(std::span<const CompiledShader> shaders, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing, bool imageInt64Atomics, bool geometryShader, bool sampleRateShading, bool bufferInt64Atomics) {
++std::set<std::uint32_t> ValidateShaders(std::span<const CompiledShader> shaders, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing, bool imageInt64Atomics, bool geometryShader, bool sampleRateShading, bool bufferInt64Atomics, bool multisampleArrayImage) {
+     using Stage = ShaderRecompiler::ShaderStage;
+     const bool tessellation = state.stages.path == ShaderPath::Tessellation;
+     const bool mesh = state.stages.path == ShaderPath::Geometry;
+@@ -568,7 +636,7 @@ std::set<std::uint32_t> ValidateShaders(std::span<const CompiledShader> shaders,
+         Require(shaders[i].program != nullptr, "missing compiled shader");
+         Require(shaders[i].stage == expected, "graphics stage order disagrees");
+         for (const auto& binding : shaders[i].program->bindings) Require(binding.descriptorSet == 0, "graphics resource uses a descriptor set other than zero");
+-        const auto current = Inspect(shaders[i], state, subgroup, fragmentShaderBarycentric, descriptorIndexing, imageInt64Atomics, geometryShader, sampleRateShading, bufferInt64Atomics);
++        const auto current = Inspect(shaders[i], state, subgroup, fragmentShaderBarycentric, descriptorIndexing, imageInt64Atomics, geometryShader, sampleRateShading, bufferInt64Atomics, multisampleArrayImage);
+         if (i != 0) {
+             for (const auto& [location, signature] : current.inputs) {
+                 const auto output = previous.outputs.find(location);
+@@ -609,4 +677,315 @@ void ValidateShaderPair(const ShaderRecompiler::RecompileResult& vertex, const S
+     ValidateShaders(shaders, state, VkPhysicalDeviceSubgroupProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES}, false);
+ }
+ 
++namespace {
++
++// This allow-list deliberately covers a smaller language than the recompiler.
++// Unknown instructions, decorations, pointer origins, or external functions do
++// not acquire split-draw eligibility by being absent from a deny-list.
++bool splitBodyShape(spv::Op op, std::size_t count) {
++    if ((op >= spv::OpIAdd && op <= spv::OpSMulExtended) ||
++        (op >= spv::OpLessOrGreater && op <= spv::OpLogicalAnd) ||
++        (op >= spv::OpIEqual && op <= spv::OpFUnordGreaterThanEqual) ||
++        (op >= spv::OpShiftRightLogical && op <= spv::OpBitwiseAnd)) return count == 5;
++    if ((op >= spv::OpConvertFToU && op <= spv::OpQuantizeToF16) ||
++        (op >= spv::OpAny && op <= spv::OpSignBitSet) ||
++        (op >= spv::OpDPdx && op <= spv::OpFwidthCoarse)) return count == 4;
++    switch (op) {
++        case spv::OpNop: case spv::OpReturn: case spv::OpKill:
++        case spv::OpUnreachable: case spv::OpFunctionEnd: return count == 1;
++        case spv::OpLabel: case spv::OpBranch: case spv::OpReturnValue: return count == 2;
++        case spv::OpSelectionMerge: case spv::OpStore: case spv::OpCopyMemory: return count == 3;
++        case spv::OpLoopMerge: case spv::OpFunctionParameter: return count == (op == spv::OpLoopMerge ? 4u : 3u);
++        case spv::OpLoad: case spv::OpCopyObject: case spv::OpTranspose:
++        case spv::OpConvertPtrToU: case spv::OpConvertUToPtr: case spv::OpBitcast:
++        case spv::OpSatConvertSToU: case spv::OpSatConvertUToS:
++        case spv::OpSNegate: case spv::OpFNegate: case spv::OpLogicalNot:
++        case spv::OpNot: case spv::OpBitReverse: case spv::OpBitCount:
++        case spv::OpImage: case spv::OpImageQueryFormat: case spv::OpImageQueryOrder:
++        case spv::OpImageQuerySize: case spv::OpImageQueryLevels: case spv::OpImageQuerySamples: return count == 4;
++        case spv::OpVariable: return count == 4 || count == 5;
++        case spv::OpBranchConditional: return count == 4 || count == 6;
++        case spv::OpPhi: return count >= 5 && (count & 1u) != 0;
++        case spv::OpFunctionCall: case spv::OpCompositeConstruct: return count >= 4;
++        case spv::OpCompositeExtract: case spv::OpAccessChain:
++        case spv::OpInBoundsAccessChain: return count >= 5;
++        case spv::OpCompositeInsert: case spv::OpPtrAccessChain:
++        case spv::OpInBoundsPtrAccessChain: case spv::OpVectorShuffle: return count >= 6;
++        case spv::OpVectorExtractDynamic: case spv::OpArrayLength: case spv::OpSampledImage:
++        case spv::OpImageQuerySizeLod: case spv::OpImageQueryLod: return count == 5;
++        case spv::OpVectorInsertDynamic: case spv::OpSelect:
++        case spv::OpBitFieldSExtract: case spv::OpBitFieldUExtract: return count == 6;
++        case spv::OpBitFieldInsert: return count == 7;
++        case spv::OpImageFetch: case spv::OpImageRead: case spv::OpImageGather:
++        case spv::OpImageDrefGather: case spv::OpImageSampleImplicitLod:
++        case spv::OpImageSampleExplicitLod: case spv::OpImageSampleDrefImplicitLod:
++        case spv::OpImageSampleDrefExplicitLod: return count >= 5;
++        case spv::OpExtInst: return count >= 6;
++        default: return false;
++    }
++}
++
++bool splitBuiltin(std::uint32_t builtin) {
++    switch (builtin) {
++        case spv::BuiltInPosition: case spv::BuiltInVertexIndex: case spv::BuiltInInstanceIndex:
++        case spv::BuiltInFragCoord: case spv::BuiltInFrontFacing: case spv::BuiltInFragDepth:
++        case spv::BuiltInHelperInvocation: case spv::BuiltInBaryCoordKHR:
++        case spv::BuiltInBaryCoordNoPerspKHR: return true;
++        default: return false;
++    }
++}
++
++bool splitImageShape(std::span<const std::uint32_t> instruction) {
++    const auto op = static_cast<spv::Op>(instruction[0] & 0xffffu);
++    const bool reference = op == spv::OpImageSampleDrefImplicitLod || op == spv::OpImageSampleDrefExplicitLod || op == spv::OpImageGather || op == spv::OpImageDrefGather;
++    const auto base = reference ? 6u : 5u;
++    if (instruction.size() < base) return false;
++    const bool explicitLod = op == spv::OpImageSampleExplicitLod || op == spv::OpImageSampleDrefExplicitLod;
++    if (instruction.size() == base) return !explicitLod;
++    const auto mask = instruction[base];
++    // Memory visibility/volatile image operands need additional ordering proofs.
++    const std::uint32_t known = spv::ImageOperandsBiasMask | spv::ImageOperandsLodMask | spv::ImageOperandsGradMask |
++        spv::ImageOperandsConstOffsetMask | spv::ImageOperandsOffsetMask | spv::ImageOperandsConstOffsetsMask |
++        spv::ImageOperandsSampleMask | spv::ImageOperandsMinLodMask | spv::ImageOperandsSignExtendMask | spv::ImageOperandsZeroExtendMask;
++    const std::uint32_t withOperand = known & ~(spv::ImageOperandsSignExtendMask | spv::ImageOperandsZeroExtendMask);
++    if ((mask & ~known) != 0 || (explicitLod && (mask & (spv::ImageOperandsLodMask | spv::ImageOperandsGradMask)) == 0)) return false;
++    const auto operands = std::popcount(mask & withOperand) + ((mask & spv::ImageOperandsGradMask) != 0 ? 1u : 0u);
++    return instruction.size() == base + 1u + operands;
++}
++
++std::string splitModuleRejection(const ShaderRecompiler::RecompileResult& program, ShaderRecompiler::ShaderStage stage) {
++    const auto bad = [](const std::string& reason) { throw std::runtime_error(reason); };
++    const auto check = [&](bool condition, const char* reason) { if (!condition) bad(reason); };
++    for (const auto& binding : program.bindings) {
++        for (const auto* flags : {&binding.imageWritten, &binding.imageAtomic, &binding.imageAtomic64, &binding.bufferWritten, &binding.bufferAtomic})
++            if (std::any_of(flags->begin(), flags->end(), [](bool value) { return value; })) return "resource metadata permits guest writes or atomics";
++    }
++    const auto& words = program.spirv;
++    check(words.size() >= 5 && words[0] == spv::MagicNumber && words[3] > 0 && words[4] == 0, "malformed SPIR-V header");
++    std::vector<std::span<const std::uint32_t>> instructions;
++    for (std::size_t cursor = 5; cursor < words.size();) {
++        const auto count = words[cursor] >> 16u;
++        check(count > 0 && count <= words.size() - cursor, "truncated SPIR-V instruction");
++        instructions.emplace_back(std::span(words).subspan(cursor, count)); cursor += count;
++    }
++    std::map<std::uint32_t, std::uint32_t> pointerStorage, valueType;
++    std::set<std::uint32_t> functions, calls, glslImports, labels;
++    std::uint32_t function = 0, entry = 0;
++    bool helper = false, derivatives = false, functionLabel = false;
++    std::size_t entries = 0;
++    const auto literalString = [&](std::span<const std::uint32_t> data) {
++        const auto bytes = std::as_bytes(data);
++        const auto* start = reinterpret_cast<const char*>(bytes.data());
++        const auto* end = std::find(start, start + bytes.size(), '\0');
++        check(end != start + bytes.size(), "unterminated SPIR-V literal string");
++        return std::string(start, end);
++    };
++    for (const auto instruction : instructions) {
++        const auto op = static_cast<spv::Op>(instruction[0] & 0xffffu);
++        if (op == spv::OpTypePointer) {
++            check(instruction.size() == 4 && instruction[1] > 0 && instruction[1] < words[3], "malformed pointer type");
++            check(pointerStorage.emplace(instruction[1], instruction[2]).second, "duplicate pointer type");
++        }
++    }
++    for (const auto instruction : instructions) {
++        const auto op = static_cast<spv::Op>(instruction[0] & 0xffffu);
++        const auto count = instruction.size();
++        if (op == spv::OpFunction) {
++            check(count == 5 && function == 0 && instruction[2] > 0 && instruction[2] < words[3], "malformed or nested function");
++            function = instruction[2]; functionLabel = false; check(functions.insert(function).second, "duplicate function");
++        } else if (function != 0) {
++            if (op == spv::OpReadClockKHR) return "shader clock changes between sample groups";
++            if ((op >= spv::OpAtomicLoad && op <= spv::OpAtomicXor) || op == spv::OpAtomicFlagTestAndSet || op == spv::OpAtomicFlagClear || op == spv::OpAtomicFMinEXT || op == spv::OpAtomicFMaxEXT || op == spv::OpAtomicFAddEXT) return "atomic access, including atomic loads, cannot be repeated";
++            if (op == spv::OpImageWrite) return "image writes cannot be repeated";
++            if (op == spv::OpBeginInvocationInterlockEXT || op == spv::OpEndInvocationInterlockEXT) return "shader interlock cannot be split";
++            if (op == spv::OpControlBarrier || op == spv::OpMemoryBarrier || op == spv::OpMemoryNamedBarrier || op == spv::OpControlBarrierArriveINTEL || op == spv::OpControlBarrierWaitINTEL) return "shader barrier cannot be repeated";
++            if ((op >= spv::OpGroupNonUniformElect && op <= spv::OpGroupNonUniformQuadSwap) || (op >= spv::OpGroupAll && op <= spv::OpGroupSMax)) return "subgroup execution depends on native invocation grouping";
++            if (!splitBodyShape(op, count)) return "unsupported or malformed split-draw SPIR-V operation " + std::to_string(static_cast<std::uint32_t>(op));
++            if (op == spv::OpLabel) {
++                check(instruction[1] > 0 && instruction[1] < words[3] && labels.insert(instruction[1]).second, "invalid or duplicate function label");
++                functionLabel = true;
++            }
++            if (op == spv::OpFunctionEnd) {
++                check(functionLabel, "external or empty shader function"); function = 0;
++            }
++            if (op == spv::OpFunctionCall) calls.insert(instruction[3]);
++            if ((op >= spv::OpDPdx && op <= spv::OpFwidthCoarse) || op == spv::OpImageSampleImplicitLod || op == spv::OpImageSampleDrefImplicitLod || op == spv::OpImageQueryLod || op == spv::OpImageGather || op == spv::OpImageDrefGather) derivatives = true;
++            if (op == spv::OpExtInst) {
++                check(glslImports.contains(instruction[3]), "unresolved or unsupported extended instruction set");
++                const auto ext = instruction[4];
++                check(ext > GLSLstd450Bad && ext < GLSLstd450Count, "unknown GLSL extended instruction");
++                if (ext == GLSLstd450Modf || ext == GLSLstd450Frexp) return "extended instruction has an additional pointer write";
++                if (ext >= GLSLstd450InterpolateAtCentroid && ext <= GLSLstd450InterpolateAtOffset) return "explicit interpolation needs sample-group remapping";
++                // GLSL.std.450's non-pointer arithmetic instructions have one,
++                // two or three operands. Reject reserved IMix and arity drift.
++                const auto operands = ext == GLSLstd450IMix ? 0u :
++                    ext == GLSLstd450Atan2 || ext == GLSLstd450Pow || (ext >= GLSLstd450FMin && ext <= GLSLstd450SMax) || ext == GLSLstd450Step || ext == GLSLstd450Ldexp || ext == GLSLstd450Distance || ext == GLSLstd450Cross || ext == GLSLstd450Reflect || ext == GLSLstd450NMin || ext == GLSLstd450NMax ? 2u :
++                    (ext >= GLSLstd450FClamp && ext <= GLSLstd450FMix) || ext == GLSLstd450SmoothStep || ext == GLSLstd450Fma || ext == GLSLstd450FaceForward || ext == GLSLstd450Refract || ext == GLSLstd450NClamp ? 3u : 1u;
++                check(operands != 0 && count == 5u + operands, "malformed or reserved GLSL extended instruction");
++            }
++            if (op >= spv::OpImageSampleImplicitLod && op <= spv::OpImageRead) check(splitImageShape(instruction), "unsupported or malformed image operands");
++        } else {
++            switch (op) {
++                case spv::OpCapability: check(count == 2, "malformed capability"); break;
++                case spv::OpMemoryModel: check(count == 3, "malformed memory model"); break;
++                case spv::OpExtension: case spv::OpSourceExtension:
++                    check(count >= 2, "malformed extension"); static_cast<void>(literalString(instruction.subspan(1))); break;
++                case spv::OpExtInstImport:
++                    check(count >= 3, "malformed extended instruction import");
++                    check(literalString(instruction.subspan(2)) == "GLSL.std.450", "unsupported extended instruction import");
++                    check(glslImports.insert(instruction[1]).second, "duplicate extended instruction import"); break;
++                case spv::OpEntryPoint:
++                    check(count >= 5 && ++entries == 1, "missing or multiple shader entry points");
++                    check(instruction[1] == (stage == ShaderRecompiler::ShaderStage::Vertex ? spv::ExecutionModelVertex : spv::ExecutionModelFragment), "entry point stage disagrees");
++                    entry = instruction[2]; static_cast<void>(literalString(instruction.subspan(3))); break;
++                case spv::OpExecutionMode:
++                    check(count >= 3, "malformed execution mode");
++                    if (instruction[2] == spv::ExecutionModePixelInterlockOrderedEXT || instruction[2] == spv::ExecutionModePixelInterlockUnorderedEXT || instruction[2] == spv::ExecutionModeSampleInterlockOrderedEXT || instruction[2] == spv::ExecutionModeSampleInterlockUnorderedEXT) return "shader interlock execution mode cannot be split";
++                    break;
++                case spv::OpName: check(count >= 3, "malformed name"); static_cast<void>(literalString(instruction.subspan(2))); break;
++                case spv::OpMemberName: check(count >= 4, "malformed member name"); static_cast<void>(literalString(instruction.subspan(3))); break;
++                case spv::OpSource: check(count >= 3, "malformed source declaration"); break;
++                case spv::OpString: check(count >= 3, "malformed string"); static_cast<void>(literalString(instruction.subspan(2))); break;
++                case spv::OpDecorate: case spv::OpMemberDecorate: {
++                    const auto index = op == spv::OpDecorate ? 2u : 3u;
++                    check(count > index, "malformed decoration");
++                    const auto decoration = instruction[index];
++                    if (decoration == spv::DecorationSample || decoration == spv::DecorationCentroid) return "sample or centroid interpolation needs sample-group remapping";
++                    if (decoration == spv::DecorationBuiltIn) {
++                        check(count == index + 2, "malformed builtin decoration");
++                        const auto builtin = instruction[index + 1];
++                        if (!splitBuiltin(builtin)) return "native sample-dependent or invocation-dependent builtin " + std::to_string(builtin) + " needs remapping";
++                        helper |= builtin == spv::BuiltInHelperInvocation;
++                    }
++                    break;
++                }
++                case spv::OpTypeVoid: case spv::OpTypeBool: case spv::OpTypeSampler: check(count == 2, "malformed scalar type"); break;
++                case spv::OpTypeFloat: case spv::OpTypeRuntimeArray: case spv::OpTypeSampledImage: check(count == 3, "malformed type"); break;
++                case spv::OpTypeInt: case spv::OpTypeVector: case spv::OpTypeMatrix: case spv::OpTypeArray: case spv::OpTypePointer: check(count == 4, "malformed aggregate type"); break;
++                case spv::OpTypeImage: check(count == 9 || count == 10, "malformed image type"); break;
++                case spv::OpTypeStruct: check(count >= 2, "malformed struct type"); break;
++                case spv::OpTypeFunction: check(count >= 3, "malformed function type"); break;
++                case spv::OpConstantTrue: case spv::OpConstantFalse: case spv::OpConstantNull: check(count == 3, "malformed constant"); break;
++                case spv::OpConstant: case spv::OpConstantComposite: check(count >= 4, "malformed constant"); break;
++                case spv::OpVariable: check(count == 4 || count == 5, "malformed variable"); break;
++                default: return "unsupported split-draw module operation " + std::to_string(static_cast<std::uint32_t>(op));
++            }
++        }
++        // Every accepted pointer-producing instruction starts with Result Type,
++        // Result ID. SPIR-V's typed pointer storage class is invariant through
++        // access chains, phi/select, parameters and returns; casts to physical
++        // storage pointers retain the external storage class and are rejected.
++        const bool pointerResult = op == spv::OpVariable || op == spv::OpLoad || op == spv::OpAccessChain || op == spv::OpInBoundsAccessChain ||
++            op == spv::OpPtrAccessChain || op == spv::OpInBoundsPtrAccessChain || op == spv::OpPhi || op == spv::OpSelect ||
++            op == spv::OpCopyObject || op == spv::OpBitcast || op == spv::OpConvertUToPtr || op == spv::OpFunctionParameter || op == spv::OpFunctionCall || op == spv::OpConstantNull;
++        if (pointerResult && count >= 3 && pointerStorage.contains(instruction[1])) {
++            check(instruction[2] > 0 && instruction[2] < words[3], "pointer result ID exceeds the module bound");
++            check(valueType.emplace(instruction[2], instruction[1]).second, "duplicate pointer result ID");
++        }
++    }
++    check(function == 0 && entries == 1 && functions.contains(entry), "incomplete shader function or unresolved entry point");
++    for (const auto call : calls) check(functions.contains(call), "unresolved external shader function");
++    if (helper && derivatives) return "helper coverage combined with derivatives or implicit LOD is not proved invariant across sample groups";
++    const auto storage = [&](std::uint32_t id) {
++        const auto value = valueType.find(id);
++        check(value != valueType.end(), "unresolved pointer origin");
++        return pointerStorage.at(value->second);
++    };
++    for (const auto instruction : instructions) {
++        const auto op = static_cast<spv::Op>(instruction[0] & 0xffffu);
++        if (op == spv::OpLoad) static_cast<void>(storage(instruction[3]));
++        if (op == spv::OpAccessChain || op == spv::OpInBoundsAccessChain || op == spv::OpPtrAccessChain || op == spv::OpInBoundsPtrAccessChain) {
++            const auto origin = storage(instruction[3]);
++            check(storage(instruction[2]) == origin, "access chain changes pointer storage class");
++        }
++        if (valueType.contains(instruction.size() >= 3 ? instruction[2] : 0u)) {
++            if (op == spv::OpCopyObject || op == spv::OpBitcast) check(storage(instruction[2]) == storage(instruction[3]), "pointer copy or cast changes storage class");
++            if (op == spv::OpSelect) check(storage(instruction[2]) == storage(instruction[4]) && storage(instruction[2]) == storage(instruction[5]), "pointer select has unresolved or inconsistent origins");
++            if (op == spv::OpPhi)
++                for (std::size_t i = 3; i < instruction.size(); i += 2) check(storage(instruction[2]) == storage(instruction[i]), "pointer phi has unresolved or inconsistent origins");
++            if (op == spv::OpConvertUToPtr) check(storage(instruction[2]) == spv::StorageClassPhysicalStorageBuffer, "integer pointer conversion cannot manufacture local storage");
++        }
++        if (op != spv::OpStore && op != spv::OpCopyMemory) continue;
++        const auto destination = storage(instruction[1]);
++        if (destination != spv::StorageClassOutput && destination != spv::StorageClassPrivate && destination != spv::StorageClassFunction) return "write to nonlocal storage class " + std::to_string(destination) + " cannot be repeated";
++        if (op == spv::OpCopyMemory) static_cast<void>(storage(instruction[2]));
++    }
++    return {};
++}
++
++}
++
++std::string SplitDrawShaderRejection(std::span<const CompiledShader> shaders) {
++    using Stage = ShaderRecompiler::ShaderStage;
++    if (shaders.size() != 2 || shaders[0].stage != Stage::Vertex || shaders[1].stage != Stage::Fragment) return "split draw currently requires exactly a vertex/fragment shader pair";
++    for (const auto& shader : shaders) {
++        const auto stage = shader.stage == Stage::Vertex ? "vertex: " : "fragment: ";
++        if (shader.program == nullptr) return std::string(stage) + "missing compiled shader";
++        try {
++            const auto reason = splitModuleRejection(*shader.program, shader.stage);
++            if (!reason.empty()) return stage + reason;
++        } catch (const std::exception& error) {
++            return std::string(stage) + error.what();
++        }
++    }
++    return {};
++}
++
++namespace {
++
++bool canonicalBinding(const ShaderRecompiler::DescriptorBinding& actual,
++                      const ShaderRecompiler::DescriptorBinding& expected) {
++    const auto fields = [](const ShaderRecompiler::DescriptorBinding& binding) {
++        return std::tie(binding.kind, binding.role, binding.descriptorSet, binding.binding,
++            binding.count, binding.guestDescriptor, binding.readOnly, binding.imageShape,
++            binding.samplerDepthCompare, binding.imageWritten, binding.imageDepthCompare,
++            binding.imageAtomic, binding.imageAtomic64, binding.bufferAtomic,
++            binding.bufferWritten, binding.samplerUnnormalized, binding.imageUnnormalized,
++            binding.imageSamplers, binding.imageLogicalSamples, binding.imageNativeSamples);
++    };
++    return fields(actual) == fields(expected);
++}
++
++bool canonicalRectStage(const ShaderRecompiler::RecompileResult& actual,
++                        const ShaderRecompiler::RecompileResult& expected) {
++    // The factory emits no guest vertex inputs or fragment interpolation
++    // metadata. Reject extra metadata even if the SPIR-V itself is unchanged.
++    return actual.spirv == expected.spirv && actual.bindings.size() == expected.bindings.size() &&
++        std::equal(actual.bindings.begin(), actual.bindings.end(), expected.bindings.begin(), canonicalBinding) &&
++        actual.pushConstants == expected.pushConstants && actual.memoryOffsetDword == expected.memoryOffsetDword &&
++        actual.bdaAbiVersion == expected.bdaAbiVersion && actual.vertexAttributes.empty() && expected.vertexAttributes.empty() &&
++        actual.vertexOffsetSgpr == expected.vertexOffsetSgpr && actual.instanceOffsetSgpr == expected.instanceOffsetSgpr &&
++        actual.vertexOffsetShared == expected.vertexOffsetShared && actual.instanceOffsetShared == expected.instanceOffsetShared &&
++        actual.vertexOffsetConflict == expected.vertexOffsetConflict && actual.instanceOffsetConflict == expected.instanceOffsetConflict &&
++        actual.hostSubgroupSize == expected.hostSubgroupSize && actual.parameterExports == expected.parameterExports &&
++        actual.fragmentParameters.empty() && expected.fragmentParameters.empty() &&
++        actual.cacheHit == expected.cacheHit && actual.variantId == expected.variantId;
++}
++
++}
++
++std::string SplitRectListShaderRejection(std::span<const CompiledShader> shaders,
++                                       const ShaderRecompiler::SpirvTarget& target) {
++    using Stage = ShaderRecompiler::ShaderStage;
++    if (shaders.size() != 4 || shaders[0].stage != Stage::Vertex ||
++        shaders[1].stage != Stage::TessellationControl || shaders[2].stage != Stage::TessellationEvaluation ||
++        shaders[3].stage != Stage::Fragment) return "split rectangle draw requires ordered vertex/control/evaluation/fragment stages";
++    for (const auto& shader : shaders)
++        if (shader.program == nullptr) return "split rectangle draw is missing a compiled shader";
++    if (shaders[1].pushConstantOffset != 0 || shaders[2].pushConstantOffset != 0)
++        return "split rectangle intermediate stages have noncanonical push constant offsets";
++    const std::array original{shaders[0], shaders[3]};
++    if (const auto rejection = SplitDrawShaderRejection(original); !rejection.empty()) return rejection;
++    try {
++        const auto expected = ShaderRecompiler::BuildRectListShaders(*shaders[0].program, *shaders[3].program, target);
++        if (!canonicalRectStage(*shaders[1].program, expected.control))
++            return "split rectangle control shader is not the canonical factory result";
++        if (!canonicalRectStage(*shaders[2].program, expected.evaluation))
++            return "split rectangle evaluation shader is not the canonical factory result";
++    } catch (const std::exception& error) {
++        return std::string("split rectangle factory: ") + error.what();
++    }
++    return {};
++}
++
+ }
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/Texture.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/Texture.cpp
+index 7a21d97..32195cb 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/Texture.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/Texture.cpp
+@@ -3,6 +3,7 @@
+ #include "prx/libSceAgcDriver/Graphics/include/Texture.hpp"
+ #include "prx/libc/include/General.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Resources.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Recorder.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/GuestBufferMemory.hpp"
+ // For the declaration of PendingStorageOverlaps, defined below.
+@@ -36,6 +37,16 @@ namespace AgcDriver::Graphics {
+ 
+ namespace {
+ 
++VkComponentMapping SupportedViewComponents(const Context& context, VkComponentMapping components) {
++    if (context.imageViewFormatSwizzle) return components;
++    const auto normalize=[](VkComponentSwizzle value,VkComponentSwizzle identity) {
++        Require(value==VK_COMPONENT_SWIZZLE_IDENTITY || value==identity, "portability device does not support image view component swizzles");
++        return VK_COMPONENT_SWIZZLE_IDENTITY;
++    };
++    return {normalize(components.r,VK_COMPONENT_SWIZZLE_R),normalize(components.g,VK_COMPONENT_SWIZZLE_G),
++            normalize(components.b,VK_COMPONENT_SWIZZLE_B),normalize(components.a,VK_COMPONENT_SWIZZLE_A)};
++}
++
+ // APS5_PROFILE_DRAW: accumulate texture setup phases and report every 200 textures.
+ struct TextureProfile {
+     double allocate = 0, read = 0, gpu = 0, view = 0;
+@@ -242,6 +253,44 @@ Texture::Texture(const Context& context, TextureDetiler& detiler, const GuestTex
+     static const bool profile = std::getenv("APS5_PROFILE_DRAW") != nullptr;
+     PhaseTimer timer;
+     try {
++        if (descriptor.samples > 1u) {
++            Require(!depthCompare, "multisample depth comparison texture is not implemented");
++            const auto geometry = DescribeSurface(descriptor);
++            Require(snapshot.size() == geometry.guestBytes, "multisample texture snapshot size mismatch");
++            ColorTarget color{};
++            color.address = descriptor.baseAddress;
++            color.extent = {descriptor.width, descriptor.height};
++            color.format = VK_FORMAT_R8G8B8A8_UNORM;
++            color.tileMode = ColorTileMode::RenderTarget;
++            color.bytes = geometry.guestBytes;
++            color.samples = descriptor.samples;
++            color.fragments = descriptor.fragments;
++            const ColorTargetLayout guestLayout(descriptor.width, descriptor.height, color.tileMode, 4u, color.pipeBankXor, color.fragments);
++            Buffer staging(context, guestLayout.LinearBytes(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
++            guestLayout.Detile(snapshot, staging.Bytes());
++            auto target=std::make_unique<RenderTarget>(context, color, false);
++            ColorSampleTransfer transfer(context, *target, color);
++            // Snapshot uploads are complete before the Texture is published into a cache.
++            // Later binding owners retain the image and view through their own GPU fence.
++            if (auto* recorder=Recorder::Active()) recorder->Sync();
++            CommandBatch batch(context);
++            transfer.RecordUpload(batch.Handle(),
++                {staging.Handle(),0,staging.Bytes().size(),VK_PIPELINE_STAGE_HOST_BIT,VK_ACCESS_HOST_WRITE_BIT},
++                {VK_IMAGE_LAYOUT_UNDEFINED,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,0},
++                {VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_ACCESS_SHADER_READ_BIT});
++            batch.SubmitAndWait();
++            VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
++            info.image=target->Image(); info.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY;
++            info.format=color.format; info.components=SupportedViewComponents(context,components);
++            info.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,target->Groups()};
++            Check(context.Function<PFN_vkCreateImageView>("vkCreateImageView")(context.device,&info,nullptr,&view),"vkCreateImageView sampled MSAA color");
++            image=target->Image(); viewFormat=color.format;
++            viewRange={VK_IMAGE_VIEW_TYPE_2D_ARRAY,1,target->Groups()};
++            logicalSamples=color.samples; nativeSamples=static_cast<std::uint32_t>(target->NativeSamples());
++            allocationBytes=geometry.guestBytes;
++            sampleOwner=std::move(target);
++            return;
++        }
+         const auto colorFormat = SampledTextureFormat(context, descriptor.format);
+         Require(!depthCompare || colorFormat == VK_FORMAT_R32_SFLOAT || colorFormat == VK_FORMAT_R16_UNORM, "comparison sampling requires an R32 float or R16 unorm depth texture");
+         Require(!depthCompare || descriptor.dimension != TextureDimension::k3D, "comparison sampling does not support 3D depth textures");
+@@ -437,7 +486,7 @@ Texture::Texture(const Context& context, TextureDetiler& detiler, const GuestTex
+         viewInfo.viewType = ViewTypeFor(descriptor.dimension, viewLayerCount);
+         viewInfo.format = vkFormat;
+         viewFormat = vkFormat;
+-        viewInfo.components = depthCompare ? VkComponentMapping{} : components;
++        viewInfo.components = depthCompare ? VkComponentMapping{} : SupportedViewComponents(context, components);
+         viewInfo.subresourceRange = {aspect, descriptor.baseLevel, viewLevelCount, descriptor.baseArray, viewLayerCount};
+         VkImageViewMinLodCreateInfoEXT minLod{VK_STRUCTURE_TYPE_IMAGE_VIEW_MIN_LOD_CREATE_INFO_EXT};
+         ChainMinLod(context, descriptor, viewInfo, minLod);
+@@ -640,7 +689,7 @@ Texture::Texture(const Context& context, const std::shared_ptr<StorageTexture>&
+         viewInfo.viewType = ViewTypeFor(descriptor.dimension, viewLayerCount);
+         viewInfo.format = vkFormat;
+         viewFormat = vkFormat;
+-        viewInfo.components = components;
++        viewInfo.components = SupportedViewComponents(context,components);
+         viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, descriptor.baseLevel, viewLevelCount, descriptor.baseArray, viewLayerCount};
+         VkImageViewMinLodCreateInfoEXT minLod{VK_STRUCTURE_TYPE_IMAGE_VIEW_MIN_LOD_CREATE_INFO_EXT};
+         ChainMinLod(context, descriptor, viewInfo, minLod);
+@@ -667,7 +716,7 @@ Texture::Texture(const Context& context, VkImage depthImage, VkFormat depthForma
+     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+     viewInfo.format = depthFormat;
+     viewFormat = depthFormat;
+-    viewInfo.components = components;
++    viewInfo.components = SupportedViewComponents(context,components);
+     viewInfo.subresourceRange = {aspect, 0, 1, 0, 1};
+     Check(context.Function<PFN_vkCreateImageView>("vkCreateImageView")(context.device, &viewInfo, nullptr, &view), "vkCreateImageView depth plane");
+     viewRange = {viewInfo.viewType, viewInfo.subresourceRange.levelCount, viewInfo.subresourceRange.layerCount};
+@@ -712,6 +761,7 @@ void Texture::release() noexcept {
+     baseLevelView = VK_NULL_HANDLE;
+     // The image and its memory go with the last holder: this texture, or the batch still uploading it.
+     owned.reset();
++    sampleOwner.reset();
+     image = VK_NULL_HANDLE;
+     SampledMemoryCounter().fetch_sub(std::exchange(countedBytes, 0), std::memory_order_relaxed);
+ }
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/TextureCache.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/TextureCache.cpp
+index 2e31ea6..d7a241a 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/TextureCache.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/TextureCache.cpp
+@@ -2,6 +2,8 @@
+ #include "prx/libSceAgcDriver/Graphics/include/TextureTiling.hpp"
+ #include "prx/libSceAgcDriver/Execution/include/GuestMemory.hpp"
+ #include <algorithm>
++#include <cstdio>
++#include <cstdlib>
+ #include <cstring>
+ #include <limits>
+ 
+@@ -11,8 +13,25 @@ TextureCache::TextureCache(const Context& context) : context(context) {
+     Require(context.detiler != nullptr, "texture cache requires a device detiler");
+ }
+ 
++std::uint64_t TextureCache::BudgetBytes() {
++    static const std::uint64_t bytes = [] {
++        const char* value = std::getenv("APS5_TEXTURE_CACHE_MIB");
++        if (value == nullptr || *value == '\0') return budget;
++        char* end = nullptr;
++        const unsigned long long mib = std::strtoull(value, &end, 10);
++        if (end == value || *end != '\0' || mib < 1 || mib > 4096) {
++            std::fprintf(stderr, "[texture-cache] APS5_TEXTURE_CACHE_MIB=%s ignored; cap stays 256 MiB\n", value);
++            return budget;
++        }
++        std::fprintf(stderr, "[texture-cache] cap %llu MiB (APS5_TEXTURE_CACHE_MIB)\n", mib);
++        return static_cast<std::uint64_t>(mib) << 20;
++    }();
++    return bytes;
++}
++
+ void TextureCache::trim() {
+-    for (auto it = entries.begin(); it != entries.end() && (retainedBytes > budget || entries.size() > 64);) {
++    const auto budgetBytes = BudgetBytes();
++    for (auto it = entries.begin(); it != entries.end() && (retainedBytes > budgetBytes || entries.size() > 64);) {
+         if (it->texture.use_count() != 1) {
+             ++it;
+             continue;
+@@ -38,9 +57,7 @@ std::shared_ptr<Texture> TextureCache::Get(std::span<const std::uint32_t> words,
+         entries.erase(it);
+         break;
+     }
+-    const auto mips = ComputeMipLayout(resource.tileMode, resource.format, resource.width, resource.height, resource.mipCount);
+-    const auto layers = resource.dimension == TextureDimension::k2DArray || resource.dimension == TextureDimension::k1DArray || resource.dimension == TextureDimension::kCube ? resource.depthOrLastArray + 1u : 1u;
+-    const auto bytes = ComputeSurfaceSize(mips, layers);
++    const auto bytes = DescribeSurface(resource).guestBytes;
+     Require(bytes != 0 && bytes <= std::numeric_limits<std::size_t>::max(), "texture cache surface size overflow");
+     std::vector<std::byte> snapshot(static_cast<std::size_t>(bytes));
+     GuestMemory::ReadCommitted(resource.baseAddress, snapshot);
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp
+index 6eca2ae..822af70 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp
+@@ -1,6 +1,7 @@
+ #include "prx/libSceAgcDriver/Graphics/include/TextureTiling.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Context.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/TextureFormat.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/ColorTargetLayout.hpp"
+ #include <string>
+ #include <algorithm>
+ #include <bit>
+@@ -382,7 +383,22 @@ ThickLayout ComputeThickLayout(TextureTileMode tileMode, std::uint32_t format, s
+ 
+ SurfaceGeometry DescribeSurface(const GuestTextureResource& descriptor) {
+     SurfaceGeometry geometry;
+-    if (descriptor.dimension == TextureDimension::k3D && (descriptor.tileMode == TextureTileMode::kZ64KBX || descriptor.tileMode == TextureTileMode::kR64KBX)) {
++    if (descriptor.samples > 1u || descriptor.dimension == TextureDimension::k2DMsaa || descriptor.dimension == TextureDimension::k2DMsaaArray) {
++        Require(descriptor.samples > 1u && descriptor.samples == descriptor.fragments && descriptor.samples <= 8u,
++                "sampled MSAA surface has unsupported stored fragment count");
++        Require(descriptor.dimension == TextureDimension::k2DMsaa || descriptor.dimension == TextureDimension::k2DMsaaArray,
++                "multisample surface requires a multisample descriptor type");
++        Require(descriptor.baseArray == 0u && descriptor.depthOrLastArray == 0u && descriptor.baseLevel == 0u && descriptor.mipCount == 1u,
++                "multisample array/mip memory layout is not implemented");
++        Require(descriptor.tileMode == TextureTileMode::kR64KBX && ResolveTextureFormat(descriptor.format) == VK_FORMAT_R8G8B8A8_UNORM && descriptor.dccAddress == 0,
++                "sampled MSAA surface requires uncompressed R64KB_X RGBA8_UNORM");
++        const ColorTargetLayout layout(descriptor.width, descriptor.height, ColorTileMode::RenderTarget, 4u, 0u, descriptor.fragments);
++        geometry.guestBytes = geometry.layerBytes = layout.Bytes();
++        geometry.sliceLinearBytes = layout.LinearBytes();
++        geometry.imageLayers = descriptor.samples > 4u ? 2u : 1u;
++        return geometry;
++    }
++    if (descriptor.dimension == TextureDimension::k3D && (descriptor.tileMode == TextureTileMode::kZ64KBX || descriptor.tileMode == TextureTileMode::kD64KBX || descriptor.tileMode == TextureTileMode::kR64KBX)) {
+         const auto depth = descriptor.depthOrLastArray + 1u;
+         geometry.mips = ComputeMipLayout(descriptor.tileMode, descriptor.format, descriptor.width, descriptor.height, descriptor.mipCount);
+         geometry.layers = depth;

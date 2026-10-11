@@ -1,0 +1,1032 @@
+{
+  "authoredLogicPreservedExceptDeclaredRedactions": true,
+  "guardPrefix": "# Archival source only; never execute or import.\nraise RuntimeError(\"Snapshot only; use reviewed current tooling.\")\n\n",
+  "originalFilesUnchanged": true,
+  "runtimeOrGameplayQualifiedByArchive": false,
+  "schema": 1,
+  "snapshotCount": 30,
+  "snapshotModulesExecuted": false,
+  "sourceFiles": {
+    "exception-trace/composition.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "d93283c57dbb06e0b45576909898f44679490adb557ac408d5baedc30a98a0bf",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/composition.py",
+      "originalSha256": "d93283c57dbb06e0b45576909898f44679490adb557ac408d5baedc30a98a0bf",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "dc8be002672a673553df237a2dd17f65cf78800f7978c43dd6bffe7756ecaad9"
+    },
+    "exception-trace/execution_tool.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "7057856dfc7177515f5c45e21e0341291a4e255cfbb3bb1ca01b4ec8f8b38f3c",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/execution_tool.py",
+      "originalSha256": "7057856dfc7177515f5c45e21e0341291a4e255cfbb3bb1ca01b4ec8f8b38f3c",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "6e24fc61b257dfea46c953749a75dadc5f99618a7ea546075ac41ecf356e5389"
+    },
+    "exception-trace/launch_query.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "faede27659d9e37e34dd1a8ed83733a70186ff5dc8c90c82355ad30730895458",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/launch_query.py",
+      "originalSha256": "8b9fab590ac33086958e7d40b8d46cfc2e54800f03fd3dc343dc1f450df4e6da",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "57be36431d3627d6b0b554a4fdccd2c90628a3b3c9ceaab4568c0064a4c6add9"
+    },
+    "exception-trace/log_contracts.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "87dc723252b014b0ebb57d7dc26955e215f2d58fb44500703b4d51a1af12b69c",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/log_contracts.py",
+      "originalSha256": "87dc723252b014b0ebb57d7dc26955e215f2d58fb44500703b4d51a1af12b69c",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "5fee8ab9faa55d86b9758a5bf4281fe431ff90610df0c343375ac857b8797120"
+    },
+    "exception-trace/make_review.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "ed0cd27ca54efb2eec4a986e38c3f41b8261c5a2df60bb9a3c3243a9f08f3dc7",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/make_review.py",
+      "originalSha256": "ed0cd27ca54efb2eec4a986e38c3f41b8261c5a2df60bb9a3c3243a9f08f3dc7",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "c5f2de7b831489ba522a9ab0a5b2a69750489d975dbe55c0cf1a905a4ca11da4"
+    },
+    "exception-trace/probe.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "9aec5226f0d49fad8db9f48e03ff2843899d611cd4d93a9d42df1972e6f203e8",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/probe.py",
+      "originalSha256": "096f9f84cff21da2d5df01fd37cbf2e91700592ad5ce98aa160123885a8eb8b8",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "3a027e8a72246350f31f92202032e5adcd061c11baaa62e0b178086eaf3debbc"
+    },
+    "exception-trace/run.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "8577692b5d0a50db83e1b3236c5a76c8654b03e19f2b60f6040c927df2523c5a",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/run.py",
+      "originalSha256": "8577692b5d0a50db83e1b3236c5a76c8654b03e19f2b60f6040c927df2523c5a",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "8a0a3846c9a7a20de8999b25973cc92c7cfb9d0e01e195a69cf12a2c30c423b1"
+    },
+    "exception-trace/test_scope.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "e7f8226185eeea944a3a20f508be053289bd89abef2e91065240c5a4b3cc094f",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal/test_scope.py",
+      "originalSha256": "e2f40335202349c9e4fac03c6496765fe65582bab1e2b69c5ee4ceb935018d41",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "7e7919aaaf47130ba9e468eb74ab8869b6dd3f0cdff3ab2b5da56f52569516a7"
+    },
+    "hle/build-hle-final43bc.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "cbebb50eba8c52f819facc6e67e24c08c40036305f05bd8dbd7850e066ce4db0",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/incremental-route/build-hle-final43bc.py",
+      "originalSha256": "f1973446d099eed367bc5146639cd8a9d1692689c92b9893e0714c73ddd9e565",
+      "redactions": [
+        {
+          "normalizedOccurrences": 2,
+          "occurrences": 2,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "e0a22b73579ee84925733c2a223926925cadfdec1e2e84571b8f0981f05d5a3f"
+    },
+    "hle/run_incremental.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "66bc04b003266b09ac7f452904ee936754b7d9654976bd78bed887f8604dce6a",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/incremental-route/run_incremental.py",
+      "originalSha256": "0090d7bd34939ea89bc7325031443ac91ba5f7db9a20ded621cdd43b6d007627",
+      "redactions": [
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "8e2ed2024aa67a54abc636eee6765bb2edf0084bf786e615a9864b48ca2648c7"
+    },
+    "hle/run_runtime_only.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "f8f29c07c9bb537add63717f7c978c678b96c1b9272149577292473dc34bdc8c",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/runtime-twojob-route/run_runtime_only.py",
+      "originalSha256": "da0b48986be638e77e3933f27f2d4751c899f82a3e4ee354efae94ee3c60e650",
+      "redactions": [
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "ae5e8f3598e51f5f392dd559bf3f7140a84a452c4ab1c851ace1ef7b363b77e1"
+    },
+    "ownership-sampler/composition.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "49863d3b1d2f79950b50f762510af4ad339cc746bc6f518df7a2f1a6a31330a0",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/composition.py",
+      "originalSha256": "49863d3b1d2f79950b50f762510af4ad339cc746bc6f518df7a2f1a6a31330a0",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "a30c2acda6f44854648fe3e19c65cf3be88adb7314ad3d5374e273f839422cd2"
+    },
+    "ownership-sampler/execution_tool.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "0708d993e5a28e1f97f9b72b25067f367926c8975c6fa28ecb05c7736631190a",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/execution_tool.py",
+      "originalSha256": "0708d993e5a28e1f97f9b72b25067f367926c8975c6fa28ecb05c7736631190a",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "e7a002e56d5937a8eeaeec73b46aea2fca0413151edbe1eed7661100674b6788"
+    },
+    "ownership-sampler/launch_query.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "faede27659d9e37e34dd1a8ed83733a70186ff5dc8c90c82355ad30730895458",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/launch_query.py",
+      "originalSha256": "8b9fab590ac33086958e7d40b8d46cfc2e54800f03fd3dc343dc1f450df4e6da",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "57be36431d3627d6b0b554a4fdccd2c90628a3b3c9ceaab4568c0064a4c6add9"
+    },
+    "ownership-sampler/log_contracts.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "bad1b28a03c946c7866a40bd8823414a65ae99b4a42dba750c4105f40e4d43c0",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/log_contracts.py",
+      "originalSha256": "bad1b28a03c946c7866a40bd8823414a65ae99b4a42dba750c4105f40e4d43c0",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "b4ae800fd719353eaefa84f96c78e0fe33bdcbeeb5c3ed4d4758b09911b4956a"
+    },
+    "ownership-sampler/make_review.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "d339885e9f89ced298fab5231144e3718eeb2191a153fc54ea7121dc531eb648",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/make_review.py",
+      "originalSha256": "d339885e9f89ced298fab5231144e3718eeb2191a153fc54ea7121dc531eb648",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "f0b956b3aefaedca37d10ef01689ceb6503bc69076383b64309cf3f4035aab46"
+    },
+    "ownership-sampler/probe.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "9cf105dcb9cf6bb5761c99ac9fd04bb36a21364675aebacaa7f49368c0a94af5",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/probe.py",
+      "originalSha256": "99859f60f6c79b53a99b45a1ba4b3d6b6ad4c3f3e8b175f29445c03384eb187e",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "36e4358c1a4dec02cb41bad7e7f45bff6bdab1100815979feae5677d486e56b3"
+    },
+    "ownership-sampler/run.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "8577692b5d0a50db83e1b3236c5a76c8654b03e19f2b60f6040c927df2523c5a",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/run.py",
+      "originalSha256": "8577692b5d0a50db83e1b3236c5a76c8654b03e19f2b60f6040c927df2523c5a",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "8a0a3846c9a7a20de8999b25973cc92c7cfb9d0e01e195a69cf12a2c30c423b1"
+    },
+    "ownership-sampler/test_scope.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "e33087d5fa930574d49eb6490b7081f93d25641a736c27eb9713a69986770334",
+      "originalRelativePath": "build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal/test_scope.py",
+      "originalSha256": "9e120aa7cdb01ffb298dea245836e2742e6ecb96701d33a06bda5384cce5aec8",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "58469a80bfb148c611edb0ce166cae8242982ba767c8028f4f43aba4679c4045"
+    },
+    "preservation/save-final43bc-authored-source.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "9e2d52c53756758658a525877cc6c27c14d394ba8fda0faa4501cf9fab37393a",
+      "originalRelativePath": "build/save-final43bc-authored-source.py",
+      "originalSha256": "c8ec90cc77d2916daeb92a21271af659ce3f027109a4bfdad375a7abd09d04d1",
+      "redactions": [
+        {
+          "normalizedOccurrences": 2,
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 2,
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 2,
+          "occurrences": 1,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 3,
+          "occurrences": 2,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 3,
+          "occurrences": 2,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "e7e5ca61b86230b359fdc856e84e1c9b712b866fe307d35ce804dd2109062a4b"
+    },
+    "promotion/promote.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "d2d9d088068edcc05fcbacd78df35217b871a126a1a689c401e1befe16520d09",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/canonical-promotion-helper/promote.py",
+      "originalSha256": "d2d9d088068edcc05fcbacd78df35217b871a126a1a689c401e1befe16520d09",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "5ecae51561750d1d1a9381913872ef86df4b42c1259817355e395fee3efec095"
+    },
+    "reconciliation/add-library-key-fixture.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "6a63eb20b60393e41425f9d80d3a9cab95a99648624caa7221dd8073088840bd",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/add-library-key-fixture.py",
+      "originalSha256": "6a63eb20b60393e41425f9d80d3a9cab95a99648624caa7221dd8073088840bd",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "4d7d3524275ccbd8248cc683adfbe26164d5d707bf97c744a29e984c076df810"
+    },
+    "reconciliation/finalize-guards.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "6414399d725e2ef8c820e1b6d96bf9bb0ec121ee1952395be05dce74b40727ce",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/finalize-guards.py",
+      "originalSha256": "6414399d725e2ef8c820e1b6d96bf9bb0ec121ee1952395be05dce74b40727ce",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "8d7136784963d1e86668750300ffaffd7ea71153d0ff3317253799f7b6b40e87"
+    },
+    "reconciliation/finalize-library-api.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "080e05545d33af3f430e2ebe83d59091ecf58b35c836ebc6f64cc4635d195df8",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/finalize-library-api.py",
+      "originalSha256": "080e05545d33af3f430e2ebe83d59091ecf58b35c836ebc6f64cc4635d195df8",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "839f9ad32d9d9643b01cc1a4281a84e06782444447059c386f16c8d7dab88964"
+    },
+    "reconciliation/freeze.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "e5bd9f47422a1b5c67638faedb38687b5a7ef099363f107ce492237a9f3be366",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/freeze.py",
+      "originalSha256": "e5bd9f47422a1b5c67638faedb38687b5a7ef099363f107ce492237a9f3be366",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "09c7d5484a3d446add014901b677ab3a7740bc5a865608a83a1ce6a5acd04d2f"
+    },
+    "reconciliation/prepare-route.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "06e7bb4dc2622f17c39da724bc36df519340709b55afab360d5f041f465bb58b",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/prepare-route.py",
+      "originalSha256": "38c032910f02a2733dd8adff14403100b991b3332fad92b9cb3e3cb1cfb15e57",
+      "redactions": [
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "ce7a5c484c1448077d812582a1d92c3eea71ceb0bb8c8fb89d3b9bb68a64094b"
+    },
+    "reconciliation/reconcile.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "add7e10c7a597172aebbf501c41cd03673e8d21d83d6e16e753436216a587609",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/reconcile.py",
+      "originalSha256": "add7e10c7a597172aebbf501c41cd03673e8d21d83d6e16e753436216a587609",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "64198e845291769a8cee27e29696918550e53fadec0d0c6a9bf41ef25b50a1a8"
+    },
+    "reconciliation/resolve0001.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "be46d7b2f8deffceeb109301e226de7483c136dc715e0055bfa84d8ac32cc0c3",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/resolve0001.py",
+      "originalSha256": "be46d7b2f8deffceeb109301e226de7483c136dc715e0055bfa84d8ac32cc0c3",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "0ef623fb98fbf31a26f8b94761d9459c4feb7cf2a5db4597700280ef8c71edfd"
+    },
+    "reconciliation/resolve0006.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "0f5ea4cc1a62e640616f979404b47baa558374f22749e64d69842b9e8917babb",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/resolve0006.py",
+      "originalSha256": "0f5ea4cc1a62e640616f979404b47baa558374f22749e64d69842b9e8917babb",
+      "redactions": [
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "4aa07cb08519cfdbc51dc194841db7f6d4e89c9596cf3b9ab0fb0252b67d6182"
+    },
+    "reconciliation/source_utils.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "8256e56e1ca358e6209508a5b4395c789b16a9c146ff92ee84a070992a2410f1",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/source_utils.py",
+      "originalSha256": "ffd77e4b87a8b28d27e9df6ffbce61e977245ad225d6946387052c4d79009a2e",
+      "redactions": [
+        {
+          "normalizedOccurrences": 1,
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_DEVICE_ID__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__PRIVATE_LOG_LEAF__"
+        },
+        {
+          "normalizedOccurrences": 0,
+          "occurrences": 0,
+          "replacement": "__LOCAL_USERS_PREFIX__"
+        }
+      ],
+      "snapshotSha256": "cc55314b32e9654d34c4509c21ebd09076ed9c62a2d46e9b311fdf4a3650e7da"
+    }
+  },
+  "sourceMapsRawLogsPairingAssetsIncluded": false
+}

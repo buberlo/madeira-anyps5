@@ -1,0 +1,33 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import shutil,subprocess,json
+OUT=Path(__file__).resolve().parent;history=OUT/'before-library-group-key-fix';history.mkdir()
+for n in ['source-candidate-review.json','candidate-source-map.json','candidate20-combined.patch','roundtrip20.json']:shutil.copy2(OUT/n,history/n)
+shutil.copytree(OUT/'patches',history/'patches')
+changes=[('0009-device-profile-pipeline-and-typed-images','core/libs/prx/libSceAgcDriver/Graphics/src/Pipeline.cpp'),('0011-integration-and-regression-tests','core/libs/prx/libSceAgcDriver/tests/Recorder.cpp')]
+for name,rel in changes:
+ case=OUT/'rebase'/name
+ if rel.endswith('Recorder.cpp'):
+  # This untouched upstream file becomes a necessary structured-configuration API adapter in patch11.
+  for root in [case/'before',case/'after']:
+   q=root/rel;q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(OUT/'source'/rel,q)
+ for tree in [OUT/'source',case/'after']:
+  p=tree/rel;s=p.read_text()
+  if rel.endswith('Pipeline.cpp'):
+   signature='bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State& state, const VertexInputLayout& input, const ShaderResources& resources, std::span<const CompiledShader> shaders) {'
+   assert s.count(signature)==1;s=s.replace(signature,signature.replace('shaders) {','shaders, std::uint32_t sampleGroup) {'))
+   call='libraryKeys(keys, context, state, vertexInput, resources, shaders)';assert s.count(call)==1;s=s.replace(call,call[:-1]+', sampleGroup)')
+   key='    appendKey(keys.fragmentShader, state.samples);\n    appendKey(keys.fragmentOutput, state.samples);\n';assert key in s
+   s=s.replace(key,key+'    // The two groups of an eight-sample draw select different native positions and masks.\n    appendKey(keys.fragmentShader, sampleGroup);\n    appendKey(keys.fragmentOutput, sampleGroup);\n')
+  else:
+   assert s.count('    state.samples = 4;\n')==1 and s.count('    state.samples = 1;\n')==1
+   s=s.replace('    state.samples = 4;\n','    const auto singleSampleConfiguration = state.samples;\n    state.samples.count = 4;\n    state.samples.nativeCount = 4;\n    state.samples.groups = 1;\n    state.samples.mask = 15;\n    state.samples.positions[0] = {0.375f, 0.125f};\n    state.samples.positions[1] = {0.875f, 0.375f};\n    state.samples.positions[2] = {0.125f, 0.625f};\n    state.samples.positions[3] = {0.625f, 0.875f};\n')
+   s=s.replace('    state.samples = 1;\n','    state.samples = singleSampleConfiguration;\n')
+   s=s.replace('    state.colors.front().samples = 4;\n','    state.colors.front().samples = 4;\n    state.colors.front().fragments = 4;\n').replace('    state.colors.front().samples = 1;\n','    state.colors.front().samples = 1;\n    state.colors.front().fragments = 1;\n')
+  p.write_text(s)
+ r=subprocess.run(['git','diff','--no-index','--binary','--',str((case/'before').relative_to(OUT)),str((case/'after').relative_to(OUT))],cwd=OUT,capture_output=True,text=True);assert r.returncode==1
+ s=r.stdout.replace('a/'+str((case/'before').relative_to(OUT))+'/','a/').replace('b/'+str((case/'after').relative_to(OUT))+'/','b/');(OUT/'patches'/(name+'.patch')).write_text(s)
+ review=case/'resolution-review.json';j=json.loads(review.read_text());j['pipelineLibraryExplicitSampleGroupKeyBothFragmentLibraries']=True if name.startswith('0009') else None;j['recorderStructuredSampleConstructionExpectedValuesUnchanged']=True if name.startswith('0011') else None;review.write_text(json.dumps(j,indent=2)+'\n')
+print('Bounded group-key and fixture construction adapters complete')

@@ -1,0 +1,33 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import runpy,subprocess,json
+OUT=Path(__file__).resolve().parent;u=runpy.run_path(str(OUT/'source_utils.py'));sha=u['sha'];dump=u['dump'];source_map=u['source_map'];file_entries=u['file_entries'];git=u['git'];BASE=u['BASE'];SRC=OUT/'source'
+patches=sorted((OUT/'patches').glob('*.patch'));assert len(patches)==20
+expected=source_map(SRC)
+def intent():
+ names=[n.decode() for n in git(SRC,'ls-files','--others','--exclude-standard','-z').split(b'\0') if n]
+ if names:subprocess.run(['git','-C',str(SRC),'add','--intent-to-add','--',*names],check=True)
+intent();combined=OUT/'candidate20-combined.patch';combined.write_bytes(git(SRC,'diff','--binary',BASE,'--'))
+subprocess.run(['git','-C',str(SRC),'diff','--check'],check=True)
+commands=[]
+def apply(p,opts):
+ subprocess.run(['git','-C',str(SRC),'apply',*opts,str(p)],check=True)
+for p in reversed(patches):
+ for opts in [('--reverse','--check'),('--reverse',)]:apply(p,opts);commands.append({'patch':p.name,'args':list(opts),'exit':0})
+subprocess.run(['git','-C',str(SRC),'read-tree',BASE],check=True);pristine=source_map(SRC)
+assert not git(SRC,'diff','--name-only')
+for p in patches:
+ for opts in [('--check',),()]:apply(p,opts);commands.append({'patch':p.name,'args':list(opts),'exit':0})
+assert source_map(SRC)==expected
+for opts in [('--reverse','--check'),('--reverse',)]:apply(combined,opts)
+assert source_map(SRC)==pristine
+for opts in [('--check',),()]:apply(combined,opts)
+assert source_map(SRC)==expected
+intent();subprocess.run(['git','-C',str(SRC),'diff','--check'],check=True)
+mapsha=dump(OUT/'candidate-source-map.json',expected);rsha=dump(OUT/'roundtrip20.json',{'seriesCommands':commands,'seriesCommandsPassed':80,'combinedCommandsPassed':4,'fullSourceFinalAndRoundtripMatched':True})
+state=json.loads((OUT/'rebase-state.json').read_text());old=Path('build/anyps5-latestca4-source-proposal-20261012/alias-fixture20-successor')
+review={'schema':1,'kind':'frozen_final43bc_plus20_source_reconciliation_with_msaa_policy_boundary','upstreamCommit':BASE,'previousCa4Plus20ReviewSha256':sha(old/'source-candidate-review.json'),'upstreamCa4To43bcCommitCount':181,'upstreamCa4To43bcChangedFiles':201,'upstreamCa4To43bcPatchSha256':sha(OUT/'upstream-ca4-43bc.patch'),'patchCount':20,'patches':{p.name:sha(p) for p in patches},'rebasedPatchNames':[x['patch'] for x in state['completed'] if x['rebased']],'sourceEntryCount':len(file_entries(expected)),'sourceFullMapPath':str(OUT/'candidate-source-map.json'),'sourceFullMapSha256':mapsha,'sourceTree':file_entries(expected),'thirdPartyGitlinks':{k:v['gitlink'] for k,v in expected.items() if v['mode']=='160000'},'combinedPatchSha256':sha(combined),'roundtripSha256':rsha,'seriesCheckApplyReverseCommandsPassed':80,'combinedCheckApplyReverseCommandsPassed':4,'fixture20PatchSha256':sha(OUT/'patches/0020-owned-lifecycle-export-alias-fixture.patch'),'requestVersion':17,'cacheFormatVersion':28,'generatedSourceVersionPendingFreshBuild':True,'allLocalProductionCorrectnessAndGuestMemoryGuardsRetained':True,'upstreamNewMsaaTestExpectedValuesAndNegativesRetained':True,'testSourceSampleCountMemberAccessAdaptedToStructuredConfigurationOnly':True,'remainingMsaaRuntimePolicyConflict':{'upstreamPositiveDefaultNativeMsaaTests':['2x and8x standard samples','CMASK/FMASK multisample positives'],'localPolicy':'Explicit opt-in grouped guest sample transfer/import/writeback; no unproven zero-initialized permanent host images','unsafeNativeMetadataResolveExplicitlyRefused':True,'fullHleRuntimeQualificationCannotBeClaimedWithoutActualPass':True},'canonicalSourceMutated':False,'privateSourceMutatedByFreeze':False,'windowsCompilerApiCoherencePendingActualBuild':True,'fullHleQualified':False,'nativeToolsQualified':False,'deviceExecuted':False,'gameplayVerified':False}
+reviewsha=dump(OUT/'source-candidate-review.json',review)
+print(json.dumps({'reviewSha256':reviewsha,'sourceMapSha256':mapsha,'sourceFiles':len(file_entries(expected)),'gitlinks':len(expected)-len(file_entries(expected)),'rebasedPatchNames':review['rebasedPatchNames'],'combinedPatchSha256':sha(combined)},indent=2))

@@ -1,0 +1,926 @@
+diff --git a/core/shader/recompiler/CacheKey.hpp b/core/shader/recompiler/CacheKey.hpp
+index be68766..4429d4f 100644
+--- a/core/shader/recompiler/CacheKey.hpp
++++ b/core/shader/recompiler/CacheKey.hpp
+@@ -36,7 +36,8 @@ public:
+         appendInterface(key, request);
+     }
+ 
+-    // A hash over every field Build appends except the code, the target and the probe flag: the
++    // A hash over every field Build appends except the code, the fixed device target
++    // (keeping the grouped-image representation), and the probe flag: the
+     // key of a source memo whose owner fixes the code (a registered shader at an offset) and the
+     // device itself, and which is bypassed while the probe is active.
+     static std::uint64_t ContextHash(const RecompileRequest& request) {
+@@ -53,6 +54,9 @@ public:
+         append(key, request.context.vertex);
+         append(key, request.context.floatMode);
+         appendMesh(key, request);
++        // Source memo owners do not fix the grouped sampled-image representation.
++        append(key, request.target.groupedMsaaMaxSamples);
++        append(key, request.target.imageDescriptorPolicy);
+         appendTessellation(key, request);
+         std::uint64_t hash = 0xcbf29ce484222325ull;
+         for (const auto value : key) {
+@@ -238,8 +242,11 @@ private:
+         append(key, value.tessellation);
+         append(key, value.nonConstantImageOffsets);
+         append(key, value.srgbDecodeFormats);
++        append(key, value.groupedMsaaMaxSamples);
+         append(key, value.narrowSubgroupClock);
+         append(key, value.float64DenormPreserve);
++        append(key, value.fixedPushSlots);
++        append(key, value.imageDescriptorPolicy);
+     }
+ };
+ 
+diff --git a/core/shader/recompiler/ControlFlow/include/ControlFlow/RequestSerializer.hpp b/core/shader/recompiler/ControlFlow/include/ControlFlow/RequestSerializer.hpp
+index 0f59c68..777e4d0 100644
+--- a/core/shader/recompiler/ControlFlow/include/ControlFlow/RequestSerializer.hpp
++++ b/core/shader/recompiler/ControlFlow/include/ControlFlow/RequestSerializer.hpp
+@@ -46,6 +46,9 @@ namespace ShaderRecompiler {
+     public:
+         [[nodiscard]] std::string Serialize(const RecompileRequest& request) const;
+         [[nodiscard]] DeserializedRequest Deserialize(std::string_view text) const;
++        // Only a caller with recorded legacy iPad provenance may select this overlapping wire layout.
++        // Pixel packing, dual-source blend and alpha-to-coverage retain conservative defaults.
++        [[nodiscard]] DeserializedRequest DeserializeLegacyIpadV14V15(std::string_view text) const;
+     };
+ 
+ }
+diff --git a/core/shader/recompiler/ControlFlow/src/RequestSerializer.cpp b/core/shader/recompiler/ControlFlow/src/RequestSerializer.cpp
+index 5a76e67..2d34971 100644
+--- a/core/shader/recompiler/ControlFlow/src/RequestSerializer.cpp
++++ b/core/shader/recompiler/ControlFlow/src/RequestSerializer.cpp
+@@ -151,7 +151,15 @@ public:
+         return static_cast<std::uint8_t>(m_data[m_offset++]);
+     }
+ 
+-    bool ReadBool() { return ReadU8() != 0u; }
++    bool ReadBool() {
++        const auto value = ReadU8();
++        if (value > 1u) throw std::runtime_error("RequestSerializer: invalid boolean");
++        return value != 0u;
++    }
++
++    void RequireEnd() const {
++        if (m_offset != m_data.size()) throw std::runtime_error("RequestSerializer: unexpected trailing data or undeclared legacy origin");
++    }
+ 
+     std::uint32_t ReadU32() {
+         std::uint32_t value = 0u;
+@@ -734,7 +742,7 @@ std::string RequestSerializer::Serialize(const RecompileRequest& request) const
+     std::string buffer;
+     Writer writer(buffer);
+     writer.WriteU32(0x41505335u);
+-    writer.WriteU32(16u);
++    writer.WriteU32(17u);
+     writeShaderBinary(writer, request.shader);
+     writeGuestContext(writer, request.context);
+     writeSpirvTarget(writer, request.target);
+@@ -754,18 +762,23 @@ std::string RequestSerializer::Serialize(const RecompileRequest& request) const
+     if (request.context.compute.has_value()) writer.WriteU32(request.context.compute->scratchDwords);
+     writer.WriteBool(request.target.narrowSubgroupClock);
+     writer.WriteBool(request.target.float64DenormPreserve);
++    writer.WriteBool(request.target.fixedPushSlots);
++    writer.WriteU32(request.target.groupedMsaaMaxSamples);
++    if (!ValidImageDescriptorPolicy(request.target.imageDescriptorPolicy)) throw std::runtime_error("invalid recompile image descriptor policy");
++    writer.WriteU32(static_cast<std::uint32_t>(request.target.imageDescriptorPolicy));
+     return base64Encode(buffer);
+ }
+ 
+-DeserializedRequest RequestSerializer::Deserialize(std::string_view text) const {
++static DeserializedRequest DeserializeRequest(std::string_view text, bool legacyIpad) {
+     const std::string decoded = base64Decode(text);
+     Reader reader(decoded);
+     if (reader.ReadU32() != 0x41505335u) throw std::runtime_error("invalid recompile request signature");
+     const auto version = reader.ReadU32();
+-    if (version < 1u || version > 16u) throw std::runtime_error("unsupported recompile request serialization version");
++    if (version < 1u || version > 17u) throw std::runtime_error("unsupported recompile request serialization version");
++    if (legacyIpad && version != 14u && version != 15u) throw std::runtime_error("legacy iPad request requires declared version14 or version15 origin");
+     DeserializedRequest result{};
+     result.request.shader = readShaderBinary(reader, result.shaderCode, result.shaderHeader);
+-    result.request.context = readGuestContext(reader, result, version);
++    result.request.context = readGuestContext(reader, result, legacyIpad ? 13u : version);
+     result.request.target = readSpirvTarget(reader, result);
+     result.request.layout = readBindingLayout(reader);
+     if (reader.ReadBool()) {
+@@ -782,8 +795,22 @@ DeserializedRequest RequestSerializer::Deserialize(std::string_view text) const
+     if (version >= 9u) result.request.target.srgbDecodeFormats = reader.ReadU32();
+     if (version >= 10u && result.request.context.compute.has_value()) result.request.context.compute->scratchDwords = reader.ReadU32();
+     if (version >= 12u) result.request.target.narrowSubgroupClock = reader.ReadBool();
+-    if (version >= 16u) result.request.target.float64DenormPreserve = reader.ReadBool();
++    if (!legacyIpad && version >= 16u) result.request.target.float64DenormPreserve = reader.ReadBool();
++    if (version >= 17u) result.request.target.fixedPushSlots = reader.ReadBool();
++    if (version >= 17u || (legacyIpad && version >= 14u)) result.request.target.groupedMsaaMaxSamples = reader.ReadU32();
++    if (result.request.target.groupedMsaaMaxSamples != 0u && result.request.target.groupedMsaaMaxSamples != 4u) throw std::runtime_error("invalid recompile grouped MSAA sample limit");
++    if (version >= 17u || (legacyIpad && version >= 15u)) result.request.target.imageDescriptorPolicy = static_cast<ImageDescriptorPolicy>(reader.ReadU32());
++    if (!ValidImageDescriptorPolicy(result.request.target.imageDescriptorPolicy)) throw std::runtime_error("invalid recompile image descriptor policy");
++    reader.RequireEnd();
+     return result;
+ }
+ 
++DeserializedRequest RequestSerializer::Deserialize(std::string_view text) const {
++    return DeserializeRequest(text, false);
++}
++
++DeserializedRequest RequestSerializer::DeserializeLegacyIpadV14V15(std::string_view text) const {
++    return DeserializeRequest(text, true);
++}
++
+ }
+diff --git a/core/shader/recompiler/GroupedMsaa.hpp b/core/shader/recompiler/GroupedMsaa.hpp
+new file mode 100644
+index 0000000..79f9d3b
+--- /dev/null
++++ b/core/shader/recompiler/GroupedMsaa.hpp
+@@ -0,0 +1,48 @@
++#ifndef CORE_SHADER_RECOMPILER_GROUPEDMSAA_HPP
++#define CORE_SHADER_RECOMPILER_GROUPEDMSAA_HPP
++
++#include <algorithm>
++#include <cstdint>
++#include <stdexcept>
++
++namespace ShaderRecompiler {
++
++// GC10 T# LAST_LEVEL and MAX_MIP both encode log2(stored fragments) for
++// types 14/15. Coverage samples cannot be inferred from a texture T#.
++// AMD PAL gfx9Device.cpp (c5e8000), CreateImageViewSrds, lines 4205-4212.
++inline std::uint32_t TextureFragmentCount(std::uint32_t word3, std::uint32_t word5) {
++    const auto base = (word3 >> 12u) & 15u;
++    const auto last = (word3 >> 16u) & 15u;
++    const auto maximum = (word5 >> 4u) & 15u;
++    if (base != 0u || last > 3u || last != maximum)
++        throw std::runtime_error("multisampled texture has inconsistent fragment-count fields");
++    return 1u << last;
++}
++
++// 0 preserves the native image representation. 4 selects a separately
++// allocated MSAA array image; eight stored samples become two four-sample layers.
++inline std::uint32_t GroupedNativeSamples(std::uint32_t fragments, std::uint32_t maximum) {
++    if (maximum != 0u && maximum != 4u)
++        throw std::runtime_error("unsupported grouped MSAA native sample limit");
++    if (fragments != 1u && fragments != 2u && fragments != 4u && fragments != 8u)
++        throw std::runtime_error("unsupported multisampled texture fragment count");
++    if (maximum == 0u) return 0u;
++    if (fragments == 1u)
++        throw std::runtime_error("one-fragment MSAA image sampling has no proved host representation");
++    return std::min(fragments, maximum);
++}
++
++struct GroupedSampleAddress { std::uint32_t layer; std::uint32_t sample; };
++
++inline GroupedSampleAddress GroupedSample(std::uint32_t layer, std::uint32_t sample,
++                                         std::uint32_t fragments, std::uint32_t nativeSamples) {
++    if (nativeSamples == 0u || nativeSamples != GroupedNativeSamples(fragments, 4u) || sample >= fragments)
++        throw std::runtime_error("invalid grouped MSAA sample address");
++    const auto groups = fragments / nativeSamples;
++    if (layer > (UINT32_MAX - groups + 1u) / groups)
++        throw std::runtime_error("grouped MSAA layer address overflows");
++    return {layer * groups + sample / nativeSamples, sample % nativeSamples};
++}
++
++}
++#endif
+diff --git a/core/shader/recompiler/ImageDescriptorPolicy.hpp b/core/shader/recompiler/ImageDescriptorPolicy.hpp
+new file mode 100644
+index 0000000..a4af8d6
+--- /dev/null
++++ b/core/shader/recompiler/ImageDescriptorPolicy.hpp
+@@ -0,0 +1,21 @@
++#ifndef CORE_SHADER_RECOMPILER_IMAGEDESCRIPTORPOLICY_HPP
++#define CORE_SHADER_RECOMPILER_IMAGEDESCRIPTORPOLICY_HPP
++#include <cstdint>
++namespace ShaderRecompiler {
++// Host descriptor legality policy. This does not advertise a SPIR-V capability
++// or emulate null image accesses; shader instructions remain unchanged.
++// TypedPlaceholders is a separate, explicitly enabled host fallback. Its 1x1
++// zero-initialized real images are not Vulkan native-null descriptors.
++enum class ImageDescriptorPolicy : std::uint32_t {
++    RequiresValidImages = 0u,
++    NativeNull = 1u,
++    TypedPlaceholders = 2u,
++};
++inline bool ValidImageDescriptorPolicy(ImageDescriptorPolicy policy) {
++    return policy == ImageDescriptorPolicy::RequiresValidImages || policy == ImageDescriptorPolicy::NativeNull || policy == ImageDescriptorPolicy::TypedPlaceholders;
++}
++inline ImageDescriptorPolicy ImageDescriptorPolicyFor(bool enabledNativeNull, bool enabledTypedPlaceholders = false) {
++    return enabledNativeNull ? ImageDescriptorPolicy::NativeNull : enabledTypedPlaceholders ? ImageDescriptorPolicy::TypedPlaceholders : ImageDescriptorPolicy::RequiresValidImages;
++}
++}
++#endif
+diff --git a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ResourcePlan.hpp b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ResourcePlan.hpp
+index cb9565f..ea1c4b1 100644
+--- a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ResourcePlan.hpp
++++ b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ResourcePlan.hpp
+@@ -59,6 +59,7 @@ struct IrResourcePlan {
+     std::uint32_t userDataBase = 0;
+     std::uint32_t userDataCount = 64;
+     std::uint32_t srgbDecodeFormats = 0;
++    std::uint32_t groupedMsaaMaxSamples = 0;
+     std::vector<std::unique_ptr<IrValue>> valueStorage;
+     std::vector<std::unique_ptr<IrBlock>> blockStorage;
+     std::vector<MemoryInfo> memoryInfo;
+diff --git a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/Resources.hpp b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/Resources.hpp
+index 25e0805..ab68c85 100644
+--- a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/Resources.hpp
++++ b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/Resources.hpp
+@@ -67,6 +67,8 @@ struct ImageResource {
+     RdnaImageDimension dimension = RdnaImageDimension::Unknown;
+     ImageMipMode mipMode = ImageMipMode::None;
+     std::uint32_t mipCount = 1;
++    std::uint32_t logicalSamples = 1;
++    std::uint32_t nativeSamples = 0;
+     IrBufferFormat conversionFormat = IrBufferFormat::Invalid;
+     std::uint32_t shaderSwizzle = ShaderImageIdentitySwizzle;
+     bool read = false;
+diff --git a/core/shader/recompiler/IntermediateRepresentation/src/IrProgram.cpp b/core/shader/recompiler/IntermediateRepresentation/src/IrProgram.cpp
+index 6a9d16e..a9ba9fd 100644
+--- a/core/shader/recompiler/IntermediateRepresentation/src/IrProgram.cpp
++++ b/core/shader/recompiler/IntermediateRepresentation/src/IrProgram.cpp
+@@ -914,7 +914,7 @@ DescriptorBindingKind DescriptorBindingForImage(const ImageResource& image) {
+             dimension = 3u;
+             break;
+         case RdnaImageDimension::Dim2DMsaa:
+-            dimension = 4u;
++            dimension = image.nativeSamples != 0u ? 5u : 4u;
+             break;
+         case RdnaImageDimension::Dim2DMsaaArray:
+             dimension = 5u;
+diff --git a/core/shader/recompiler/Optimization/include/Optimization/ResourceMaterializer.hpp b/core/shader/recompiler/Optimization/include/Optimization/ResourceMaterializer.hpp
+index 2dbf398..2fdc81b 100644
+--- a/core/shader/recompiler/Optimization/include/Optimization/ResourceMaterializer.hpp
++++ b/core/shader/recompiler/Optimization/include/Optimization/ResourceMaterializer.hpp
+@@ -16,9 +16,9 @@ class ResourceMaterializer {
+ public:
+     static std::uint32_t EmulatedCompareState(const ShaderInfo& info, const ResourceSnapshot& snapshot, std::uint32_t index);
+     void ApplyStaticInterface(IrProgram& program, bool nativeSampleOffsets = true) const;
+-    static std::vector<ImageResource> RuntimeImageModes(const ImageResource& image);
++    static std::vector<ImageResource> RuntimeImageModes(const ImageResource& image, std::uint32_t groupedMsaaMaxSamples = 0u);
+     static std::uint32_t RuntimeImageMode(const ImageResource& image, const DescriptorValue& descriptor, std::span<const ImageResource> modes);
+-    static void PrepareImageModes(ShaderInfo& info);
++    static void PrepareImageModes(ShaderInfo& info, std::uint32_t groupedMsaaMaxSamples = 0u);
+     static const char* UnnormalizedSampleMismatch(const ImageResource& image);
+     [[nodiscard]] IrResourcePlan ExtractPlan(const IrProgram& program) const;
+     void Materialize(const IrResourcePlan& program, const SrtRuntime& runtime, ResourceSnapshot& snapshot) const;
+diff --git a/core/shader/recompiler/Optimization/src/BindingAllocator.cpp b/core/shader/recompiler/Optimization/src/BindingAllocator.cpp
+index f99616a..cd916e0 100644
+--- a/core/shader/recompiler/Optimization/src/BindingAllocator.cpp
++++ b/core/shader/recompiler/Optimization/src/BindingAllocator.cpp
+@@ -119,7 +119,10 @@ BindingAllocationResult BindingAllocator::Allocate(IrProgram& program, const Bin
+         const bool dynamic = info.images[i].mipMode == ImageMipMode::DynamicStorage;
+         const std::uint32_t count = dynamic ? RuntimeAbi::StorageMipSlots : 1u;
+         std::array<bool, ImageBindingCount> placed{};
+-        for (const auto& mode : ResourceMaterializer::RuntimeImageModes(info.images[i])) {
++        std::vector<ImageResource> generated;
++        if (info.runtimeImageModes.empty()) generated = ResourceMaterializer::RuntimeImageModes(info.images[i], program.Resources().groupedMsaaMaxSamples);
++        const auto& modes = info.runtimeImageModes.empty() ? generated : info.runtimeImageModes.at(i);
++        for (const auto& mode : modes) {
+             const auto group = ImageBindingIndex(DescriptorBindingForImage(mode));
+             if (placed.at(group)) continue;
+             placed[group] = true;
+diff --git a/core/shader/recompiler/Optimization/src/ConstantFolder.cpp b/core/shader/recompiler/Optimization/src/ConstantFolder.cpp
+index 0020b87..12dadda 100644
+--- a/core/shader/recompiler/Optimization/src/ConstantFolder.cpp
++++ b/core/shader/recompiler/Optimization/src/ConstantFolder.cpp
+@@ -120,6 +120,38 @@ bool replaceBinaryIdentity(IrValue& inst, IrType type, std::uint64_t identity) {
+     return false;
+ }
+ 
++// Prove a masked constant shift independent of its dynamic selector. The
++// selector must be explicitly bounded to 0..31, so no undefined shift or
++// host subgroup ordering is assumed. This also removes dead LaneId inputs
++// from exports whose execution mask is fully set.
++bool foldMaskedConstantShift(IrBuilder& builder, IrValue& inst) {
++    for (std::size_t side = 0; side != 2; ++side) {
++        auto& shifted = resolveArg(inst, side);
++        auto& mask = resolveArg(inst, 1u - side);
++        if (shifted.Opcode() != IrOpcode::ShiftRightLogical32 || !isImmediate(mask, IrType::U32)) continue;
++        auto& source = resolveArg(shifted, 0);
++        auto& selector = resolveArg(shifted, 1);
++        if (!isImmediate(source, IrType::U32) || selector.Opcode() != IrOpcode::BitwiseAnd32) continue;
++        const auto& left = resolveArg(selector, 0);
++        const auto& right = resolveArg(selector, 1);
++        const auto* bound = isImmediate(left, IrType::U32) ? &left : isImmediate(right, IrType::U32) ? &right : nullptr;
++        if (bound == nullptr || bound->ImmediateU32() > 31u) continue;
++        const auto expected = source.ImmediateU32() & mask.ImmediateU32();
++        bool invariant = true;
++        for (std::uint32_t shift = 1; shift <= bound->ImmediateU32(); ++shift) {
++            if (((source.ImmediateU32() >> shift) & mask.ImmediateU32()) != expected) {
++                invariant = false;
++                break;
++            }
++        }
++        if (invariant) {
++            replaceWith(inst, builder.Constant(expected));
++            return true;
++        }
++    }
++    return false;
++}
++
+ bool foldSelect(IrValue& inst) {
+     auto& condition = resolveArg(inst, 0);
+     auto& trueValue = resolveArg(inst, 1);
+@@ -579,6 +611,7 @@ bool ConstantFolder::tryFoldValue(IrProgram& program, IrValue& value) const {
+             if (foldU32(builder, value, [](std::uint32_t a, std::uint32_t b) { return a & b; })) {
+                 return true;
+             }
++            if (foldMaskedConstantShift(builder, value)) return true;
+             return replaceBinaryIdentity(value, IrType::U32, 0xffffffffu);
+         }
+         case IrOpcode::BitwiseAnd64: {
+diff --git a/core/shader/recompiler/Optimization/src/DescriptorBindingBuilder.cpp b/core/shader/recompiler/Optimization/src/DescriptorBindingBuilder.cpp
+index 6b68b29..f6f23f5 100644
+--- a/core/shader/recompiler/Optimization/src/DescriptorBindingBuilder.cpp
++++ b/core/shader/recompiler/Optimization/src/DescriptorBindingBuilder.cpp
+@@ -1,5 +1,6 @@
+ #include "Optimization/DescriptorBindingBuilder.hpp"
+ #include "Optimization/ResourceMaterializer.hpp"
++#include "GroupedMsaa.hpp"
+ #include "SpirvBackend/SpirvEmitterHelpers.hpp"
+ #include "SpirvBackend/SpirvBufferFormat.hpp"
+ #include <spirv/unified1/spirv.hpp>
+@@ -79,7 +80,7 @@ DescriptorRole RoleFor(DescriptorBindingKind kind) {
+ DescriptorImageShape ImageShapeForResource(const ImageResource& image) {
+     const RdnaImageDimensionInfo& info = RdnaImageDimensionInfoFor(image.dimension);
+     if (info.multisampled != 0u) {
+-        fail("DescriptorBindingBuilder::Populate multisampled image resources have no descriptor image shape");
++        return info.arrayed != 0u || image.nativeSamples != 0u ? DescriptorImageShape::Image2DMsaaArray : DescriptorImageShape::Image2DMsaa;
+     }
+     if (info.spirvDimension == spv::Dim1D) {
+         return info.arrayed != 0u ? DescriptorImageShape::Image1DArray : DescriptorImageShape::Image1D;
+@@ -396,6 +397,10 @@ DescriptorBindingPlan DescriptorBindingBuilder::Prepare(const IrBindingLayout& l
+                 const auto resource = compact.resources[element];
+                 const auto& image = info.images.at(resource);
+                 const auto& mode = info.runtimeImageModes.at(resource).at(imageModes[resource]);
++                const auto& value = snapshot.images.at(resource);
++                const bool multisampled = mode.dimension == RdnaImageDimension::Dim2DMsaa || mode.dimension == RdnaImageDimension::Dim2DMsaaArray;
++                physical.imageLogicalSamples.push_back(multisampled ? 1u << ((value.dwords[5] >> 4u) & 15u) : 1u);
++                physical.imageNativeSamples.push_back(mode.nativeSamples);
+                 entry.identityImageSwizzle.push_back(mode.conversionFormat != IrBufferFormat::Invalid || mode.depthBits);
+                 physical.imageWritten.push_back(image.written || image.atomic);
+                 physical.imageDepthCompare.push_back(mode.depthCompare);
+diff --git a/core/shader/recompiler/Optimization/src/ResourceMaterializer.cpp b/core/shader/recompiler/Optimization/src/ResourceMaterializer.cpp
+index 838e529..d0aa949 100644
+--- a/core/shader/recompiler/Optimization/src/ResourceMaterializer.cpp
++++ b/core/shader/recompiler/Optimization/src/ResourceMaterializer.cpp
+@@ -1,4 +1,5 @@
+ #include "Optimization/ResourceMaterializer.hpp"
++#include "GroupedMsaa.hpp"
+ #include "Optimization/SrtWalker/SrtFlatSlotClasses.hpp"
+ #include "Optimization/ShaderStageInputInfo.hpp"
+ #include "RdnaDecoder/RdnaDescriptorFormat.hpp"
+@@ -35,6 +36,8 @@ bool MaterializeProfiled() {
+ }
+ 
+ struct DecodedImage {
++    std::uint32_t logicalSamples = 1u;
++    std::uint32_t nativeSamples = 0u;
+     IrTextureNumericClass numericClass = IrTextureNumericClass::Unsupported;
+     RdnaImageDimension dimension = RdnaImageDimension::Unknown;
+     std::uint32_t mipCount = 1;
+@@ -130,7 +133,7 @@ std::uint32_t storageMipCount(const ImageResource& base, const DescriptorValue&
+     return mipBase <= mipLast ? mipLast - mipBase + 1u : 0u;
+ }
+ 
+-DecodedImage decodeImageDescriptor(const DescriptorValue& descriptor, const ImageResource& base, std::uint32_t srgbDecodeFormats) {
++DecodedImage decodeImageDescriptor(const DescriptorValue& descriptor, const ImageResource& base, std::uint32_t srgbDecodeFormats, std::uint32_t groupedMsaaMaxSamples = 0u) {
+     DecodedImage decoded;
+     decoded.mipCount = storageMipCount(base, descriptor);
+     if (decoded.mipCount == 0u) {
+@@ -149,6 +152,14 @@ DecodedImage decodeImageDescriptor(const DescriptorValue& descriptor, const Imag
+         throw std::runtime_error("image descriptor is invalid");
+     }
+     decoded.dimension = descriptorDimension(descriptor, base.dimension);
++    if (decoded.dimension == RdnaImageDimension::Dim2DMsaa || decoded.dimension == RdnaImageDimension::Dim2DMsaaArray) {
++        decoded.logicalSamples = 1u << ((descriptor.dwords[5] >> 4u) & 15u);
++        if (groupedMsaaMaxSamples != 0u && base.resourceClass == ImageResourceClass::Sampled && !base.written && !base.atomic && !base.packed && !base.depthCompare) {
++            if (base.r128) throw std::runtime_error("128-bit grouped multisampled texture descriptors are not implemented");
++            decoded.logicalSamples = TextureFragmentCount(descriptor.dwords[3], descriptor.dwords[5]);
++            decoded.nativeSamples = GroupedNativeSamples(decoded.logicalSamples, groupedMsaaMaxSamples);
++        }
++    }
+     decoded.cube = descriptorIsCube(descriptor);
+     const auto format = rawImageFormat(descriptor);
+     if (base.atomic64 && format != IrBufferFormat::Format32_32UInt && format != IrBufferFormat::Format32_32SInt && format != IrBufferFormat::Format32_32Float) {
+@@ -399,7 +410,7 @@ void resolveTableImage(const IrResourcePlan& plan, std::uint32_t imageIndex, con
+             continue;
+         }
+         if (!validImageDescriptor(candidate, image.r128)) throw std::runtime_error("bindless image table contains an invalid descriptor");
+-        const auto decoded = decodeImageDescriptor(candidate, image, plan.srgbDecodeFormats);
++        const auto decoded = decodeImageDescriptor(candidate, image, plan.srgbDecodeFormats, plan.groupedMsaaMaxSamples);
+         if (decoded.fmask) throw std::runtime_error("bindless FMASK images are unsupported");
+         static_cast<void>(ResourceMaterializer::RuntimeImageMode(image, candidate, plan.info.runtimeImageModes.at(imageIndex)));
+         valid[i] = 1u;
+@@ -621,7 +632,8 @@ void materializeSrtGuards(const IrResourcePlan& plan, ResourceSnapshot& snapshot
+ 
+ }
+ 
+-std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageResource& image) {
++std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageResource& image, std::uint32_t groupedMsaaMaxSamples) {
++    if (groupedMsaaMaxSamples != 0u && groupedMsaaMaxSamples != 4u) throw std::runtime_error("unsupported grouped MSAA native sample limit");
+     std::vector<ImageResource> modes;
+     const bool storage = image.resourceClass == ImageResourceClass::Storage;
+     const auto append = [&](IrTextureNumericClass numeric, IrBufferFormat conversion, IrBufferFormat packed, bool depth, bool unorm16) {
+@@ -760,6 +772,19 @@ std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageRe
+             modes.push_back(mode);
+         }
+     }
++    if (groupedMsaaMaxSamples != 0u && image.resourceClass == ImageResourceClass::Sampled && !image.written && !image.atomic && !image.packed && !image.depthCompare) {
++        const auto count = modes.size();
++        for (std::size_t index = 0u; index < count; ++index) {
++            const auto base = modes[index];
++            if (base.dimension != RdnaImageDimension::Dim2DMsaa && base.dimension != RdnaImageDimension::Dim2DMsaaArray) continue;
++            for (const auto samples : {2u, 4u, 8u}) {
++                auto mode = base;
++                mode.logicalSamples = samples;
++                mode.nativeSamples = GroupedNativeSamples(samples, groupedMsaaMaxSamples);
++                modes.push_back(std::move(mode));
++            }
++        }
++    }
+     if (modes.empty()) throw std::runtime_error("image instruction has no supported runtime modes");
+     if (image.foldTexelOffsetsOnly && std::ranges::any_of(modes, [](const ImageResource& mode) { return UnnormalizedSampleMismatch(mode) == nullptr; })) {
+         std::erase_if(modes, [](const ImageResource& mode) { return UnnormalizedSampleMismatch(mode) != nullptr; });
+@@ -780,7 +805,8 @@ std::uint32_t ResourceMaterializer::RuntimeImageMode(const ImageResource& image,
+     if (descriptor.dwordCount != 8u) throw std::runtime_error("runtime image descriptor must contain eight dwords");
+     if (modes.empty()) throw std::runtime_error("prepared runtime image modes are missing");
+     if (nullImageDescriptor(descriptor)) return 0u;
+-    const auto decoded = decodeImageDescriptor(descriptor, image, image.srgbDecodeFormats);
++    const auto groupLimit = std::any_of(modes.begin(), modes.end(), [](const ImageResource& mode) { return mode.nativeSamples != 0u; }) ? 4u : 0u;
++    const auto decoded = decodeImageDescriptor(descriptor, image, image.srgbDecodeFormats, groupLimit);
+     const auto format = rawImageFormat(descriptor);
+     const bool emulated = image.depthCompare && format != IrBufferFormat::Format32Float && format != IrBufferFormat::Format16UNorm && !IsDepthBitsTexture(descriptor.dwords[1], descriptor.dwords[3]);
+     if (!emulated && (image.emulatedCompare & EmulatedCompare::NativeOffsetUnsupported) != 0u) throw std::runtime_error("native comparison with a nonconstant texel offset requires VK_KHR_maintenance8 and shaderImageGatherExtended");
+@@ -809,6 +835,7 @@ std::uint32_t ResourceMaterializer::RuntimeImageMode(const ImageResource& image,
+             if (mode.packedFormat == IrBufferFormat::Fmask8_S2_F1) return index;
+             continue;
+         }
++        if (mode.nativeSamples != decoded.nativeSamples || (mode.nativeSamples != 0u && mode.logicalSamples != decoded.logicalSamples)) continue;
+         if (mode.numericClass == decoded.numericClass && mode.dimension == decoded.dimension && mode.conversionFormat == decoded.conversionFormat && mode.packedFormat == decoded.packedFormat && mode.cube == decoded.cube && mode.depthBits == decoded.depthBits && mode.depthUnorm16 == decoded.depthUnorm16 && mode.srgbDecode == decoded.srgbDecode) return index;
+     }
+     if (image.dimension == RdnaImageDimension::Dim1D && decoded.dimension != RdnaImageDimension::Dim1D) throw std::runtime_error("image address has too few coordinate components");
+@@ -884,13 +911,13 @@ void ResourceMaterializer::ApplyStaticInterface(IrProgram& program, bool nativeS
+     resources.guardedSrtSlots = Detail::ComputeGuardedFlatSlots(resources);
+     resources.srtGuardOffset = mappingOffset;
+     if (!resources.guardedSrtSlots.empty()) resources.info.usesFaultBuffer = true;
+-    PrepareImageModes(resources.info);
++    PrepareImageModes(resources.info, resources.groupedMsaaMaxSamples);
+ }
+ 
+-void ResourceMaterializer::PrepareImageModes(ShaderInfo& info) {
++void ResourceMaterializer::PrepareImageModes(ShaderInfo& info, std::uint32_t groupedMsaaMaxSamples) {
+     info.runtimeImageModes.clear();
+     info.runtimeImageModes.reserve(info.images.size());
+-    for (const auto& image : info.images) info.runtimeImageModes.push_back(RuntimeImageModes(image));
++    for (const auto& image : info.images) info.runtimeImageModes.push_back(RuntimeImageModes(image, groupedMsaaMaxSamples));
+ }
+ 
+ namespace {
+@@ -966,6 +993,8 @@ IrResourcePlan ResourceMaterializer::ExtractPlan(const IrProgram& program) const
+     plan.userDataBase = source.userDataBase;
+     plan.userDataCount = source.userDataCount;
+     plan.srgbDecodeFormats = source.srgbDecodeFormats;
++    plan.groupedMsaaMaxSamples = source.groupedMsaaMaxSamples;
++    if (plan.groupedMsaaMaxSamples != 0u && plan.groupedMsaaMaxSamples != 4u) throw std::runtime_error("unsupported grouped MSAA native sample limit");
+     plan.memoryInfo = source.memoryInfo;
+     plan.descriptorSources = source.descriptorSources;
+     plan.controlFlow = source.controlFlow;
+@@ -975,7 +1004,7 @@ IrResourcePlan ResourceMaterializer::ExtractPlan(const IrProgram& program) const
+     plan.srtPlanComplete = source.srtPlanComplete;
+     plan.resourceTrackingComplete = source.resourceTrackingComplete;
+     plan.info = source.info;
+-    PrepareImageModes(plan.info);
++    PrepareImageModes(plan.info, plan.groupedMsaaMaxSamples);
+     plan.uniformFill = source.uniformFill;
+     ownPlanValues(plan);
+     const auto addSource = [&plan](std::uint32_t index) {
+diff --git a/core/shader/recompiler/Recompiler.cpp b/core/shader/recompiler/Recompiler.cpp
+index 7e5883e..55fcd7b 100644
+--- a/core/shader/recompiler/Recompiler.cpp
++++ b/core/shader/recompiler/Recompiler.cpp
+@@ -250,6 +250,7 @@ IrProgram PrepareResourceProgram(const RecompileRequest& request, ShaderPreparat
+     deadCodeEliminator.Eliminate(program);
+     dumpIr("resources");
+     program.Resources().srgbDecodeFormats = request.target.srgbDecodeFormats;
++    program.Resources().groupedMsaaMaxSamples = request.target.groupedMsaaMaxSamples;
+ 
+     return program;
+ }
+diff --git a/core/shader/recompiler/Recompiler.hpp b/core/shader/recompiler/Recompiler.hpp
+index deca904..5128a00 100644
+--- a/core/shader/recompiler/Recompiler.hpp
++++ b/core/shader/recompiler/Recompiler.hpp
+@@ -2,6 +2,7 @@
+ #define CORE_SHADER_RECOMPILIER_INCLUDE_SHADER_RECOMPILIER_RECOMPILER_HPP
+ 
+ #include "RuntimeAbi.hpp"
++#include "ImageDescriptorPolicy.hpp"
+ #include "PipelineSpecialization.hpp"
+ #include <array>
+ #include <cstddef>
+@@ -225,9 +226,12 @@ struct SpirvTarget {
+     std::optional<TessellationTargetLimits> tessellation;
+     bool nonConstantImageOffsets = false;
+     std::uint32_t srgbDecodeFormats = 0;
++    // 0: native sampled MSAA. 4: group logical samples in MSAA array layers.
++    std::uint32_t groupedMsaaMaxSamples = 0;
+     bool narrowSubgroupClock = false;
+     bool fixedPushSlots = false;
+     bool float64DenormPreserve = false;
++    ImageDescriptorPolicy imageDescriptorPolicy = ImageDescriptorPolicy::RequiresValidImages;
+ };
+ 
+ struct BindingLayout {
+@@ -326,7 +330,9 @@ enum class DescriptorImageShape {
+     Image2DArray,
+     ImageCube,
+     Image3D,
+-    Image1DArray
++    Image1DArray,
++    Image2DMsaa,
++    Image2DMsaaArray
+ };
+ 
+ enum class DescriptorRole {
+@@ -371,6 +377,9 @@ struct DescriptorBinding {
+     std::vector<bool> imageUnnormalizedBaseLevel;
+     std::vector<std::uint32_t> imageSamplers;
+     std::vector<bool> bufferRead;
++    // One entry per guest-image descriptor; native=0 means unmodified image shape.
++    std::vector<std::uint32_t> imageLogicalSamples;
++    std::vector<std::uint32_t> imageNativeSamples;
+ };
+ 
+ struct VertexAttribute {
+diff --git a/core/shader/recompiler/ShaderDiskCache.cpp b/core/shader/recompiler/ShaderDiskCache.cpp
+index bd05440..838258b 100644
+--- a/core/shader/recompiler/ShaderDiskCache.cpp
++++ b/core/shader/recompiler/ShaderDiskCache.cpp
+@@ -11,6 +11,8 @@
+ #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
++#elif defined(__APPLE__)
++#include <mach-o/dyld.h>
+ #endif
+ #include "ShaderCacheVersion.hpp"
+ #include <algorithm>
+@@ -53,7 +55,15 @@ std::filesystem::path ShaderCacheDirectory() {
+     const char* directory = std::getenv("ANYPS5_SHADER_CACHE_DIR");
+     if (directory != nullptr && *directory != '\0') return std::filesystem::path(directory);
+     std::error_code error;
++#ifdef __APPLE__
++    std::uint32_t size = 0;
++    if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) return {};
++    std::vector<char> path(size);
++    if (_NSGetExecutablePath(path.data(), &size) != 0) return {};
++    const auto executable = std::filesystem::weakly_canonical(std::filesystem::path(path.data()), error);
++#else
+     const auto executable = std::filesystem::read_symlink("/proc/self/exe", error);
++#endif
+     if (error) return {};
+     return executable.parent_path() / "shader_cache";
+ #endif
+@@ -67,7 +77,7 @@ namespace ShaderRecompiler::ShaderDiskCache {
+ static_assert(sizeof(CompiledShaderArtifact) == 192, "CompiledShaderArtifact changed: update the artifact encoder");
+ static_assert(sizeof(ShaderInvocation) == 112, "ShaderInvocation changed: update the invocation encoder");
+ static_assert(sizeof(RecompileResult) == 312, "RecompileResult changed: update EncodeResult and DecodeResult");
+-static_assert(sizeof(DescriptorBinding) == 568, "DescriptorBinding changed: update the binding encoder");
++static_assert(sizeof(DescriptorBinding) == 656, "DescriptorBinding changed: update the binding encoder");
+ static_assert(sizeof(VertexAttribute) == 32, "VertexAttribute changed: update the attribute encoder");
+ static_assert(sizeof(VertexInput) == 16, "VertexInput changed: update the vertex input encoder");
+ static_assert(sizeof(FragmentParameter) == 12, "FragmentParameter changed: update the parameter encoder");
+@@ -260,6 +270,8 @@ void encodeBinding(Writer& writer, const DescriptorBinding& binding) {
+     writer.Flags(binding.samplerIntegerBorder);
+     writer.Values(std::span<const std::uint32_t>(binding.imageSamplers));
+     writer.Flags(binding.bufferRead);
++    writer.Values(std::span<const std::uint32_t>(binding.imageLogicalSamples));
++    writer.Values(std::span<const std::uint32_t>(binding.imageNativeSamples));
+ }
+ 
+ void decodeBinding(Reader& reader, DescriptorBinding& binding) {
+@@ -286,6 +298,8 @@ void decodeBinding(Reader& reader, DescriptorBinding& binding) {
+     reader.Flags(binding.samplerIntegerBorder);
+     reader.Values(binding.imageSamplers);
+     reader.Flags(binding.bufferRead);
++    reader.Values(binding.imageLogicalSamples);
++    reader.Values(binding.imageNativeSamples);
+ }
+ 
+ void encodeArtifact(Writer& writer, const CompiledShaderArtifact& result) {
+@@ -469,6 +483,8 @@ void encodeInfo(Writer& writer, const CompiledShaderInfo& compiled) {
+         out.Value(image.dimension);
+         out.Value(image.mipMode);
+         out.Value(image.mipCount);
++        out.Value(image.logicalSamples);
++        out.Value(image.nativeSamples);
+         out.Value(image.conversionFormat);
+         out.Value(image.shaderSwizzle);
+         out.Value(image.read);
+@@ -501,6 +517,8 @@ void encodeInfo(Writer& writer, const CompiledShaderInfo& compiled) {
+         out.Values(std::span<const std::uint32_t>(image.indirectResources));
+     });
+     writer.Value(!info.runtimeImageModes.empty());
++    const bool grouped = std::any_of(info.runtimeImageModes.begin(), info.runtimeImageModes.end(), [](const auto& modes) { return std::any_of(modes.begin(), modes.end(), [](const ImageResource& mode) { return mode.nativeSamples != 0u; }); });
++    writer.Value<std::uint32_t>(grouped ? 4u : 0u);
+     writer.List(info.samplers, [](Writer& out, const SamplerResource& sampler) {
+         out.Value(sampler.source);
+         out.Value(sampler.firstUsePc);
+@@ -576,6 +594,8 @@ void decodeInfo(Reader& reader, CompiledShaderInfo& compiled) {
+         in.Value(image.dimension);
+         in.Value(image.mipMode);
+         in.Value(image.mipCount);
++        in.Value(image.logicalSamples);
++        in.Value(image.nativeSamples);
+         in.Value(image.conversionFormat);
+         in.Value(image.shaderSwizzle);
+         in.Value(image.read);
+@@ -609,7 +629,11 @@ void decodeInfo(Reader& reader, CompiledShaderInfo& compiled) {
+     });
+     bool preparedImageModes = false;
+     reader.Value(preparedImageModes);
+-    if (preparedImageModes) ResourceMaterializer::PrepareImageModes(info);
++    std::uint32_t groupedMsaaMaxSamples = 0u;
++    reader.Value(groupedMsaaMaxSamples);
++    if (groupedMsaaMaxSamples != 0u && groupedMsaaMaxSamples != 4u) throw std::runtime_error("shader cache has an unsupported grouped MSAA native sample limit");
++    if (!preparedImageModes && groupedMsaaMaxSamples != 0u) throw std::runtime_error("shader cache groups MSAA without prepared image modes");
++    if (preparedImageModes) ResourceMaterializer::PrepareImageModes(info, groupedMsaaMaxSamples);
+     reader.List(info.samplers, 17, [](Reader& in, SamplerResource& sampler) {
+         in.Value(sampler.source);
+         in.Value(sampler.firstUsePc);
+diff --git a/core/shader/recompiler/ShaderDiskCache.hpp b/core/shader/recompiler/ShaderDiskCache.hpp
+index 9747d87..7a9a2d3 100644
+--- a/core/shader/recompiler/ShaderDiskCache.hpp
++++ b/core/shader/recompiler/ShaderDiskCache.hpp
+@@ -12,7 +12,7 @@
+ 
+ namespace ShaderRecompiler::ShaderDiskCache {
+ 
+-inline constexpr std::uint32_t FormatVersion = 27;
++inline constexpr std::uint32_t FormatVersion = 28;
+ 
+ enum class LoadStatus {
+     Loaded,
+diff --git a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvAnalysis.hpp b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvAnalysis.hpp
+index 5c63224..ba86073 100644
+--- a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvAnalysis.hpp
++++ b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvAnalysis.hpp
+@@ -38,6 +38,7 @@ inline constexpr std::uint32_t FunctionLdsDwordLimit = 8192u;
+ [[nodiscard]] std::unordered_map<const IrValue*, std::uint32_t> FunctionLdsLaneAddresses(const IrProgram& program);
+ [[nodiscard]] std::unordered_set<const IrValue*> WaveUniformValues(const IrProgram& program);
+ [[nodiscard]] bool IsWaveMaskBranch(BranchCondition condition);
++[[nodiscard]] bool IsUniformWaveBranchPredicate(const IrValue* value);
+ 
+ }
+ 
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvAnalysis.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvAnalysis.cpp
+index 0014b0b..3dc59ed 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvAnalysis.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvAnalysis.cpp
+@@ -428,7 +428,7 @@ SpirvRequirements AnalyzeProgramRequirements(const IrProgram& program) {
+         }
+     }
+     for (const auto& info : program.Metadata().blockInfo) {
+-        if (info.terminator.kind == TerminatorKind::ConditionalBranch && IsWaveMaskBranch(info.terminator.condition)) {
++        if (info.terminator.kind == TerminatorKind::ConditionalBranch && IsWaveMaskBranch(info.terminator.condition) && !IsUniformWaveBranchPredicate(info.condition)) {
+             requirements.subgroupBallot = true;
+         }
+     }
+@@ -452,6 +452,64 @@ bool IsWaveMaskBranch(BranchCondition condition) {
+     return condition == BranchCondition::ExecZero || condition == BranchCondition::ExecNonZero || condition == BranchCondition::VccZero || condition == BranchCondition::VccNonZero;
+ }
+ 
++bool IsUniformWaveBranchPredicate(const IrValue* value) {
++    // Any/all of one wave-uniform Boolean is that Boolean, including a partial
++    // subgroup. Prove only draw-wide scalar sources and a small pure expression
++    // closure. Do not reuse WaveUniformValues: a phi selected by divergent
++    // control flow can vary even when all its incoming operands are constants.
++    std::unordered_map<const IrValue*, bool> memo;
++    const auto prove = [&](const auto& self, const IrValue* current, unsigned depth) -> bool {
++        if (!current || depth > 64u) return false;
++        current = current->Resolve();
++        if (!current) return false;
++        if (current->HasImmediate()) return true;
++        if (const auto found = memo.find(current); found != memo.end()) return found->second;
++        if (memo.size() >= 256u) return false;
++        memo.emplace(current, false); // also breaks cycles, conservatively
++        switch (current->Opcode()) {
++        case IrOpcode::GetUserData:
++        case IrOpcode::GetShaderBase:
++            memo[current] = true;
++            return true;
++        case IrOpcode::GetBufferResource:
++        case IrOpcode::GetSrtResource:
++        case IrOpcode::ReadConst:
++        case IrOpcode::ReadConstBuffer:
++        case IrOpcode::BitCastF32U32:
++        case IrOpcode::BitCastU32F32:
++        case IrOpcode::BitwiseAnd32:
++        case IrOpcode::BitwiseOr32:
++        case IrOpcode::BitwiseXor32:
++        case IrOpcode::IEqual32:
++        case IrOpcode::INotEqual32:
++        case IrOpcode::LogicalNot:
++        case IrOpcode::LogicalAnd:
++        case IrOpcode::LogicalOr:
++        case IrOpcode::FPOrdEqual32:
++        case IrOpcode::FPUnordEqual32:
++        case IrOpcode::FPOrdNotEqual32:
++        case IrOpcode::FPUnordNotEqual32:
++        case IrOpcode::FPOrdLessThan32:
++        case IrOpcode::FPUnordLessThan32:
++        case IrOpcode::FPOrdGreaterThan32:
++        case IrOpcode::FPUnordGreaterThan32:
++        case IrOpcode::FPOrdLessThanEqual32:
++        case IrOpcode::FPUnordLessThanEqual32:
++        case IrOpcode::FPOrdGreaterThanEqual32:
++        case IrOpcode::FPUnordGreaterThanEqual32:
++            break;
++        default:
++            return false;
++        }
++        if (!current->ArgumentCount()) return false;
++        for (const IrValue* argument : current->Arguments())
++            if (!self(self, argument, depth + 1u)) return false;
++        memo[current] = true;
++        return true;
++    };
++    return prove(prove, value, 0u);
++}
++
+ std::unordered_set<const IrValue*> WaveUniformValues(const IrProgram& program) {
+     std::unordered_map<const IrValue*, bool> varying;
+     const auto isVarying = [&](const IrValue* value) {
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
+index 59a389e..89fc697 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
+@@ -158,6 +158,11 @@ std::uint32_t EmitWaveMaskBranchCondition(SpirvValueEmitContext& ctx, const Bloc
+ 
+ std::uint32_t EmitBranchCondition(SpirvValueEmitContext& ctx, const BlockInfo& info) {
+     const auto condition = info.terminator.condition;
++    if (IsWaveMaskBranch(condition) && IsUniformWaveBranchPredicate(info.condition)) {
++        // info.condition already includes the zero/nonzero sense. A uniform
++        // predicate needs no cross-invocation vote, on either wave half.
++        return ctx.Def(info.condition);
++    }
+     if (ctx.otherHalf == nullptr && IsWaveMaskBranch(condition)) {
+         return EmitWaveMaskBranchCondition(ctx, info);
+     }
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvImageEmitter.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvImageEmitter.cpp
+index 5e20971..04f6a1f 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvImageEmitter.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvImageEmitter.cpp
+@@ -422,7 +422,8 @@ std::uint32_t QueryDimensions(SpirvValueEmitContext& ctx, const ImageEmitAccess&
+     const auto image = LoadSampledImageDescriptor(state, access.mem.resource, access.slot);
+     const auto size = state.module.AllocateId();
+     if (info.multisampled != 0u) {
+-        state.module.AddFunction(spv::OpImageQuerySize, ImageViewSizeType(state, dimension), size, image);
++        const auto sizeType = access.image.nativeSamples != 0u ? TypeU32Vector(state, 3) : ImageViewSizeType(state, dimension);
++        state.module.AddFunction(spv::OpImageQuerySize, sizeType, size, image);
+     } else {
+         state.module.AddFunction(spv::OpImageQuerySizeLod, ImageViewSizeType(state, dimension), size, image, AddressU32(ctx, access, 0));
+     }
+@@ -439,9 +440,17 @@ std::uint32_t QueryDimensions(SpirvValueEmitContext& ctx, const ImageEmitAccess&
+     if (access.mem.imageDimension == RdnaImageDimension::Dim3D && dimension == RdnaImageDimension::Dim2D) {
+         result[2] = ConstantU32(state, 1);
+     }
++    if (access.image.nativeSamples != 0u && info.arrayed != 0u) {
++        const auto groups = access.image.logicalSamples / access.image.nativeSamples;
++        result[2] = Binary(state, spv::OpUDiv, TypeU32(state), result[2], ConstantU32(state, groups));
++    }
+     if (info.multisampled == 0u) {
+         result[3] = state.module.AllocateId();
+         state.module.AddFunction(spv::OpImageQueryLevels, TypeU32(state), result[3], image);
++    } else {
++        // IMAGE_GET_RESINFO returns the number of mip levels, not physical groups.
++        // GC10 multisampled images have exactly one mip level.
++        result[3] = ConstantU32(state, 1u);
+     }
+     const auto vector = state.module.AllocateId();
+     state.module.AddFunction(spv::OpCompositeConstruct, TypeU32Vector(state, 4), vector, result[0], result[1], result[2], result[3]);
+@@ -863,6 +872,8 @@ void EmitQueryDimensionsOp(SpirvValueEmitContext& ctx, const ImageEmitAccess& ac
+ 
+ void EmitQueryLodOp(SpirvValueEmitContext& ctx, const ImageEmitAccess& access) {
+     auto& state = ctx.state;
++    if (RdnaImageDimensionInfoFor(access.image.dimension).multisampled != 0u)
++        ctx.Fail(access.inst, "queries LOD of a multisampled image");
+     if (ImageConversionFormat(access.image).type == SpirvFormatComponentType::Unorm) {
+         ctx.Fail(access.inst, "queries the level of detail of a converted unorm image, which is not implemented");
+     }
+@@ -971,13 +982,24 @@ void EmitReadOp(SpirvValueEmitContext& ctx, const ImageEmitAccess& access) {
+     ctx.Define(access.inst, EmitValueOrDefaultIfCondition(state, condition, TypeU32Vector(state, 4), ConstantU32CompositeZero(state, 4), [&]() {
+         const auto descriptor = LoadSampledImageDescriptor(state, access.mem.resource, access.slot);
+         const auto color = state.module.AllocateId();
+-        const auto coord = CoordU32(ctx, access);
++        auto coord = CoordU32(ctx, access);
+         if (dimensionInfo.multisampled != 0u) {
+             const auto& addressInfo = AddressDimension(access);
+             if (addressInfo.multisampled == 0u || access.mem.imageAddressComponents <= addressInfo.coordinateComponents) {
+                 ctx.Fail(access.inst, "has no sample index in the image address");
+             }
+-            state.module.AddFunction(spv::OpImageFetch, ImageVectorType(state, numericClass, 4), color, descriptor, coord, spv::ImageOperandsSampleMask, AddressU32(ctx, access, addressInfo.coordinateComponents));
++            auto sample = AddressU32(ctx, access, addressInfo.coordinateComponents);
++            if (access.image.nativeSamples != 0u) {
++                const auto native = ConstantU32(state, access.image.nativeSamples);
++                const auto groups = ConstantU32(state, access.image.logicalSamples / access.image.nativeSamples);
++                const auto guestLayer = dimensionInfo.arrayed != 0u ? AddressU32(ctx, access, 2u) : ConstantU32(state, 0u);
++                const auto group = Binary(state, spv::OpUDiv, TypeU32(state), sample, native);
++                const auto layer = Binary(state, spv::OpIAdd, TypeU32(state), Binary(state, spv::OpIMul, TypeU32(state), guestLayer, groups), group);
++                sample = Binary(state, spv::OpUMod, TypeU32(state), sample, native);
++                coord = state.module.AllocateId();
++                state.module.AddFunction(spv::OpCompositeConstruct, TypeU32Vector(state, 3), coord, AddressU32(ctx, access, 0u), AddressU32(ctx, access, 1u), layer);
++            }
++            state.module.AddFunction(spv::OpImageFetch, ImageVectorType(state, numericClass, 4), color, descriptor, coord, spv::ImageOperandsSampleMask, sample);
+         } else {
+             state.module.AddFunction(spv::OpImageFetch, ImageVectorType(state, numericClass, 4), color, descriptor, coord, spv::ImageOperandsLodMask, LodU32(ctx, access));
+         }
+@@ -1068,6 +1090,7 @@ void EmitAtomicOp(SpirvValueEmitContext& ctx, const ImageEmitAccess& access) {
+ 
+ SampleSetup MakeSampleSetup(SpirvValueEmitContext& ctx, const ImageEmitAccess& access) {
+     const auto& dimensionInfo = RdnaImageDimensionInfoFor(access.image.dimension);
++    if (dimensionInfo.multisampled != 0u) ctx.Fail(access.inst, "filters or gathers a multisampled image");
+     const auto layout = Layout(access.mem);
+     const bool dref = HasFlag(access.mem, RdnaImageSampleFlagCompare);
+     if (dref && access.image.conversionFormat != IrBufferFormat::Invalid) {
+@@ -1622,7 +1645,9 @@ void EmitImage(SpirvValueEmitContext& ctx, const IrValue& inst) {
+     auto& state = ctx.state;
+     const auto& memory = ctx.Memory(inst);
+     const auto& base = ImageResourceOf(state, memory);
+-    const auto modes = ResourceMaterializer::RuntimeImageModes(base);
++    std::vector<ImageResource> generated;
++    if (state.program.Info().runtimeImageModes.empty()) generated = ResourceMaterializer::RuntimeImageModes(base, state.program.Resources().groupedMsaaMaxSamples);
++    const auto& modes = state.program.Info().runtimeImageModes.empty() ? generated : state.program.Info().runtimeImageModes.at(memory.resource);
+     state.runtimeImageMetadata = ConstantU32(state, memory.resource);
+     const auto table = TableSlot(ctx, inst, memory, base);
+     if (table.slot != 0u) {
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvDescriptors.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvDescriptors.cpp
+index b1a37bb..b875bb1 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvDescriptors.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvDescriptors.cpp
+@@ -3,6 +3,7 @@
+ #include "SpirvBackend/SpirvMemory/SpirvConstants.hpp"
+ #include "SpirvBackend/SpirvEmitterHelpers.hpp"
+ #include "Optimization/ResourceMaterializer.hpp"
++#include "GroupedMsaa.hpp"
+ #include "PipelineSpecialization.hpp"
+ #include <spirv/unified1/spirv.hpp>
+ #include <algorithm>
+@@ -128,15 +129,23 @@ std::uint32_t ImageType(SpirvEmitterState& state, const ImageResource& image) {
+         FailEmit("invalid image resource class");
+     }
+     const auto& info = RdnaImageDimensionInfoFor(image.dimension);
++    if (image.nativeSamples != 0u) {
++        if (info.multisampled == 0u || image.resourceClass != ImageResourceClass::Sampled ||
++            image.nativeSamples != GroupedNativeSamples(image.logicalSamples, 4u))
++            FailEmit("invalid grouped multisampled image representation");
++    }
+     if (info.multisampled != 0u) {
+         if (sampled == 2u) {
+             if (std::ranges::find(state.supportedCapabilities, spv::CapabilityStorageImageMultisample) == state.supportedCapabilities.end()) FailEmit("storage image multisampling is unavailable on the target device");
+             state.module.EmitCapability(spv::CapabilityStorageImageMultisample);
+         }
+-        if (info.arrayed != 0u) state.module.EmitCapability(spv::CapabilityImageMSArray);
++        if (info.arrayed != 0u || image.nativeSamples != 0u) {
++            if (std::ranges::find(state.supportedCapabilities, spv::CapabilityImageMSArray) == state.supportedCapabilities.end()) FailEmit("multisampled array image capability is unavailable");
++            state.module.EmitCapability(spv::CapabilityImageMSArray);
++        }
+     }
+     const auto scalar = image.atomic64 ? TypeScalarU64(state) : ImageScalarType(state, image.numericClass);
+-    return state.module.Type(spv::OpTypeImage, scalar, info.spirvDimension, image.depthCompare ? 1u : 0u, info.arrayed, info.multisampled, sampled, format);
++    return state.module.Type(spv::OpTypeImage, scalar, info.spirvDimension, image.depthCompare ? 1u : 0u, image.nativeSamples != 0u ? 1u : info.arrayed, info.multisampled, sampled, format);
+ }
+ 
+ std::uint32_t ImageViewSizeType(SpirvEmitterState& state, RdnaImageDimension dimension) {
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
+index 3cd67e8..a7775bf 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
+@@ -421,7 +421,10 @@ void DefineDescriptors(SpirvEmitterState& state) {
+             if (ImageBindingResourceClass(binding.kind) == ImageResourceClass::None) {
+                 FailEmit("descriptor binding has an unmapped image resource class");
+             }
+-            const auto modes = ResourceMaterializer::RuntimeImageModes(state.program.Info().images.at(binding.resources.front()));
++            const auto resource = binding.resources.front();
++            std::vector<ImageResource> generated;
++            if (state.program.Info().runtimeImageModes.empty()) generated = ResourceMaterializer::RuntimeImageModes(state.program.Info().images.at(resource), state.program.Resources().groupedMsaaMaxSamples);
++            const auto& modes = state.program.Info().runtimeImageModes.empty() ? generated : state.program.Info().runtimeImageModes.at(resource);
+             const auto selected = std::ranges::find_if(modes, [&](const ImageResource& mode) { return DescriptorBindingForImage(mode) == binding.kind; });
+             if (selected == modes.end()) FailEmit("static image heap has no runtime mode");
+             const auto& image = *selected;
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvModuleSetup.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvModuleSetup.cpp
+index db279fd..1f997be 100644
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvModuleSetup.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvModuleSetup.cpp
+@@ -78,7 +78,7 @@ void DefineModule(SpirvEmitterState& state) {
+     }
+     if (state.requirements.bufferInt64Atomics) {
+         if (std::find(state.supportedCapabilities.begin(), state.supportedCapabilities.end(), static_cast<std::uint32_t>(spv::CapabilityInt64Atomics)) == state.supportedCapabilities.end()) {
+-            FailEmit("64-bit buffer atomics need shaderBufferInt64Atomics");
++            FailEmit("64-bit buffer atomics need shaderBufferInt64Atomics (VK_KHR_shader_atomic_int64), which this device does not report. MoltenVK leaves the feature false; the shader is not compiled.");
+         }
+         state.module.EmitCapability(spv::CapabilityInt64);
+         state.module.EmitCapability(spv::CapabilityInt64Atomics);

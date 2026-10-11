@@ -149,10 +149,10 @@ index b366da3..502a1f0 100644
  }
  
 diff --git a/core/libs/prx/libSceHttp2/Export.cpp b/core/libs/prx/libSceHttp2/Export.cpp
-index e4869b1..b65ae51 100644
+index f037bf7..bbbdbde 100644
 --- a/core/libs/prx/libSceHttp2/Export.cpp
 +++ b/core/libs/prx/libSceHttp2/Export.cpp
-@@ -270,9 +270,12 @@ int APS5_VABI sceHttp2GetMemoryPoolStats(int lib_http2_ctx_id, Http2MemoryPoolSt
+@@ -343,9 +343,12 @@ int APS5_VABI sceHttp2GetMemoryPoolStats(int lib_http2_ctx_id, Http2MemoryPoolSt
      return 0;
  }
  
@@ -168,7 +168,7 @@ index e4869b1..b65ae51 100644
  }
  
  int APS5_VABI sceHttp2CreateCookieBox(int lib_http2_ctx_id) {
-@@ -289,6 +292,7 @@ int APS5_VABI sceHttp2SetCookieBox(int id, int cookie_box_id) {
+@@ -365,6 +368,7 @@ int APS5_VABI sceHttp2SetCookieBox(int id, int cookie_box_id) {
  int APS5_VABI sceHttp2SetRequestNoContentLength(int id) {
      (void)id;
      return 0;
@@ -177,7 +177,7 @@ index e4869b1..b65ae51 100644
  
  
 diff --git a/core/libs/prx/libSceJson2/Export.cpp b/core/libs/prx/libSceJson2/Export.cpp
-index 672d857..11e416c 100644
+index 19b25be..c3f9193 100644
 --- a/core/libs/prx/libSceJson2/Export.cpp
 +++ b/core/libs/prx/libSceJson2/Export.cpp
 @@ -5,6 +5,9 @@
@@ -590,7 +590,7 @@ index 672d857..11e416c 100644
  void APS5_VABI _ZN3sce4Json6StringC1EPKc(String* self, const char* text) {
      if (text == nullptr) throw std::invalid_argument("sce::Json::String: null text");
      Construct(*self, text);
-@@ -573,8 +756,9 @@ void APS5_VABI _ZN3sce4Json6Object8iteratorD1Ev(ObjectIterator* self) { (void)se
+@@ -583,8 +766,9 @@ void APS5_VABI _ZN3sce4Json6Object8iteratorD1Ev(ObjectIterator* self) { (void)se
  ObjectIterator* APS5_VABI _ZN3sce4Json6Object8iteratorppEv(ObjectIterator* self) { ++self->it; return self; }
  Pair* APS5_VABI _ZNK3sce4Json6Object8iteratordeEv(const ObjectIterator* self) { return &*self->it; }
  bool APS5_VABI _ZNK3sce4Json6Object8iteratorneERKS2_(const ObjectIterator* self, const ObjectIterator* other) { return self->it != other->it; }
@@ -602,7 +602,7 @@ index 672d857..11e416c 100644
  
  void APS5_VABI _ZN3sce4Json5ValueC1Ev(Value* self) { Construct(*self); }
  void APS5_VABI _ZN3sce4Json5ValueC1Eb(Value* self, bool value) { Construct(*self); self->node->type = TypeBoolean; self->node->boolean = value; }
-@@ -616,13 +800,13 @@ int APS5_VABI _ZN3sce4Json5Value3setEm(Value* self, std::uint64_t value) { SetTy
+@@ -626,13 +810,13 @@ int APS5_VABI _ZN3sce4Json5Value3setEm(Value* self, std::uint64_t value) { SetTy
  int APS5_VABI _ZN3sce4Json5Value3setEd(Value* self, double value) { SetType(NodeOf(*self), TypeReal); self->node->real = value; return 0; }
  int APS5_VABI _ZN3sce4Json5Value3setEPKc(Value* self, const char* text) {
      if (text == nullptr) throw std::invalid_argument("sce::Json::Value::set: null text");
@@ -618,7 +618,7 @@ index 672d857..11e416c 100644
      SetType(NodeOf(*self), TypeString);
      *self->node->string.text = copy;
      return 0;
-@@ -738,7 +922,7 @@ Object* APS5_VABI _ZN3sce4Json5Value11referObjectEv(Value* self) {
+@@ -748,7 +932,7 @@ Object* APS5_VABI _ZN3sce4Json5Value11referObjectEv(Value* self) {
      return &n.object;
  }
  int APS5_VABI _ZN3sce4Json5Value9serializeERNS0_6StringE(Value* self, String* out) {
@@ -627,7 +627,7 @@ index 672d857..11e416c 100644
      Serialize(text, NodeOf(*self));
      *out->text = std::move(text);
      return 0;
-@@ -749,7 +933,7 @@ int APS5_VABI _ZNK3sce4Json5Value8toStringERNS0_6StringE(const Value* self, Stri
+@@ -759,7 +943,7 @@ int APS5_VABI _ZNK3sce4Json5Value8toStringERNS0_6StringE(const Value* self, Stri
          *out->text = *n.string.text;
          return 0;
      }
@@ -636,7 +636,7 @@ index 672d857..11e416c 100644
      Serialize(text, n);
      *out->text = std::move(text);
      return 0;
-@@ -780,30 +964,16 @@ int APS5_VABI _ZN3sce4Json17InitParameterRttiC1EPNS0_14AllocParamRttiEPvm(void)
+@@ -802,30 +986,16 @@ int APS5_VABI _ZN3sce4Json17InitParameterRttiC1EPNS0_14AllocParamRttiEPvm(void)
      NotImplemented_nid_no_patch(__func__);
      return 0;
  }
@@ -672,7 +672,7 @@ index 672d857..11e416c 100644
  }
  
  void APS5_VABI _ZN3sce4Json5Value5clearEv(Value* self) {
-@@ -811,20 +981,10 @@ void APS5_VABI _ZN3sce4Json5Value5clearEv(Value* self) {
+@@ -833,19 +1003,10 @@ void APS5_VABI _ZN3sce4Json5Value5clearEv(Value* self) {
      Clear(NodeOf(*self));
  }
  
@@ -681,9 +681,8 @@ index 672d857..11e416c 100644
 -    return 0;
 -}
 -
--int APS5_VABI _ZN3sce4Json14InitParameter2C2Ev(void) {
--    NotImplemented_nid_no_patch(__func__);
--    return 0;
+-void APS5_VABI _ZN3sce4Json14InitParameter2C2Ev(InitParameter2* self) {
+-    _ZN3sce4Json14InitParameter2C1Ev(self);
 +void APS5_VABI _ZN3sce4Json12MemAllocator11notifyErrorEimPv(void* self, int error, std::size_t size, void* context) {
 +    JsonMemAllocatorNotify(self, error, size, context);
  }
@@ -877,10 +876,10 @@ index 525178f..109f79e 100644
  }
  
 diff --git a/core/libs/prx/libSceNpEntitlementAccess/Export.cpp b/core/libs/prx/libSceNpEntitlementAccess/Export.cpp
-index d0bc1f7..e2c54d2 100644
+index 90aeb0b..f2ebe92 100644
 --- a/core/libs/prx/libSceNpEntitlementAccess/Export.cpp
 +++ b/core/libs/prx/libSceNpEntitlementAccess/Export.cpp
-@@ -129,55 +129,20 @@ int APS5_VABI sceNpEntitlementAccessRequestConsumeUnifiedEntitlement(void) {
+@@ -129,51 +129,19 @@ int APS5_VABI sceNpEntitlementAccessRequestConsumeUnifiedEntitlement(void) {
  }
  
  
@@ -890,37 +889,21 @@ index d0bc1f7..e2c54d2 100644
 -
 -
 -int APS5_VABI sceNpEntitlementAccessPollServiceEntitlementInfo(void) {
--    NotImplemented_nid_no_patch(__func__);
--    return 0;
+-    return SCE_NP_ERROR_SIGNED_OUT;
 -}
 -
 -int APS5_VABI sceNpEntitlementAccessPollUnifiedEntitlementInfo(void) {
--    NotImplemented_nid_no_patch(__func__);
--    return 0;
+-    return SCE_NP_ERROR_SIGNED_OUT;
 -}
-+// Unavailable PSN request entry points intentionally do not inspect opaque request
-+// structures or create successful asynchronous work. Polling fails too.
-+int APS5_VABI sceNpEntitlementAccessRequestUnifiedEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessPollUnifiedEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessRequestUnifiedEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessPollUnifiedEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessRequestServiceEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessPollServiceEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessRequestServiceEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessPollServiceEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessRequestConsumeServiceEntitlement(void) { return SCE_NP_ERROR_SIGNED_OUT; }
-+int APS5_VABI sceNpEntitlementAccessGetGameTrialsFlag(void) { return SCE_NP_ERROR_SIGNED_OUT; }
- 
+-
 -int APS5_VABI sceNpEntitlementAccessRequestServiceEntitlementInfo(void) {
--    NotImplemented_nid_no_patch(__func__);
--    return 0;
+-    return SCE_NP_ERROR_SIGNED_OUT;
 -}
- 
+-
 -int APS5_VABI sceNpEntitlementAccessRequestUnifiedEntitlementInfo(void) {
--    NotImplemented_nid_no_patch(__func__);
--    return 0;
- }
- 
+-    return SCE_NP_ERROR_SIGNED_OUT;
+-}
+-
 -int APS5_VABI sceNpEntitlementAccessGetPftFlag(void) {
 -    NotImplemented_nid_no_patch(__func__);
 -    return 0;
@@ -948,6 +931,21 @@ index d0bc1f7..e2c54d2 100644
 -}
 -
 -}
++// Unavailable PSN request entry points intentionally do not inspect opaque request
++// structures or create successful asynchronous work. Polling fails too.
++int APS5_VABI sceNpEntitlementAccessRequestUnifiedEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessPollUnifiedEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessRequestUnifiedEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessPollUnifiedEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessRequestServiceEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessPollServiceEntitlementInfo(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessRequestServiceEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessPollServiceEntitlementInfoList(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessRequestConsumeServiceEntitlement(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++int APS5_VABI sceNpEntitlementAccessGetGameTrialsFlag(void) { return SCE_NP_ERROR_SIGNED_OUT; }
++
++
++
 +extern "C" int APS5_VABI sceNpEntitlementAccessGetPftFlag(void) { return SCE_NP_ERROR_SIGNED_OUT; }
 diff --git a/core/libs/prx/libSceNpManager/Export.cpp b/core/libs/prx/libSceNpManager/Export.cpp
 index a384c22..c67ad9c 100644
@@ -1004,7 +1002,7 @@ index 74048df..a7b1ddb 100644
  
  }
 diff --git a/core/libs/prx/libSceSsl/Export.cpp b/core/libs/prx/libSceSsl/Export.cpp
-index e8fd494..8577659 100644
+index 4b3e23a..f7e1962 100644
 --- a/core/libs/prx/libSceSsl/Export.cpp
 +++ b/core/libs/prx/libSceSsl/Export.cpp
 @@ -129,34 +129,34 @@ int APS5_VABI sceSslGetMemoryPoolStats(int ssl_ctx_id, SslMemoryPoolStats* stats
@@ -1063,7 +1061,7 @@ index e8fd494..8577659 100644
 -    return 0;
  }
  
- }
+ int APS5_VABI sceSslCreateConnection(void) {
 diff --git a/core/libs/prx/libSceSystemService/Export.cpp b/core/libs/prx/libSceSystemService/Export.cpp
 index da7831b..9ee3dfa 100644
 --- a/core/libs/prx/libSceSystemService/Export.cpp
@@ -1403,10 +1401,10 @@ index 5e7b5c1..3d0d74e 100644
      const auto start = std::chrono::steady_clock::now();
      try {
 diff --git a/core/libs/prx/libSceVideoOut/tests/Flip.cpp b/core/libs/prx/libSceVideoOut/tests/Flip.cpp
-index 6078706..63a521d 100644
+index 85d8771..d609cb8 100644
 --- a/core/libs/prx/libSceVideoOut/tests/Flip.cpp
 +++ b/core/libs/prx/libSceVideoOut/tests/Flip.cpp
-@@ -348,8 +348,8 @@ void testControls() {
+@@ -358,8 +358,8 @@ void testControls() {
      vrrStatus.ident = VIDEO_OUT_EVENT_VRR_STATUS;
      vrrStatus.filter = EVFILT_VIDEO_OUT;
      check(sceVideoOutGetEventId(&vrrStatus) == VIDEO_OUT_EVENT_VRR_STATUS, "VRR status event id rejected");
@@ -1418,7 +1416,7 @@ index 6078706..63a521d 100644
      expectFailure([&] { sceVideoOutVrrPegToFixedRate(handle, 0, 1); });
      expectFailure([&] { sceVideoOutVrrPegToFixedRate(handle, 0x100000000ull, 0); });
 diff --git a/core/libs/prx/libc/include/WindowsMappings.hpp b/core/libs/prx/libc/include/WindowsMappings.hpp
-index b518d9c..61dae31 100644
+index 9d33b9b..453c884 100644
 --- a/core/libs/prx/libc/include/WindowsMappings.hpp
 +++ b/core/libs/prx/libc/include/WindowsMappings.hpp
 @@ -10,6 +10,7 @@
@@ -1561,7 +1559,7 @@ index b518d9c..61dae31 100644
          auto it = cleanRanges.lower_bound(start);
          if (it != cleanRanges.begin() && std::prev(it)->second > start) --it;
 diff --git a/core/libs/prx/libc/src/GuestArena.cpp b/core/libs/prx/libc/src/GuestArena.cpp
-index fea67b8..577d2e2 100644
+index 025f4fa..36300ae 100644
 --- a/core/libs/prx/libc/src/GuestArena.cpp
 +++ b/core/libs/prx/libc/src/GuestArena.cpp
 @@ -3,6 +3,7 @@
@@ -1586,12 +1584,12 @@ index fea67b8..577d2e2 100644
  #include <stdexcept>
  #include <system_error>
  #include <utility>
-@@ -32,15 +37,69 @@ std::atomic<std::uint64_t> commitGeneration{1};
- std::atomic<void (*)(std::uintptr_t, std::size_t, std::uint64_t)> privateMappingObserver{nullptr};
+@@ -37,15 +42,69 @@ constexpr std::uintptr_t GuestArenaOffset = 0x0000100000000000ull;
+ #else
+ constexpr std::uintptr_t GuestArenaOffset = 0;
  #endif
- 
--constexpr std::uintptr_t ArenaStart = 0x0000000200000000ull;
-+constexpr std::uintptr_t DefaultArenaStart = 0x0000000200000000ull;
+-constexpr std::uintptr_t ArenaStart = 0x0000000200000000ull + GuestArenaOffset;
++constexpr std::uintptr_t DefaultArenaStart = 0x0000000200000000ull + GuestArenaOffset;
 +// Upstream #652 reserves through the application map area end (1008 GiB).
 +// The size is that end minus the 8 GiB base. APS5_GUEST_ARENA_* can shrink
 +// and shift the window: the qualified iPad profile is base 0x7400000000,
@@ -1599,12 +1597,12 @@ index fea67b8..577d2e2 100644
 +// 512 GiB and cannot hold the full span. Fixed mappings outside the
 +// configured window fail. Windows startup stacks stay below 0x200000000
 +// (the PE clears HIGH_ENTROPY_VA), which is also below a shifted iPad base.
-+constexpr std::uintptr_t ApplicationAreaEnd = 0x000000FC00000000ull;
++constexpr std::uintptr_t ApplicationAreaEnd = 0x000000FC00000000ull + GuestArenaOffset;
 +constexpr std::size_t DefaultArenaSize = static_cast<std::size_t>(ApplicationAreaEnd - DefaultArenaStart);
 +constexpr std::size_t DefaultChunk = 0x0000000010000000ull;
- constexpr std::uintptr_t SystemReservedStart = 0x00000007FFFFC000ull;
- constexpr std::uintptr_t SystemReservedEnd = 0x0000001000000000ull;
--constexpr std::uintptr_t ApplicationAreaEnd = 0x000000FC00000000ull;
+ constexpr std::uintptr_t SystemReservedStart = 0x00000007FFFFC000ull + GuestArenaOffset;
+ constexpr std::uintptr_t SystemReservedEnd = 0x0000001000000000ull + GuestArenaOffset;
+-constexpr std::uintptr_t ApplicationAreaEnd = 0x000000FC00000000ull + GuestArenaOffset;
  
  std::uintptr_t alignUp(std::uintptr_t value, std::size_t alignment) {
 +    if (value > std::numeric_limits<std::uintptr_t>::max() - (alignment - 1))
@@ -1658,7 +1656,7 @@ index fea67b8..577d2e2 100644
  class Arena {
  public:
      static Arena& Get() {
-@@ -63,6 +122,7 @@ public:
+@@ -68,6 +127,7 @@ public:
  
      void* AllocateAtOrAbove(std::uintptr_t hint, std::size_t bytes, std::size_t alignment) {
          if (_base == 0) throw std::runtime_error("guest address space arena is unavailable");
@@ -1666,7 +1664,7 @@ index fea67b8..577d2e2 100644
          if (alignment == 0 || (alignment & (alignment - 1)) != 0) throw std::invalid_argument("invalid guest arena alignment");
          std::lock_guard lock(_lock);
          if (hint >= _end) throw std::runtime_error("mapping address hint is above the guest address space arena");
-@@ -75,7 +135,14 @@ public:
+@@ -80,7 +140,14 @@ public:
              candidate = std::max(candidate, alignUp(end, alignment));
          }
          if (candidate > _end || bytes > _end - candidate) throw std::runtime_error("guest address space arena exhausted");
@@ -1682,7 +1680,7 @@ index fea67b8..577d2e2 100644
          return reinterpret_cast<void*>(candidate);
      }
  
-@@ -96,6 +163,7 @@ public:
+@@ -116,6 +183,7 @@ public:
      }
  
      void MarkUsed(const void* pointer, std::size_t bytes) {
@@ -1690,7 +1688,7 @@ index fea67b8..577d2e2 100644
          std::lock_guard lock(_lock);
          const auto start = reinterpret_cast<std::uintptr_t>(pointer);
          const auto next = _used.lower_bound(start);
-@@ -104,10 +172,17 @@ public:
+@@ -124,10 +192,17 @@ public:
              std::snprintf(message, sizeof(message), "fixed guest mapping 0x%llx+0x%zx overlaps %s", static_cast<unsigned long long>(start), bytes, OverlapsHostRegion(start, bytes) ? "a host region in the guest arena" : "a guest arena range");
              throw std::runtime_error(message);
          }
@@ -1709,7 +1707,7 @@ index fea67b8..577d2e2 100644
          std::lock_guard lock(_lock);
          const auto start = reinterpret_cast<std::uintptr_t>(pointer);
          const auto end = start + bytes;
-@@ -129,37 +204,111 @@ public:
+@@ -149,37 +224,111 @@ public:
          }
      }
  
@@ -1824,11 +1822,7 @@ index fea67b8..577d2e2 100644
 -            if (last < regionEnd) _holes.emplace_back(last, regionEnd);
 -            cursor = regionEnd;
 +            if (!_lazy) _hostRegions = _holes;
-         }
--        _hostRegions = _holes;
--        _holes.emplace_back(SystemReservedStart, SystemReservedEnd);
--        for (const auto& [holeStart, holeEnd] : _holes) _used.emplace(holeStart, holeEnd);
--        _base = ArenaStart;
++        }
 +        const auto holeStart = std::max(SystemReservedStart, arenaStart);
 +        const auto holeEnd = std::min(SystemReservedEnd, end);
 +        if (holeStart < holeEnd) _holes.emplace_back(holeStart, holeEnd);
@@ -1837,14 +1831,47 @@ index fea67b8..577d2e2 100644
 +        for (const auto& hole : _holes) {
 +            if (!merged.empty() && hole.first <= merged.back().second) merged.back().second = std::max(merged.back().second, hole.second);
 +            else merged.push_back(hole);
-+        }
+         }
+-        _hostRegions = _holes;
+-        _holes.emplace_back(SystemReservedStart, SystemReservedEnd);
+-        for (const auto& [holeStart, holeEnd] : _holes) _used.emplace(holeStart, holeEnd);
+-        _base = ArenaStart;
 +        _holes = std::move(merged);
 +        for (const auto& [usedStart, usedEnd] : _holes) _used.emplace(usedStart, usedEnd);
 +        _base = arenaStart;
          _end = end;
  #endif
      }
-@@ -230,18 +379,27 @@ private:
+@@ -194,8 +343,8 @@ private:
+             std::uintptr_t begin = 0, end = 0;
+             char dash = 0;
+             if (!(fields >> std::hex >> begin >> dash >> end) || dash != '-' || end <= begin) throw std::runtime_error("guest arena: malformed /proc/self/maps line: " + line);
+-            if (end <= ArenaStart || begin >= ApplicationAreaEnd) continue;
+-            const auto first = std::max(begin, ArenaStart);
++            if (end <= DefaultArenaStart || begin >= ApplicationAreaEnd) continue;
++            const auto first = std::max(begin, DefaultArenaStart);
+             const auto last = std::min(end, ApplicationAreaEnd);
+             _used.emplace(first, last);
+             _hostRegions.emplace_back(first, last);
+@@ -203,7 +352,7 @@ private:
+         _used.emplace(SystemReservedStart, SystemReservedEnd);
+         _hostRegions.emplace_back(SystemReservedStart, SystemReservedEnd);
+         ReserveFreeRanges();
+-        _base = ArenaStart;
++        _base = DefaultArenaStart;
+         _end = ApplicationAreaEnd;
+     }
+ 
+@@ -229,7 +378,7 @@ private:
+ 
+     void ReserveFreeRanges() {
+         std::vector<std::pair<std::uintptr_t, std::uintptr_t>> occupied;
+-        std::uintptr_t cursor = ArenaStart;
++        std::uintptr_t cursor = DefaultArenaStart;
+         for (const auto& [usedStart, usedEnd] : _used) {
+             if (usedStart > ApplicationAreaEnd) break;
+             if (usedStart > cursor) TryReserve(occupied, cursor, std::min(usedStart, ApplicationAreaEnd));
+@@ -250,18 +399,27 @@ private:
      std::vector<std::pair<std::uintptr_t, std::uintptr_t>> _hostRegions;
      std::uintptr_t _base = 0;
      std::uintptr_t _end = 0;
@@ -1872,7 +1899,7 @@ index fea67b8..577d2e2 100644
  };
  
  const bool g_reserved = (Arena::Get(), true);
-@@ -328,6 +486,7 @@ void GuestArenaSetPrivateMappingObserver_nid_postfix(void (*callback)(std::uintp
+@@ -352,6 +510,7 @@ void GuestArenaSetPrivateMappingObserver_nid_postfix(void (*callback)(std::uintp
  
  void GuestArenaCommit_nid_postfix(void* pointer, std::size_t bytes, std::uint32_t protection, std::size_t granule) {
      if (!Arena::Get().Contains(pointer, bytes)) throw OutsideArena("commit", pointer, bytes);
@@ -1880,7 +1907,7 @@ index fea67b8..577d2e2 100644
      const auto generation = commitGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
      const auto created = WindowsMappings::Get().Commit(pointer, bytes, protection, granule, Arena::Get().WriteWatched());
      if (const auto callback = privateMappingObserver.load(std::memory_order_acquire)) {
-@@ -342,6 +501,7 @@ void GuestArenaReset_nid_postfix(void* pointer, std::size_t bytes) {
+@@ -366,6 +525,7 @@ void GuestArenaReset_nid_postfix(void* pointer, std::size_t bytes) {
  
  void GuestArenaMap_nid_postfix(void* pointer, std::size_t bytes, void* section, std::uint64_t offset, std::uint32_t protection) {
      if (!Arena::Get().Contains(pointer, bytes)) throw OutsideArena("shared mapping", pointer, bytes);
@@ -1889,7 +1916,7 @@ index fea67b8..577d2e2 100644
  }
  
 diff --git a/core/libs/prx/libc/src/Strings.cpp b/core/libs/prx/libc/src/Strings.cpp
-index 978a499..10efc09 100644
+index 564458a..b5e5afe 100644
 --- a/core/libs/prx/libc/src/Strings.cpp
 +++ b/core/libs/prx/libc/src/Strings.cpp
 @@ -7,10 +7,22 @@
@@ -1998,10 +2025,10 @@ index 5454db4..407162f 100644
  static int DoLstat(const std::filesystem::path& p, NativeStat* st) {
      const auto attributes = GetFileAttributesW(p.c_str());
 diff --git a/core/libs/prx/libkernel/File/src/Open.cpp b/core/libs/prx/libkernel/File/src/Open.cpp
-index ca7cbe5..836b05b 100644
+index bfcf004..877b620 100644
 --- a/core/libs/prx/libkernel/File/src/Open.cpp
 +++ b/core/libs/prx/libkernel/File/src/Open.cpp
-@@ -17,11 +17,43 @@
+@@ -19,10 +19,10 @@
  #include <string>
  
  #ifdef _WIN32
@@ -2009,8 +2036,34 @@ index ca7cbe5..836b05b 100644
  #include <fcntl.h>
  #include <io.h>
  #include <sys/stat.h>
+-#include <windows.h>
+ static int OpenError(DWORD error) {
+     switch (error) {
+     case ERROR_FILE_NOT_FOUND:
+@@ -31,6 +31,7 @@ static int OpenError(DWORD error) {
+     case ERROR_BAD_NETPATH:
+     case ERROR_BAD_NET_NAME:
+     case ERROR_BAD_PATHNAME:
++    case ERROR_INVALID_NAME:
+     case ERROR_FILENAME_EXCED_RANGE:
+         return ENOENT;
+     case ERROR_ACCESS_DENIED:
+@@ -51,25 +52,36 @@ static int OpenError(DWORD error) {
+         return ENOMEM;
+     case ERROR_DISK_FULL:
+         return ENOSPC;
++    case ERROR_DIRECTORY:
++        return ENOTDIR;
+     default:
+         return EINVAL;
+     }
+ }
  static int NativeOpen(const std::filesystem::path& p, int nativeFlags, std::uint16_t mode) {
--    return ::_wopen(p.wstring().c_str(), nativeFlags, static_cast<int>(mode));
+-    const int access = nativeFlags & (_O_RDONLY | _O_WRONLY | _O_RDWR);
+-    const DWORD desired = access == _O_RDONLY ? GENERIC_READ : access == _O_WRONLY ? GENERIC_WRITE : GENERIC_READ | GENERIC_WRITE;
+-    DWORD disposition = OPEN_EXISTING;
+-    if (nativeFlags & _O_CREAT) disposition = (nativeFlags & _O_EXCL) ? CREATE_NEW : (nativeFlags & _O_TRUNC) ? CREATE_ALWAYS : OPEN_ALWAYS;
+-    else if (nativeFlags & _O_TRUNC) disposition = TRUNCATE_EXISTING;
 +    // CRT _wopen omits FILE_SHARE_DELETE, preventing POSIX rename/unlink while
 +    // a descriptor is open. Keep descriptor ownership, with native delete sharing.
 +    DWORD access = (nativeFlags & _O_RDWR) ? GENERIC_READ | GENERIC_WRITE :
@@ -2020,37 +2073,32 @@ index ca7cbe5..836b05b 100644
 +        ((nativeFlags & _O_EXCL) ? CREATE_NEW : (nativeFlags & _O_TRUNC) ? CREATE_ALWAYS : OPEN_ALWAYS) :
 +        (nativeFlags & _O_TRUNC) ? TRUNCATE_EXISTING : OPEN_EXISTING;
 +    SECURITY_ATTRIBUTES security{sizeof(security), nullptr, !(nativeFlags & _O_NOINHERIT)};
-+    const DWORD attributes = (mode & _S_IWRITE) ? FILE_ATTRIBUTE_NORMAL : FILE_ATTRIBUTE_READONLY;
+     const DWORD attributes = (nativeFlags & _O_CREAT) && !(mode & _S_IWRITE) ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL;
+-    SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+-    const auto handle = CreateFileW(p.c_str(), desired, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &security, disposition, attributes, nullptr);
 +    HANDLE handle = CreateFileW(p.wstring().c_str(), access | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
 +        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &security, creation, attributes, nullptr);
 +    // Metadata rights must not prevent an otherwise permitted data-only open.
 +    if (handle == INVALID_HANDLE_VALUE && GetLastError() == ERROR_ACCESS_DENIED)
 +        handle = CreateFileW(p.wstring().c_str(), access,
 +            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &security, creation, attributes, nullptr);
-+    if (handle == INVALID_HANDLE_VALUE) {
-+        switch (GetLastError()) {
-+        case ERROR_FILE_NOT_FOUND: case ERROR_PATH_NOT_FOUND: case ERROR_INVALID_NAME: errno = ENOENT; break;
-+        case ERROR_ALREADY_EXISTS: case ERROR_FILE_EXISTS: errno = EEXIST; break;
-+        case ERROR_ACCESS_DENIED: case ERROR_SHARING_VIOLATION: case ERROR_LOCK_VIOLATION: errno = EACCES; break;
-+        case ERROR_TOO_MANY_OPEN_FILES: errno = EMFILE; break;
-+        case ERROR_NOT_ENOUGH_MEMORY: case ERROR_OUTOFMEMORY: errno = ENOMEM; break;
-+        case ERROR_DIRECTORY: errno = ENOTDIR; break;
-+        default: errno = EIO; break;
-+        }
-+        return -1;
-+    }
+     if (handle == INVALID_HANDLE_VALUE) {
+         errno = OpenError(GetLastError());
+         return -1;
+     }
+-    const int descriptor = ::_open_osfhandle(reinterpret_cast<std::intptr_t>(handle), nativeFlags & (_O_APPEND | _O_RDONLY | _O_BINARY));
+-    if (descriptor < 0) CloseHandle(handle);
 +    const int descriptor = ::_open_osfhandle(reinterpret_cast<std::intptr_t>(handle),
 +        nativeFlags & (_O_RDONLY | _O_WRONLY | _O_RDWR | _O_APPEND | _O_BINARY | _O_NOINHERIT));
 +    if (descriptor < 0) { const int saved = errno; CloseHandle(handle); errno = saved; }
-+    return descriptor;
+     return descriptor;
  }
  static std::int64_t NativeLseek(int fd, std::int64_t offset, int whence) {
-     return ::_lseeki64(fd, offset, whence);
 diff --git a/core/libs/prx/libkernel/File/src/Stdio.cpp b/core/libs/prx/libkernel/File/src/Stdio.cpp
-index 255a3d9..32f77d9 100644
+index e7e0eee..dfa61bb 100644
 --- a/core/libs/prx/libkernel/File/src/Stdio.cpp
 +++ b/core/libs/prx/libkernel/File/src/Stdio.cpp
-@@ -113,10 +113,6 @@ static std::optional<std::filesystem::path> NativeDescriptorPath(int descriptor)
+@@ -86,10 +86,6 @@ static std::optional<std::filesystem::path> NativeDescriptorPath(int descriptor)
      path.resize(length);
      return path;
  }
@@ -2059,9 +2107,9 @@ index 255a3d9..32f77d9 100644
 -    return path ? NativeChmod(*path, mode) : -1;
 -}
  static int NativeFtruncate(int descriptor, std::int64_t length) {
-     return static_cast<int>(::_chsize_s(descriptor, length));
- }
-@@ -127,7 +123,8 @@ static int NativeTruncate(const std::filesystem::path& path, std::int64_t length
+     const int result = File::TruncateSharedMemory_nid_no_patch(descriptor, length);
+     return result == -2 ? static_cast<int>(::_chsize_s(descriptor, length)) : result;
+@@ -101,7 +97,8 @@ static int NativeTruncate(const std::filesystem::path& path, std::int64_t length
      ::_close(descriptor);
      return error;
  }
@@ -2071,7 +2119,7 @@ index 255a3d9..32f77d9 100644
      FILETIME access{}, modified{};
      if (times == nullptr) {
          GetSystemTimePreciseAsFileTime(&access);
-@@ -136,7 +133,10 @@ static int SetTimes(HANDLE handle, const KernelTimeval* times) {
+@@ -110,7 +107,10 @@ static int SetTimes(HANDLE handle, const KernelTimeval* times) {
          errno = EINVAL;
          return -1;
      }
@@ -2083,7 +2131,7 @@ index 255a3d9..32f77d9 100644
  }
  static int NativeUtimes(const std::filesystem::path& path, const KernelTimeval* times) {
      const auto handle = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-@@ -152,15 +152,77 @@ static int NativeFutimes(int descriptor, const KernelTimeval* times) {
+@@ -126,13 +126,74 @@ static int NativeFutimes(int descriptor, const KernelTimeval* times) {
      const auto original = reinterpret_cast<HANDLE>(::_get_osfhandle(descriptor));
      if (original == INVALID_HANDLE_VALUE) { errno = EBADF; return -1; }
      if (GetFileType(original) != FILE_TYPE_DISK) { errno = EINVAL; return -1; }
@@ -2161,11 +2209,8 @@ index 255a3d9..32f77d9 100644
 +    const int saved = errno; CloseHandle(attributes); errno = saved;
      return result;
  }
-+
- static int NativeFlock(int descriptor, int operation) {
-     return File::Flock(descriptor, operation);
- }
-@@ -249,6 +311,7 @@ static int NativeUtimes(const std::filesystem::path& path, const KernelTimeval*
+ static int NativeSync(int descriptor) {
+@@ -250,6 +311,7 @@ static int NativeUtimes(const std::filesystem::path& path, const KernelTimeval*
  }
  static int NativeFutimes(int descriptor, const KernelTimeval* times) {
      if (times == nullptr) return ::futimes(descriptor, nullptr);
@@ -2173,7 +2218,7 @@ index 255a3d9..32f77d9 100644
      struct timeval values[2]{{static_cast<time_t>(times[0].tv_sec), static_cast<suseconds_t>(times[0].tv_usec)},
          {static_cast<time_t>(times[1].tv_sec), static_cast<suseconds_t>(times[1].tv_usec)}};
      return ::futimes(descriptor, values);
-@@ -1110,6 +1173,7 @@ int APS5_VABI futimes_nid_postfix(int d, const KernelTimeval* times) {
+@@ -1143,6 +1205,7 @@ int APS5_VABI futimes_nid_postfix(int d, const KernelTimeval* times) {
  int APS5_VABI fsync_nid_postfix(int fd) {
      if (sceKernelFsync(fd) != 0) return PosixFailure(errno);
      return 0;
@@ -2182,10 +2227,10 @@ index 255a3d9..32f77d9 100644
  
  int APS5_VABI fdatasync_nid_postfix(int fd) {
 diff --git a/core/libs/prx/libkernel/Pthread/Posix/Thread.cpp b/core/libs/prx/libkernel/Pthread/Posix/Thread.cpp
-index 11e577c..a5d4159 100644
+index 37beb11..2e14214 100644
 --- a/core/libs/prx/libkernel/Pthread/Posix/Thread.cpp
 +++ b/core/libs/prx/libkernel/Pthread/Posix/Thread.cpp
-@@ -108,7 +108,7 @@ int APS5_VABI scePthreadGetschedparam(Pthread thread, int* policy, KernelSchedPa
+@@ -114,7 +114,7 @@ int APS5_VABI scePthreadGetschedparam(Pthread thread, int* policy, KernelSchedPa
  }
  
  int APS5_VABI scePthreadSetschedparam(Pthread thread, int policy, const KernelSchedParam* param) {
@@ -2194,7 +2239,7 @@ index 11e577c..a5d4159 100644
      if (!param) return SCE_KERNEL_ERROR_EINVAL;
      return scePthreadSetprio(thread, param->sched_priority);
  }
-@@ -194,7 +194,7 @@ int APS5_VABI pthread_setprio_nid_postfix(Pthread thread, int prio) {
+@@ -200,7 +200,7 @@ int APS5_VABI pthread_setprio_nid_postfix(Pthread thread, int prio) {
  }
  
  int APS5_VABI pthread_setschedparam_nid_postfix(Pthread thread, int policy, const KernelSchedParam* param) {
@@ -2203,13 +2248,13 @@ index 11e577c..a5d4159 100644
      if (!param) return PosixThread::GUEST_EINVAL;
      return PosixThread::ToErrno(scePthreadSetprio(thread, param->sched_priority));
  }
-@@ -214,4 +214,5 @@ unsigned int APS5_VABI sleep_nid_postfix(unsigned int seconds) {
+@@ -220,4 +220,5 @@ unsigned int APS5_VABI sleep_nid_postfix(unsigned int seconds) {
      return 0;
  }
  
 +
  }
-diff --git a/core/libs/prx/libkernel/Pthread/include/HostThreadPriority.hpp b/core/libs/prx/libkernel/Pthread/include/HostThreadPriority.hpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/prx/libkernel/Pthread/include/HostThreadPriority.hpp b/core/libs/prx/libkernel/Pthread/include/HostThreadPriority.hpp
 new file mode 100644
 index 0000000..937bd5a
 --- /dev/null
@@ -2267,7 +2312,7 @@ index 0000000..937bd5a
 +} // namespace HostThreadPriority
 +#endif
 diff --git a/core/libs/prx/libkernel/Pthread/include/Pthread.hpp b/core/libs/prx/libkernel/Pthread/include/Pthread.hpp
-index f2df5c9..a4565ed 100644
+index 05177ac..09aa7c8 100644
 --- a/core/libs/prx/libkernel/Pthread/include/Pthread.hpp
 +++ b/core/libs/prx/libkernel/Pthread/include/Pthread.hpp
 @@ -120,6 +120,8 @@ struct PthreadPrivate {
@@ -2280,7 +2325,7 @@ index f2df5c9..a4565ed 100644
      std::atomic<KernelCpumask> affinity{DEFAULT_THREAD_AFFINITY};
      std::atomic<int> priority{DEFAULT_THREAD_PRIORITY};
 diff --git a/core/libs/prx/libkernel/Pthread/src/Thread.cpp b/core/libs/prx/libkernel/Pthread/src/Thread.cpp
-index 11400bd..a350767 100644
+index fada8e7..1bb51a0 100644
 --- a/core/libs/prx/libkernel/Pthread/src/Thread.cpp
 +++ b/core/libs/prx/libkernel/Pthread/src/Thread.cpp
 @@ -39,6 +39,8 @@ static constexpr std::size_t THREAD_NAME_CAPACITY = 32;
@@ -2303,7 +2348,7 @@ index 11400bd..a350767 100644
  static std::map<PthreadPrivate*, std::pair<std::uintptr_t, std::uintptr_t>> liveStacks;
  static std::map<std::uintptr_t, std::size_t> protectedStackPages;
  
-@@ -386,6 +392,9 @@ static void RunThread(std::unique_ptr<ThreadArgs> args) {
+@@ -398,6 +404,9 @@ static void RunThread(std::unique_ptr<ThreadArgs> args) {
      pthread_sigmask(SIG_SETMASK, &signalMask, nullptr);
  #endif
      finishThread(self, entry(arg));
@@ -2313,7 +2358,7 @@ index 11400bd..a350767 100644
      CurrentGuestState().current = nullptr;
  }
  
-@@ -438,7 +447,7 @@ static void ApplyJobAffinity(PthreadPrivate& thread, void* handle) {
+@@ -450,7 +459,7 @@ static void ApplyJobAffinity(PthreadPrivate& thread, void* handle) {
  struct NativeThreadArgs {
      std::unique_ptr<ThreadArgs> guest;
      std::future<bool> start;
@@ -2322,7 +2367,7 @@ index 11400bd..a350767 100644
  };
  
  #ifdef _WIN32
-@@ -465,7 +474,15 @@ static unsigned __stdcall StartNativeThread(void* opaque) {
+@@ -477,7 +486,15 @@ static unsigned __stdcall StartNativeThread(void* opaque) {
              SetThreadDescription(GetCurrentThread(), description.c_str());
              ApplyJobAffinity(*self, nullptr);
          }
@@ -2339,7 +2384,7 @@ index 11400bd..a350767 100644
      } catch (...) {
          args->initialized.set_exception(std::current_exception());
          return 0;
-@@ -491,7 +508,7 @@ static void* StartNativeThread(void* opaque) {
+@@ -503,7 +520,7 @@ static void* StartNativeThread(void* opaque) {
              throw std::runtime_error("Cannot query guest thread stack");
          self->stackAddress = reinterpret_cast<void*>(high - reserve - self->stackSize);
          self->threadId = std::this_thread::get_id();
@@ -2348,7 +2393,7 @@ index 11400bd..a350767 100644
      } catch (...) {
          args->initialized.set_exception(std::current_exception());
          return nullptr;
-@@ -503,6 +520,7 @@ static void* StartNativeThread(void* opaque) {
+@@ -515,6 +532,7 @@ static void* StartNativeThread(void* opaque) {
      struct ThreadGuard {
          PthreadPrivate* self;
          ~ThreadGuard() {
@@ -2356,7 +2401,7 @@ index 11400bd..a350767 100644
              CurrentGuestState().current = nullptr;
              ReleaseThread(self);
          }
-@@ -536,9 +554,15 @@ int APS5_VABI scePthreadCreate(Pthread* thread, const PthreadAttr* attr, Pthread
+@@ -548,9 +566,15 @@ int APS5_VABI scePthreadCreate(Pthread* thread, const PthreadAttr* attr, Pthread
  #ifdef _WIN32
      SYSTEM_INFO system{};
      GetSystemInfo(&system);
@@ -2374,7 +2419,7 @@ index 11400bd..a350767 100644
      auto native = std::make_unique<NativeThreadArgs>(NativeThreadArgs{std::move(args), start.get_future(), {}});
      auto initialized = native->initialized.get_future();
      const auto handle = _beginthreadex(nullptr, static_cast<unsigned>(nativeStack), StartNativeThread, native.get(), 0, nullptr);
-@@ -547,7 +571,13 @@ int APS5_VABI scePthreadCreate(Pthread* thread, const PthreadAttr* attr, Pthread
+@@ -559,7 +583,13 @@ int APS5_VABI scePthreadCreate(Pthread* thread, const PthreadAttr* attr, Pthread
      p->nativeHandle = reinterpret_cast<void*>(handle);
      native.release();
      try {
@@ -2389,7 +2434,7 @@ index 11400bd..a350767 100644
      } catch (...) {
          start.set_value(false);
          WaitForSingleObject(p->nativeHandle, INFINITE);
-@@ -650,6 +680,7 @@ void APS5_VABI scePthreadExit(void* retval) {
+@@ -662,6 +692,7 @@ void APS5_VABI scePthreadExit(void* retval) {
      CurrentGuestState().exiting = true;
      while (CurrentGuestState().cleanupHandlers) __pthread_cleanup_pop_imp_nid_postfix(1);
      finishThread(self, retval);
@@ -2397,7 +2442,7 @@ index 11400bd..a350767 100644
      CurrentGuestState().current = nullptr;
  #ifdef _WIN32
      ReleaseThread(self);
-@@ -798,6 +829,18 @@ void APS5_VABI scePthreadTestcancel() {
+@@ -810,6 +841,18 @@ void APS5_VABI scePthreadTestcancel() {
  
  int APS5_VABI scePthreadSetprio(Pthread thread, int prio) {
      if (!thread) return SCE_KERNEL_ERROR_EINVAL;
@@ -2546,7 +2591,7 @@ index 887ff0e..c08a01a 100644
  std::uint64_t NowNanos();
  std::uint64_t DeadlineNanos(std::uint64_t microseconds);
  std::uint64_t RemainingMicros(std::uint64_t deadlineNanos);
-diff --git a/core/libs/tests/GuestAudio3dObjectAttributes.cpp b/core/libs/tests/GuestAudio3dObjectAttributes.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/GuestAudio3dObjectAttributes.cpp b/core/libs/tests/GuestAudio3dObjectAttributes.cpp
 new file mode 100644
 index 0000000..ca8a219
 --- /dev/null
@@ -2861,7 +2906,7 @@ index fa5d8f2..bd4551a 100644
      Audio3dAttribute missing{0x10001, 0, nullptr, 0};
      Require(sceAudio3dObjectSetAttributes(0, 1, 1, &missing) == INVALID_PARAMETER, "a value is required");
      Require(sceAudio3dObjectUnreserve(0, 1) == 0, "unreserve");
-diff --git a/core/libs/tests/GuestCompatibilityApis.cpp b/core/libs/tests/GuestCompatibilityApis.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/GuestCompatibilityApis.cpp b/core/libs/tests/GuestCompatibilityApis.cpp
 new file mode 100644
 index 0000000..d77edc8
 --- /dev/null
@@ -2956,10 +3001,10 @@ index 0000000..d77edc8
 +    std::puts("PASS offline service failures, immutable error outputs, context lifetime, accessibility and progress dialog lifecycle");
 +}
 diff --git a/core/libs/tests/GuestFilesystem.cpp b/core/libs/tests/GuestFilesystem.cpp
-index b741a61..3f5e013 100644
+index ded4521..166497f 100644
 --- a/core/libs/tests/GuestFilesystem.cpp
 +++ b/core/libs/tests/GuestFilesystem.cpp
-@@ -9,13 +9,19 @@
+@@ -12,13 +12,19 @@
  #include <cstdio>
  #include <cstring>
  #include <stdexcept>
@@ -2979,7 +3024,7 @@ index b741a61..3f5e013 100644
  int APS5_VABI remove_nid_postfix(const char*);
  int APS5_VABI rename_nid_postfix(const char*, const char*);
  int APS5_VABI sceKernelChmod_nid_postfix(const char*, unsigned short);
-@@ -26,6 +32,7 @@ int APS5_VABI futimes_nid_postfix(int, const KernelTimeval*);
+@@ -29,6 +35,7 @@ int APS5_VABI futimes_nid_postfix(int, const KernelTimeval*);
  int APS5_VABI sceKernelFutimes(int, const KernelTimeval*);
  int APS5_VABI socket_nid_postfix(int, int, int);
  int APS5_VABI sceKernelFsync(int);
@@ -2987,7 +3032,7 @@ index b741a61..3f5e013 100644
  int APS5_VABI fdatasync_nid_postfix(int);
  int APS5_VABI sceKernelFdatasync(int);
  int APS5_VABI sceKernelWriteThrottlingStatus(std::uint64_t*);
-@@ -111,6 +118,9 @@ int main() {
+@@ -205,6 +212,9 @@ int main() {
      Require(pipe_nid_postfix(nullptr) == -1 && *__error_nid_postfix() == 14);
      int descriptors[2] = {-1, -1};
      Require(pipe_nid_postfix(descriptors) == 0 && descriptors[0] >= 0 && descriptors[1] >= 0);
@@ -2997,7 +3042,7 @@ index b741a61..3f5e013 100644
      const char payload[] = {'A', '\0', '\r', '\n', '\x1a', 'Z'};
      Require(write_nid_postfix(descriptors[1], payload, sizeof(payload)) == sizeof(payload));
      Require(close_nid_postfix(descriptors[1]) == 0);
-@@ -128,6 +138,8 @@ int main() {
+@@ -222,6 +232,8 @@ int main() {
          Require(std::filesystem::remove("creat_probe.bin"));
      }
      Require(close_nid_postfix(descriptors[0]) == 0);
@@ -3006,7 +3051,7 @@ index b741a61..3f5e013 100644
      const auto root = std::filesystem::path("anyps5-filesystem-test-" +
          std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
      Require(mkdir_nid_postfix(root.string().c_str(), 0700) == 0);
-@@ -230,12 +242,14 @@ int main() {
+@@ -339,12 +351,14 @@ int main() {
      Require(sceKernelFchmod(descriptor, 0400) == 0 && !ownerWrite());
      Require(fchmod_nid_postfix(descriptor, 0600) == 0 && ownerWrite());
      Require(sceKernelFtruncate(descriptor, 3) == 0);
@@ -3024,7 +3069,7 @@ index b741a61..3f5e013 100644
      const KernelTimeval overflow[2]{{0, 0}, {0, 1000000}};
      Require(sceKernelFutimes(descriptor, overflow) == static_cast<int>(0x80020016u));
      Require(futimes_nid_postfix(descriptor, overflow) == -1 && *__error_nid_postfix() == 22);
-@@ -540,6 +554,87 @@ int main() {
+@@ -685,6 +699,87 @@ int main() {
      Require(std::filesystem::create_directory(empty));
      Require(rmdir_nid_postfix(empty.string().c_str()) == 0 && !std::filesystem::exists(empty));
      Require(rmdir_nid_postfix(dotDirectory.string().c_str()) == 0 && !std::filesystem::exists(dotDirectory));
@@ -3113,10 +3158,10 @@ index b741a61..3f5e013 100644
      Require(!std::filesystem::exists(root));
  }
 diff --git a/core/libs/tests/GuestJson.cpp b/core/libs/tests/GuestJson.cpp
-index 8150bc2..c896dd6 100644
+index 6b73091..e45b70d 100644
 --- a/core/libs/tests/GuestJson.cpp
 +++ b/core/libs/tests/GuestJson.cpp
-@@ -347,13 +347,14 @@ static void ValueAccess() {
+@@ -371,13 +371,14 @@ static void ValueAccess() {
      alignas(16) std::uint8_t parameter[40];
      std::memset(parameter, 0xff, sizeof(parameter));
      _ZN3sce4Json14InitParameter2C1Ev(parameter);
@@ -3134,7 +3179,7 @@ index 8150bc2..c896dd6 100644
      alignas(16) std::uint8_t initializer[16]{};
      Require(_ZN3sce4Json11InitializerC1Ev(initializer) == 0);
      Require(_ZN3sce4Json11Initializer10initializeEPKNS0_14InitParameter2E(initializer, parameter) == 0);
-diff --git a/core/libs/tests/GuestJson2Initialization.cpp b/core/libs/tests/GuestJson2Initialization.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/GuestJson2Initialization.cpp b/core/libs/tests/GuestJson2Initialization.cpp
 new file mode 100644
 index 0000000..df7e60e
 --- /dev/null
@@ -3225,7 +3270,7 @@ index 0000000..df7e60e
 +    CHECK(_ZN3sce4Json11Initializer9terminateEv(nullptr)==0);
 +    std::puts("PASS JSON2 allocator callbacks, temporary configuration, live object cleanup, parsing and allocation failure");
 +}
-diff --git a/core/libs/tests/GuestJson2VirtualAllocator.cpp b/core/libs/tests/GuestJson2VirtualAllocator.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/GuestJson2VirtualAllocator.cpp b/core/libs/tests/GuestJson2VirtualAllocator.cpp
 new file mode 100644
 index 0000000..d4f0cbd
 --- /dev/null
@@ -3735,10 +3780,10 @@ index 0000000..d4f0cbd
 +    std::puts("PASS JSON2 virtual SysV slots, bounded parameters, owner lifetime, RTTI switches, failures and reentrant/concurrent policy changes");
 +}
 diff --git a/core/libs/tests/GuestMath.cpp b/core/libs/tests/GuestMath.cpp
-index 6d56671..9402487 100644
+index 409a96b..6b5280d 100644
 --- a/core/libs/tests/GuestMath.cpp
 +++ b/core/libs/tests/GuestMath.cpp
-@@ -245,13 +245,18 @@ static void CheckIntegerConversions() {
+@@ -253,13 +253,18 @@ static void CheckIntegerConversions() {
          {"123!", 10, 123, 3, 0}
      };
      for (const auto& test : unsignedCases) {
@@ -3764,7 +3809,7 @@ index 6d56671..9402487 100644
      }
      for (const int base : {0, 2}) {
          const char text[] = " -0B11";
-@@ -276,6 +281,10 @@ static void CheckIntegerConversions() {
+@@ -284,6 +289,10 @@ static void CheckIntegerConversions() {
      Require(*__error_nid_postfix() == 13);
      Require(_Stoul_nid_postfix("18446744073709551615", nullptr, 10) == UINT64_MAX);
      Require(_Stoul_nid_postfix("-1", nullptr, 10) == UINT64_MAX && *__error_nid_postfix() == 13);
@@ -3776,27 +3821,32 @@ index 6d56671..9402487 100644
  }
  
 diff --git a/core/libs/tests/GuestMemory.cpp b/core/libs/tests/GuestMemory.cpp
-index bfab220..d2ed71f 100644
+index 427a6d0..02eb8f3 100644
 --- a/core/libs/tests/GuestMemory.cpp
 +++ b/core/libs/tests/GuestMemory.cpp
-@@ -887,13 +887,13 @@ static void CheckArenaHonoursHintsWithoutGoingBelowThem() {
+@@ -904,7 +904,7 @@ static void CheckArenaHonoursHintsWithoutGoingBelowThem() {
      GuestArena::GuestArenaRelease_nid_postfix(placed, page);
  }
  
 -static void CheckFixedMappingsReachTheApplicationAreaEnd() {
 +static void CheckFixedMappingsReachConfiguredArenaEnd() {
      constexpr std::size_t page = 0x4000;
--    constexpr std::uintptr_t applicationAreaEnd = 0xFC00000000ull;
      std::uintptr_t base = 0;
      std::size_t size = 0;
-     GuestArena::GuestArenaRange_nid_postfix(&base, &size);
--    Require(base == 0x200000000ull && base + size == applicationAreaEnd);
+@@ -915,8 +915,10 @@ static void CheckFixedMappingsReachTheApplicationAreaEnd() {
+ #else
+         0;
+ #endif
+-    constexpr std::uintptr_t applicationAreaEnd = 0xFC00000000ull + expectedOffset;
+-    Require(base == 0x200000000ull + expectedOffset && base + size == applicationAreaEnd);
 +    Require(base != 0 && size >= page * 2 && base <= UINTPTR_MAX - size);
 +    const auto applicationAreaEnd = base + size;
++    if (!std::getenv("APS5_GUEST_ARENA_BASE") && !std::getenv("APS5_GUEST_ARENA_SIZE"))
++        Require(base == 0x200000000ull + expectedOffset && applicationAreaEnd == 0xFC00000000ull + expectedOffset);
      std::int64_t phys = 0;
      Require(sceKernelAllocateDirectMemory(0, 0x7fffffffffll, page * 2, 0, 0, &phys) == 0);
      void* const requested = reinterpret_cast<void*>(applicationAreaEnd - page * 2);
-@@ -951,15 +951,26 @@ static void CheckMlock() {
+@@ -974,15 +976,26 @@ static void CheckMlock() {
      SIZE_T minimum = 0;
      SIZE_T maximum = 0;
      DWORD limits = 0;
@@ -3810,7 +3860,7 @@ index bfab220..d2ed71f 100644
      Require(VirtualUnlock(mapped, length));
 -    Require(!VirtualUnlock(mapped, length) && GetLastError() == ERROR_NOT_LOCKED);
 +    if (!wine) Require(!VirtualUnlock(mapped, length) && GetLastError() == ERROR_NOT_LOCKED);
- #elif defined(__linux__)
+ #elif defined(__linux__) && !defined(ANYPS5_ENABLE_ASAN)
      Require(LockedKilobytes() - lockedBefore == length / 1024);
  #endif
      Require(sceKernelMlock_nid_postfix(mapped, length) == 0);
@@ -3825,7 +3875,7 @@ index bfab220..d2ed71f 100644
      Require(sceKernelMlock_nid_postfix(reinterpret_cast<void*>(std::numeric_limits<std::uintptr_t>::max() - page + 1), page * 2) == invalid);
      void* reserved = nullptr;
      Require(sceKernelReserveVirtualRange(&reserved, page, 0, 0) == 0);
-@@ -1153,6 +1164,53 @@ static void CheckFailedCollectKeepsWrites() {
+@@ -1180,6 +1193,53 @@ static void CheckFailedCollectKeepsWrites() {
  #endif
  }
  
@@ -3879,7 +3929,7 @@ index bfab220..d2ed71f 100644
  static void CheckPinnedSharedPages() {
  #ifdef _WIN32
      constexpr std::size_t page = 0x4000;
-@@ -1707,7 +1765,7 @@ int main() {
+@@ -1754,7 +1814,7 @@ int main() {
      CheckHeapAlignment();
      CheckHeapAfterMappingReuse();
      CheckNoOverwriteRejectsHostOccupiedMapping();
@@ -3888,7 +3938,7 @@ index bfab220..d2ed71f 100644
  #ifdef _WIN32
      CheckGuestModuleImageProtection();
  #endif
-@@ -1719,6 +1777,7 @@ int main() {
+@@ -1766,6 +1826,7 @@ int main() {
      CheckArenaReusesAFreedRange();
      CheckArenaHonoursHintsWithoutGoingBelowThem();
      CheckSharedWriteTracking();
@@ -3897,7 +3947,7 @@ index bfab220..d2ed71f 100644
      CheckPinnedSharedPages();
      CheckFailedCollectKeepsWrites();
 diff --git a/core/libs/tests/GuestNpTrophy2.cpp b/core/libs/tests/GuestNpTrophy2.cpp
-index 6a5111f..4bbbddf 100644
+index 165d434..987211b 100644
 --- a/core/libs/tests/GuestNpTrophy2.cpp
 +++ b/core/libs/tests/GuestNpTrophy2.cpp
 @@ -1,5 +1,6 @@
@@ -3907,7 +3957,7 @@ index 6a5111f..4bbbddf 100644
  #include <cstdlib>
  #include <stdexcept>
  
-@@ -22,7 +23,7 @@ int main() {
+@@ -33,7 +34,7 @@ int main() {
      Require(sceNpTrophy2RegisterUnlockCallback(reinterpret_cast<void*>(&OnUnlock), &userdata) == 0);
      Require(sceNpTrophy2UnregisterUnlockCallback() == 0);
  
@@ -4013,7 +4063,7 @@ index e9bdd16..ebcd7e2 100644
 +    for (bool detached : {false, true})
 +        for (bool explicitExit : {false, true}) CheckDestructorWait(detached, explicitExit);
  }
-diff --git a/core/libs/tests/GuestShaderAlignment.cpp b/core/libs/tests/GuestShaderAlignment.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/GuestShaderAlignment.cpp b/core/libs/tests/GuestShaderAlignment.cpp
 new file mode 100644
 index 0000000..41a2051
 --- /dev/null
@@ -4259,7 +4309,7 @@ index 95d5225..30a7804 100644
      }
      Require(sceSaveDataTerminate() == 0);
      std::filesystem::current_path(previousDirectory);
-diff --git a/core/libs/tests/UniformWaveBranch.cpp b/core/libs/tests/UniformWaveBranch.cpp
+diff --git a/rebase/0001-ipad-runtime-compatibility/after/core/libs/tests/UniformWaveBranch.cpp b/core/libs/tests/UniformWaveBranch.cpp
 new file mode 100644
 index 0000000..0e7edcf
 --- /dev/null

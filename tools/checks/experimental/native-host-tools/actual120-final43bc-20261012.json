@@ -1,0 +1,999 @@
+{
+  "actualAdoptionReceiptSha256": "07b1910c7b807ae5835303fa4ace01299a4e03f55122ec73a93a479cb1b7b45c",
+  "actualReceiptSha256": "700e023fe25df5c4310a63bec08e3ad77500a4384cb2cbadfc8e609e6dd4d85e",
+  "allElevenDependenciesCleanAtExpectedGitlinksBeforeAfter": true,
+  "binaries": {
+    "nid_patcher": {
+      "bytes": 191064,
+      "format": "Mach-O 64-bit executable arm64",
+      "sha256": "79863c1696316ad1e0d26d87380e1dcea0107e29d7cfff8735f1eee8e5dc9d01"
+    },
+    "relinker": {
+      "bytes": 982760,
+      "format": "Mach-O 64-bit executable arm64",
+      "sha256": "f6892a42c53f05a55c1e6ab1248aff9454e4265110259e76825dafcb0c84a4a2"
+    }
+  },
+  "buildExitCode": 0,
+  "configureExitCode": 0,
+  "ctestExitCode": 0,
+  "evidenceSha256": {
+    "build.log": "e8487fb0934491a3d630a0410ce71ad14b2e6ca913771a338cd996c9b5cbc349",
+    "build/CMakeCache.txt": "ce4b4b2cae844627347919497ac72cbea274780a851c10abc3161f2fdc3dc71b",
+    "build/Testing/Temporary/LastTest.log": "c4da803fa89772f922098e13785e53d9d74b7562400af21168c6905bc0e788db",
+    "build/build.ninja": "1bb1f24ccd0c3dcf3d0ce23427cd2455eaed4548bbf4a9b8614b6ba8dfa94c03",
+    "configure.log": "2009acdb7360e798f9b7572defcafe370552b3bff42470ed6a0b426072b2fabc",
+    "ctest.log": "52afa2600013e1d58bb83205e1ff6da2ae22694d31ee4826f3181ece41e3c7ca",
+    "source-after.json": "01e4beb9e6ee0ea1df648ecca2524ca87653fe23f388baedf4665acb1ffb69c4",
+    "source-before.json": "01e4beb9e6ee0ea1df648ecca2524ca87653fe23f388baedf4665acb1ffb69c4",
+    "test-inventory.json": "b8ef2ec5a25172a651a538729a24ea4ebdf67a04e70e1c107a1252d667ce4bc7",
+    "tests.xml": "91df76417f1cdec7fe9aa1af765ae905e9fe5eff7ec682de725425fb0174585b"
+  },
+  "executedCTestCases": 120,
+  "executedHelperFilesSha256": {
+    "CMakeLists.txt": "a68b3bb3d052877d8377949842e9cfe10a079039683d353e2cbe0fb53112b137",
+    "README.md": "94abc3d3fc1ff7cbb064869f3fd23dde56fa59bbef351d9fa5eec6c6313cf78b",
+    "finalize.py": "17e27e475df5d93412864466ff59b39ee00ac2e0f530ff4ddd36aedb01f64cf8",
+    "receipt.py": "6dfd167d0616b5947c974fbc64bd39dcb6ef0836d1b388750313db15bbd30999",
+    "run.py": "2abe26f3f082bd0c653603b247767f068b6c7209df7ee09db86147c7295602b1"
+  },
+  "failedCTestCases": 0,
+  "gameImportsQualified": false,
+  "gameplayVerified": false,
+  "gpuQualified": false,
+  "groups": {
+    "nidPatcher": 2,
+    "relinker": 103,
+    "rootPortableCpp": 1,
+    "rootTooling": 14
+  },
+  "guestExecutedOnIpad": false,
+  "hleQualified": false,
+  "hostGuestExecutionLimitations": [
+    {
+      "name": "linux_guest_stack",
+      "notes": [
+        "Native dlopen execution skipped: Linux x86-64 required"
+      ]
+    },
+    {
+      "name": "guest_module_args",
+      "notes": [
+        "Guest module argument tests passed: native execution skipped"
+      ]
+    },
+    {
+      "name": "guest_init_fini",
+      "notes": [
+        "Native lifecycle execution skipped: Linux x86-64 or Windows required"
+      ]
+    }
+  ],
+  "maxBuildJobs": 1,
+  "missingPriorCases": [],
+  "newRegisteredCases": [
+    "elf_reader_bounds",
+    "guest_syscall_trap",
+    "none_relocations",
+    "param_json_utf8",
+    "program_layout_ranges",
+    "release_package",
+    "rewrite_boundaries",
+    "section_header_ranges",
+    "shader_cache_file_read",
+    "windows_guest_export_aliases"
+  ],
+  "passedCTestCases": 120,
+  "patchCount": 20,
+  "priorInventorySha256": "9493da69ec708c50814f61c4d37c4b093657ceee8e9d7b79f64eea763c9972b5",
+  "publishedHelperFilesSha256": {
+    "CMakeLists.txt": "a68b3bb3d052877d8377949842e9cfe10a079039683d353e2cbe0fb53112b137",
+    "README.md": "2e253b58fb19ffc5c4df6189f5c9b210a04d2388e148ae0777ed0ae636ec66f1",
+    "finalize.py": "17e27e475df5d93412864466ff59b39ee00ac2e0f530ff4ddd36aedb01f64cf8",
+    "receipt.py": "6dfd167d0616b5947c974fbc64bd39dcb6ef0836d1b388750313db15bbd30999",
+    "run.py": "2abe26f3f082bd0c653603b247767f068b6c7209df7ee09db86147c7295602b1"
+  },
+  "qualified": true,
+  "registeredAndExecutedNamesMatch": true,
+  "registeredTests": 120,
+  "requiredLatestRegressionNames": [
+    "elf_reader_bounds",
+    "guest_syscall_trap",
+    "none_relocations",
+    "param_json_utf8",
+    "program_layout_ranges",
+    "release_package",
+    "rewrite_boundaries",
+    "section_header_ranges",
+    "shader_cache_file_read",
+    "windows_guest_export_aliases"
+  ],
+  "retainedPriorCaseCount": 110,
+  "sameFrozenReviewBeforeAfter": true,
+  "sanitization": "Absolute private paths, source maps, vendor/provider lists, raw assets, logs and pairing material omitted; evidence digests and per-name results retained.",
+  "schema": 1,
+  "scope": "Fresh native arm64 host conversion-tool qualification. Existing host conditions inspect emitted x86-64 PE/ELF without incompatible execution. No HLE, GPU, game import/launch, device or gameplay qualification.",
+  "skippedCTestCases": 0,
+  "sourceBeforeAfterUnchanged": true,
+  "sourceEntryCount": 2199,
+  "sourceMapSha256": "93c5810972df6630cb81690a49ca8be82d74e1eceece9e8f283079d492b14b2e",
+  "sourceMatchesFrozenReviewBeforeAfter": true,
+  "sourceReviewSha256": "3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398",
+  "status": "native_arm64_conversion_tools_built_and_complete_ctest_qualified_not_game_or_runtime",
+  "testResults": [
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "nid_patcher_macho",
+      "skipped": false,
+      "time": "0.298229"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "nid_patcher_symbol_versions",
+      "skipped": false,
+      "time": "0.101093"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_guest_export_aliases",
+      "skipped": false,
+      "time": "0.367547"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "shader_cache_file_read",
+      "skipped": false,
+      "time": "0.597379"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "pr_overlap_encoding",
+      "skipped": false,
+      "time": "0.993087"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "pr_overlap_dependencies",
+      "skipped": false,
+      "time": "0.291944"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "pr_overlap_tools",
+      "skipped": false,
+      "time": "0.280325"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "progress_report",
+      "skipped": false,
+      "time": "0.419636"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "progress_encoding",
+      "skipped": false,
+      "time": "1.31813"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "import_audit",
+      "skipped": false,
+      "time": "1.07041"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "conventions_function_bodies",
+      "skipped": false,
+      "time": "9.77012"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "test_registration",
+      "skipped": false,
+      "time": "0.197494"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "check_skips",
+      "skipped": false,
+      "time": "0.146794"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "stubgen",
+      "skipped": false,
+      "time": "0.145513"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "hardware_oracle",
+      "skipped": false,
+      "time": "0.212599"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "pr_overlap_exports",
+      "skipped": false,
+      "time": "0.100624"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "nid_database_cache",
+      "skipped": false,
+      "time": "0.237496"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "release_package",
+      "skipped": false,
+      "time": "0.226603"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "elf_reader_bounds",
+      "skipped": false,
+      "time": "0.323045"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "autorun_exit_status",
+      "skipped": false,
+      "time": "0.81269"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "rewrite_boundaries",
+      "skipped": false,
+      "time": "0.315437"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "cli_args",
+      "skipped": false,
+      "time": "0.30305"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "program_layout_ranges",
+      "skipped": false,
+      "time": "0.278393"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "buffer_bounds",
+      "skipped": false,
+      "time": "0.299068"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "param_json_utf8",
+      "skipped": false,
+      "time": "0.321758"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "section_header_ranges",
+      "skipped": false,
+      "time": "0.295794"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "amd64_only_converter",
+      "skipped": false,
+      "time": "0.294524"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "decoder_length",
+      "skipped": false,
+      "time": "0.2887"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "cli_help",
+      "skipped": false,
+      "time": "0.453513"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "elf_offsets",
+      "skipped": false,
+      "time": "0.125523"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "dynamic_segment",
+      "skipped": false,
+      "time": "0.220533"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "rela_size",
+      "skipped": false,
+      "time": "0.295178"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "none_relocations",
+      "skipped": false,
+      "time": "0.568404"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "optional_plt",
+      "skipped": false,
+      "time": "0.0904638"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "empty_tls",
+      "skipped": false,
+      "time": "0.0767938"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_metadata",
+      "skipped": false,
+      "time": "0.244401"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_padding",
+      "skipped": false,
+      "time": "0.163335"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_register_loads",
+      "skipped": false,
+      "time": "0.164275"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_bounds",
+      "skipped": false,
+      "time": "0.213094"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_execution",
+      "skipped": false,
+      "time": "0.255736"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_register_address_loads",
+      "skipped": false,
+      "time": "0.372177"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_rejected",
+      "skipped": false,
+      "time": "0.142568"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r0",
+      "skipped": false,
+      "time": "0.138045"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r1",
+      "skipped": false,
+      "time": "0.143681"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r2",
+      "skipped": false,
+      "time": "0.147639"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r3",
+      "skipped": false,
+      "time": "0.165559"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r5",
+      "skipped": false,
+      "time": "0.186947"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r6",
+      "skipped": false,
+      "time": "0.152729"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r7",
+      "skipped": false,
+      "time": "0.151965"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r8",
+      "skipped": false,
+      "time": "0.155963"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r9",
+      "skipped": false,
+      "time": "0.154611"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r10",
+      "skipped": false,
+      "time": "0.148739"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r11",
+      "skipped": false,
+      "time": "0.145776"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r12",
+      "skipped": false,
+      "time": "0.145832"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r13",
+      "skipped": false,
+      "time": "0.148341"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r14",
+      "skipped": false,
+      "time": "0.134493"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_displacement_r15",
+      "skipped": false,
+      "time": "0.126588"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_add",
+      "skipped": false,
+      "time": "0.167355"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_or",
+      "skipped": false,
+      "time": "0.166642"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_adc",
+      "skipped": false,
+      "time": "0.160571"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_sbb",
+      "skipped": false,
+      "time": "0.164904"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_and",
+      "skipped": false,
+      "time": "0.287688"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_sub",
+      "skipped": false,
+      "time": "0.235182"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_xor",
+      "skipped": false,
+      "time": "0.223725"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_function_coverage_alu_cmp",
+      "skipped": false,
+      "time": "0.282347"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "tls_diagnostics",
+      "skipped": false,
+      "time": "0.131235"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_load_alignment",
+      "skipped": false,
+      "time": "0.0956608"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_eh_frame_header",
+      "skipped": false,
+      "time": "0.501105"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_dynamic_strings",
+      "skipped": false,
+      "time": "0.0642494"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_runpath",
+      "skipped": false,
+      "time": "0.161653"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "executable_segments",
+      "skipped": false,
+      "time": "0.143178"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_executable_exports",
+      "skipped": false,
+      "time": "0.0403116"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_entry_argv",
+      "skipped": false,
+      "time": "0.067346"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_program_header_order",
+      "skipped": false,
+      "time": "0.0685256"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_input_program_headers",
+      "skipped": false,
+      "time": "0.0844825"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_gui",
+      "skipped": false,
+      "time": "0.0613725"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_working_directory",
+      "skipped": false,
+      "time": "0.0799398"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_address_space",
+      "skipped": false,
+      "time": "0.0480416"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_tls_thread_pointer",
+      "skipped": false,
+      "time": "0.0453492"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_bss",
+      "skipped": false,
+      "time": "0.382973"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_icon",
+      "skipped": false,
+      "time": "0.196857"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "linux_desktop_entry_output",
+      "skipped": false,
+      "time": "0.115874"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_intel_trampolines",
+      "skipped": false,
+      "time": "0.0989"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_syscall_trap",
+      "skipped": false,
+      "time": "0.0549039"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_tls",
+      "skipped": false,
+      "time": "0.0886709"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_optional_notes",
+      "skipped": false,
+      "time": "0.268022"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_needed_modules",
+      "skipped": false,
+      "time": "0.26609"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_module_dir",
+      "skipped": false,
+      "time": "0.5319"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_module_directories",
+      "skipped": false,
+      "time": "0.681363"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "sce_module_path",
+      "skipped": false,
+      "time": "0.186308"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [
+        "Native dlopen execution skipped: Linux x86-64 required"
+      ],
+      "name": "linux_guest_stack",
+      "skipped": false,
+      "time": "0.0753069"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_symbol_names",
+      "skipped": false,
+      "time": "0.100606"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_registry",
+      "skipped": false,
+      "time": "0.128484"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "macos_output",
+      "skipped": false,
+      "time": "0.0879986"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_host_libc",
+      "skipped": false,
+      "time": "0.127096"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [
+        "Guest module argument tests passed: native execution skipped"
+      ],
+      "name": "guest_module_args",
+      "skipped": false,
+      "time": "0.122669"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [
+        "Native lifecycle execution skipped: Linux x86-64 or Windows required"
+      ],
+      "name": "guest_init_fini",
+      "skipped": false,
+      "time": "0.609436"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_deferred_lifecycle",
+      "skipped": false,
+      "time": "0.189761"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_absolute_symbols",
+      "skipped": false,
+      "time": "0.0994206"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_module_identity",
+      "skipped": false,
+      "time": "0.657125"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "guest_needed_nested_modules",
+      "skipped": false,
+      "time": "0.93396"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_import_modules",
+      "skipped": false,
+      "time": "0.369334"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "elf_header",
+      "skipped": false,
+      "time": "0.326687"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "input_magic",
+      "skipped": false,
+      "time": "0.0816381"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "input_preservation",
+      "skipped": false,
+      "time": "0.624153"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "input_file",
+      "skipped": false,
+      "time": "0.0956362"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "input_nonascii",
+      "skipped": false,
+      "time": "0.074839"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "string_table_bounds",
+      "skipped": false,
+      "time": "0.152034"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "sce_code_extent",
+      "skipped": false,
+      "time": "0.100577"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "call_registry",
+      "skipped": false,
+      "time": "0.49593"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "jmprel_table_bounds",
+      "skipped": false,
+      "time": "0.119259"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "entry_point_bounds",
+      "skipped": false,
+      "time": "0.0692607"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "init_array_roots",
+      "skipped": false,
+      "time": "0.130098"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "gnu_hash_analysis",
+      "skipped": false,
+      "time": "0.144979"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "to_rosetta",
+      "skipped": false,
+      "time": "0.098403"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "syscall_number",
+      "skipped": false,
+      "time": "0.105258"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "unused_filter_indirect",
+      "skipped": false,
+      "time": "0.128983"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "windows_icon_resource",
+      "skipped": false,
+      "time": "0.349339"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "entry_stub",
+      "skipped": false,
+      "time": "0.437185"
+    },
+    {
+      "failed": false,
+      "hostExecutionScopeNotes": [],
+      "name": "strict_nid_filter",
+      "skipped": false,
+      "time": "0.382051"
+    }
+  ],
+  "toolchain": {
+    "clang": {
+      "sha256": "34129c71a01a74f7f3b2443521519b2e5447553fa187f5fcafaaf8c42cc192e2",
+      "version": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+      "versionExitCode": 0
+    },
+    "cmake": {
+      "sha256": "64c16ba19481b4e8fa5fc51afa37a7609128d5e5c10236eb1492d16d22d029c4",
+      "version": "cmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+      "versionExitCode": 0
+    },
+    "effectiveClangSelectedByXcrun": {
+      "sha256": "1590ac950a3d627817d09ade5cb60b2115f17a72182a3141e010b4bcc482a0c9",
+      "version": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+      "versionExitCode": 0
+    },
+    "ninja": {
+      "sha256": "1474a6ef89624613732e0fc9e6d9fe5338b8885916cf64ab8c1c6097123f3ef6",
+      "version": "1.13.2\n",
+      "versionExitCode": 0
+    },
+    "python": {
+      "sha256": "4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc",
+      "version": "Python 3.12.14\n",
+      "versionExitCode": 0
+    }
+  },
+  "upstreamCommit": "43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b"
+}

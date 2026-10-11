@@ -1,0 +1,11 @@
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp
+@@ -398,7 +398,7 @@
+         geometry.imageLayers = descriptor.samples > 4u ? 2u : 1u;
+         return geometry;
+     }
+-    if (descriptor.dimension == TextureDimension::k3D && (descriptor.tileMode == TextureTileMode::kZ64KBX || descriptor.tileMode == TextureTileMode::kD64KBX || descriptor.tileMode == TextureTileMode::kR64KBX)) {
++    if (descriptor.dimension == TextureDimension::k3D && (descriptor.tileMode == TextureTileMode::kZ64KBX || descriptor.tileMode == TextureTileMode::kR64KBX)) {
+         const auto depth = descriptor.depthOrLastArray + 1u;
+         geometry.mips = ComputeMipLayout(descriptor.tileMode, descriptor.format, descriptor.width, descriptor.height, descriptor.mipCount);
+         geometry.layers = depth;

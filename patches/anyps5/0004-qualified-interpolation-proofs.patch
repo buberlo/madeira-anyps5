@@ -1,4 +1,4 @@
-diff --git a/core/libs/prx/libSceAgcDriver/tests/InstrumentationProofCases.hpp b/core/libs/prx/libSceAgcDriver/tests/InstrumentationProofCases.hpp
+diff --git a/rebase/0004-qualified-interpolation-proofs/after/core/libs/prx/libSceAgcDriver/tests/InstrumentationProofCases.hpp b/core/libs/prx/libSceAgcDriver/tests/InstrumentationProofCases.hpp
 new file mode 100644
 index 0000000..91c4bea
 --- /dev/null
@@ -92,7 +92,7 @@ index 0000000..91c4bea
 + return all;
 +}
 +} // namespace PublicInstrumentationProofCases
-diff --git a/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp b/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp
+diff --git a/rebase/0004-qualified-interpolation-proofs/after/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp b/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp
 new file mode 100644
 index 0000000..b6d94f8
 --- /dev/null
@@ -762,7 +762,7 @@ index 0000000..b6d94f8
 +  need(UnusedBarycentricProof::Prove(rdna,graph,{0,1}),"exact private request proof failed");stage(real.request);++passes;std::cout<<"PASS exact_private_request_staged_prepare_and_materialize\n";}
 + std::cout<<"TOTAL_PASS "<<passes<<"\n";return 0;
 + }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<"\n";return 1;}}
-diff --git a/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
+diff --git a/rebase/0004-qualified-interpolation-proofs/after/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
 new file mode 100644
 index 0000000..38e9fc6
 --- /dev/null
@@ -1269,7 +1269,7 @@ index 0000000..38e9fc6
 +    if (!pending.empty()) fail();
 +}
 +}
-diff --git a/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp b/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp
+diff --git a/rebase/0004-qualified-interpolation-proofs/after/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp b/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp
 new file mode 100644
 index 0000000..eef5820
 --- /dev/null
@@ -1364,7 +1364,7 @@ index 0000000..eef5820
 +    return true;
 +}
 +}
-diff --git a/core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp b/core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp
+diff --git a/rebase/0004-qualified-interpolation-proofs/after/core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp b/core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp
 new file mode 100644
 index 0000000..92e0da4
 --- /dev/null
@@ -1811,7 +1811,7 @@ index 0000000..92e0da4
 +}
 +}
 diff --git a/core/shader/recompiler/Translation/src/InstructionTranslator.cpp b/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
-index 421ea46..cfedf14 100644
+index f99b87a..22acf5e 100644
 --- a/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
 +++ b/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
 @@ -1,4 +1,5 @@
@@ -1820,7 +1820,7 @@ index 421ea46..cfedf14 100644
  #include "Recompiler.hpp"
  #include "Translation/DispatchInstructions.hpp"
  #include "Translation/TranslationContext.hpp"
-@@ -394,6 +395,9 @@ IrProgram InstructionTranslator::Translate(const RdnaProgram& decoded, const Con
+@@ -395,6 +396,9 @@ IrProgram InstructionTranslator::Translate(const RdnaProgram& decoded, const Con
          }
      }
  
@@ -1829,4 +1829,4 @@ index 421ea46..cfedf14 100644
 +    }
      IrProgram program;
      program.SetWaveSize(options.waveSize);
-     program.Resources().stage = toIrShaderStage(options.stage);
+     std::uint32_t windowBase = NumVectorRegs;

@@ -5,7 +5,7 @@ records fixed source inputs; subsequent upstream movement needs a new review.
 
 | Path | Remote | Commit | Branch |
 | --- | --- | --- | --- |
-| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `0a8b1d32b12a6d6a3acd462787750b482bf78884` | `main` |
+| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b` | `main` |
 | `upstreams/Madeira` | https://github.com/willfaust/Madeira.git | `48f976429c189f8396e23d251d8a82f43c705922` | `main` |
 | `upstreams/FEX` | https://github.com/FEX-Emu/FEX.git | `14c92681f4d62cf84d901460e0358de09c8847a7` | `FEX-2610` tag |
 | `upstreams/wine` | https://github.com/willfaust/wine.git | `257f271cfffed9f22f7987cac53bc00095d092fe` | `madeira-lgpl` |
@@ -44,25 +44,34 @@ source pin is updated.
 
 ## Complete main refresh, 2026-10-12
 
-AnyPS5 includes all **1,735 merged commits** after `c963432d`, including
-Apple fixes #1776, #1831 and #2015. Seventeen reconciled patches retain the
-iPad runtime and strict shader/resource contracts. Fresh application and
-reversal pass all 68 commands. Both actual source checkouts match all 2,137
-files and modes; eleven dependency trees are initialized at their exact
-recorded commits and clean.
+[Actual canonical and build-source integration](evidence/anyps5-43bc-source-integration-20261012.json).
 
-Current shader requests use version 17 and disk caches use format 28; old
-cache entries are rejected. All six freshly built native shader suites and
-the full new ShaderMemory fixture pass. Complete linked-runtime, native
-Windows GPU and iPad qualification remain separate. Earlier 95 host/relinker
-passes belong to the preceding complete refresh; they are retained as
-historical evidence. [Current reconciliation and test boundaries](UPSTREAM-REFRESH-20261012.md),
-[actual source/scoped results](evidence/anyps5-0a8b-source-integration-20261012.json).
+The final checked AnyPS5 source target is `43bc17f7`: **397 merged commits after
+`0a8b1d32` and 2,132 after `c963432d`**. Apple fixes #1776, #1831 and #2015
+remain included. Twenty reconciled patches preserve the local iPad, exception,
+thread-lifetime, memory, lifecycle and shader/resource contracts. The complete
+source map contains 2,199 files and eleven unchanged gitlinks; the twenty-patch
+application/check/reversal route passes all 80 commands plus four combined
+roundtrip commands. This is source integration, not a rebuilt or installed
+43b runtime.
+
+Request version 17, cache format 28 and generated source-version separation
+retain local policy identity and reject incompatible cache entries. Exact
+interpolation, sample-group isolation, descriptor ownership and depth/resource
+guards remain required. Default-profile MSAA policy positive cases remain
+unqualified. Fresh native conversion tools pass all 120 configured CTests with identical
+source hashes/modes and eleven clean vendor identities before and after. Full
+HLE qualification remains separate; the older **110 native CTests, six native shader suites and complete
+ShaderMemory result** retain their preceding source identities.
+[Current reconciliation and test boundaries](UPSTREAM-REFRESH-20261012.md),
+[historical native tool results](evidence/native-host-tools-latest17-20261012.json),
+[historical source/scoped results](evidence/anyps5-0a8b-source-integration-20261012.json).
 
 Madeira `main`, official FEX `main`/FEX-2610 and Madeira's FEX `ios-port-2607`
-baseline all matched the checked heads. The FEX #6021 backport remains
-included. Unmerged Madeira experiments are not treated as required updates.
-These are fixed checked inputs; later upstream movement is a separate refresh.
+baseline retain the heads checked in this refresh. The FEX #6021 backport remains
+included. No further moving AnyPS5 head is folded into this frozen cycle.
+Installed packages retain their own provenance; neither their HLE bytes nor
+gameplay status changes through a source-pin update.
 
 ## Historical targeted Apple GPU additions, 2026-10-11
 

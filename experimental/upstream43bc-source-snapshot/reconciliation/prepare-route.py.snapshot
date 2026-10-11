@@ -1,0 +1,27 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import json,hashlib,ast,difflib
+OUT=Path(__file__).resolve().parent;ROOT=Path('__LOCAL_PROJECT_ROOT__');old=ROOT/'build/anyps5-latestca4-source-proposal-20261012/incremental-route';ROUTE=OUT/'incremental-route';ROUTE.mkdir()
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def dump(p,d):p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+reviewsha=sha(OUT/'source-candidate-review.json');assert reviewsha=='7968df60cebbfa715d5a60bdedd457c99c60080d040d8c34166b8a4ba8ad9391'
+s=(old/'build-hle-ca4.py').read_text();s=s.replace(str(ROOT/'build/anyps5-latestca4-source-proposal-20261012/patches'),str(OUT/'patches'));helper=ROUTE/'build-hle-final43bc.py';helper.write_text(s);helpersha=sha(helper);ast.parse(s)
+plan=json.loads((old/'plan.json').read_text());new=['guest_rudp_pump_tests','guest_acm_tests','guest_force_tls_destructor_tests','log_macros_tests','windows_backtrace_report_tests','guest_pthread_destructor_lifetime_tests','guest_socket_error_tests','agc_vector_window_tests','agc_compute_pipeline_capture_tests'];plan['final43bcAdditionalNoGpuTargets']=new;plan['totalAdditionalTargets']+=new;assert len(set(plan['totalAdditionalTargets']))==32
+plan.update(schema=1,kind='final43bc_incremental_full_hle_selected_route',frozenUpstream='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b',newPatchCount=20,sourceReviewSha256=reviewsha,helperSha256=helpersha,compilerJobs=1,totalRequiredExecutableTargets=74,newWinePrefix=str(ROOT/'build/anyps5-full-main-update-20261012/wine-prefix-final43bc-patch20'),output=str(ROOT/'build/anyps5-full-main-update-20261012/hle-final43bc-patch20/hle-runtime.zip'),knownMsaaRuntimePolicyConflict=True,unqualifiedGpuNewCasesPreserved=True)
+plan['helperChanges']='Project ROOT; exact frozen Ngs2 foreach admission; provenance exact final43bc20patches. Default42 contracts and all expected failures/skips remain unchanged.'
+plan['gpuDependentNewCasesNotQualifiedByThisRoute']+=['agc_storage_upload_lifetime','agc_storage_upload_failure','agc_multisample_guest_access','agc_shared_write_partial_collect','agc_shared_write_partial_collect_two_pass','agc_driver_flat_apertures_parts0through13','agc_compute_pipeline_replay','agc_compute_pipeline_capture_run']
+plan['separateNewNonGpuCase']='agc_compute_descriptor_layout_flags (default Graphics target, requires explicit CTest selection beyond its default direct run)'
+dump(ROUTE/'plan.json',plan)
+s=(old/'run_incremental.py').read_text()
+s=s.replace("REVIEW_SHA='107d956fa6edf0ff0eb7fa0d63bb2d1466d52b86746583dfad779b9ffa663b01'",f"REVIEW_SHA='{reviewsha}'").replace("BASE='ca4ab0d5d66f3855991fa95eec6e7e15e34e24c6'", "BASE='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b'").replace("OLD='0a8b1d32b12a6d6a3acd462787750b482bf78884'", "OLD='ca4ab0d5d66f3855991fa95eec6e7e15e34e24c6'")
+s=s.replace("HELPER_SHA='2c5863d6d4f97b6cd3f3679df9dc7863e54c5fda3f5943874831421557ff93d7'",f"HELPER_SHA='{helpersha}'").replace("'build-hle-ca4.py'","'build-hle-final43bc.py'")
+s=s.replace("previous=json.loads((TARGETED/'source-after.json').read_text());assert source_map(SOURCE,False)==previous", "previous_full=json.loads((ROOT/'build/anyps5-latestca4-source-proposal-20261012/candidate-source-map.json').read_text());previous=file_entries(previous_full);assert source_map(SOURCE)==previous_full\n assert sha(ROOT/'build/anyps5-latestca4-source-proposal-20261012/actual-incremental-run/source-adoption-receipt.json')=='bbb140da988fde77f161bf4d9667d038b248f0dac568f2f86c1307a08328c38a'")
+s=s.replace("2161","2199").replace("==19","==20").replace("'patchCount':19","'patchCount':20").replace("--jobs','2'","--jobs','1'")
+s=s.replace("ca4_plus19","final43bc_plus20").replace("ca4_plus19","final43bc_plus20").replace("ca4_plus19","final43bc_plus20").replace("latestca4-patch19","final43bc-patch20").replace("private_ca4", "private_final43bc").replace("private ca4", "private final43bc").replace("ca4_plus19", "final43bc_plus20").replace("plus19", "plus20")
+s=s.replace("'additionalTestTargetCount':23", "'additionalTestTargetCount':32").replace("'requiredAdditionalTargetCount':23", "'requiredAdditionalTargetCount':32").replace("'requiredCompleteHostTestTargetCount':65", "'requiredCompleteHostTestTargetCount':74").replace("'requiredExecutableTargetCount':65", "'requiredExecutableTargetCount':74")
+s=s.replace("except Exception as exc:error=repr(exc)", "except BaseException as exc:error=repr(exc)")
+runner=ROUTE/'run_incremental.py';runner.write_text(s);ast.parse(s)
+(ROUTE/'helper-source.diff').write_text(''.join(difflib.unified_diff((old/'original-build-hle.py').read_text().splitlines(True),helper.read_text().splitlines(True),fromfile='public build-hle original',tofile='held final43bc helper')))
+print(json.dumps({'runnerSha256':sha(runner),'helperSha256':helpersha,'planSha256':sha(ROUTE/'plan.json'),'sourceReviewSha256':reviewsha,'additionalTargets':32,'totalExecutableTargets':74,'jobs':1},indent=2))

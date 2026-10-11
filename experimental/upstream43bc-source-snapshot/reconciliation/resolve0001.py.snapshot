@@ -1,0 +1,32 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import re,json,shutil
+OUT=Path(__file__).resolve().parent;case=OUT/'rebase/0001-ipad-runtime-compatibility';merged=case/'merged';resolved=case/'resolved'
+pattern=re.compile(r'^<<<<<<<[^\n]*\n(.*?)^=======[^\n]*\n(.*?)^>>>>>>>[^\n]*\n',re.M|re.S)
+choices={}
+for rel in ['core/libs/prx/libSceJson2/Export.cpp','core/libs/prx/libSceNpEntitlementAccess/Export.cpp','core/libs/prx/libc/src/GuestArena.cpp','core/libs/tests/GuestMemory.cpp']:
+ p=merged/rel;s=p.read_text();matches=list(pattern.finditer(s));assert len(matches)==(2 if rel.endswith('GuestMemory.cpp') else 1)
+ out=[];at=0
+ for i,m in enumerate(matches):
+  out.append(s[at:m.start()]);theirs,ours=m.groups();end=m.end()
+  if rel.endswith('libSceJson2/Export.cpp'):
+   replacement=ours;choices[rel]='Retain owned JsonMemAllocatorNotify ABI and single existing C2 constructor, retain upstream new Value exports and entire tail.'
+  elif rel.endswith('libSceNpEntitlementAccess/Export.cpp'):
+   replacement=ours;assert s[end:end+2]=='}\n';end+=2;choices[rel]='Upstream signed-out requests already match local strict behavior; retain local complete request/list/flag coverage exactly once.'
+  elif rel.endswith('GuestArena.cpp'):
+   offset=theirs.split('constexpr std::uintptr_t ArenaStart')[0];replacement=offset+ours
+   for name,value in [('DefaultArenaStart','0x0000000200000000ull'),('ApplicationAreaEnd','0x000000FC00000000ull'),('SystemReservedStart','0x00000007FFFFC000ull'),('SystemReservedEnd','0x0000001000000000ull')]:
+    old=f'constexpr std::uintptr_t {name} = {value};';assert old in replacement;replacement=replacement.replace(old,f'constexpr std::uintptr_t {name} = {value} + GuestArenaOffset;')
+   choices[rel]='Retain new ASAN shadow-avoiding default offset and shifted reserved limits, plus original explicit environment arena/lazy/chunk and bounds guards.'
+  elif i==0:
+   replacement=theirs[:theirs.index('    constexpr std::uintptr_t applicationAreaEnd')]+ours
+   replacement+='    if (!std::getenv("APS5_GUEST_ARENA_BASE") && !std::getenv("APS5_GUEST_ARENA_SIZE"))\n        Require(base == 0x200000000ull + expectedOffset && applicationAreaEnd == 0xFC00000000ull + expectedOffset);\n'
+   choices[rel]='Retain exact upstream ASAN/default placement assertion when no explicit arena window is requested; retain exact configured-window assertions and native Windows unlock expectations with Wine bookkeeping branch; preserve non-ASAN Linux check guard.'
+  else:
+   replacement=ours.replace('#elif defined(__linux__)\n','#elif defined(__linux__) && !defined(ANYPS5_ENABLE_ASAN)\n')
+  out.append(replacement);at=end
+ out.append(s[at:]);new=''.join(out);assert '<<<<<<<' not in new and '>>>>>>>' not in new
+ q=resolved/rel;q.parent.mkdir(parents=True,exist_ok=True);q.write_text(new);shutil.copymode(p,q)
+(case/'resolution-review.json').write_text(json.dumps({'choices':choices,'fullTailPreserved':True,'noExpectationsRemoved':True},indent=2)+'\n')

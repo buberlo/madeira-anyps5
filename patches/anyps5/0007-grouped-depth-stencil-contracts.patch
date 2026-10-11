@@ -1,4 +1,4 @@
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/DepthSampleSwizzleEquations.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DepthSampleSwizzleEquations.hpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/include/DepthSampleSwizzleEquations.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DepthSampleSwizzleEquations.hpp
 new file mode 100644
 index 0000000..82b7f48
 --- /dev/null
@@ -97,7 +97,7 @@ index f5b6cad..4e1296a 100644
  std::uint64_t DepthSliceBytes(VkExtent2D extent, std::uint32_t bytesPerTexel);
  void ClearDepthSurfaces(VkDevice device);
  bool DepthSurfaceAt(std::uint64_t address);
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/DepthTargetLayout.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DepthTargetLayout.hpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/include/DepthTargetLayout.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DepthTargetLayout.hpp
 new file mode 100644
 index 0000000..ab4eb39
 --- /dev/null
@@ -171,7 +171,7 @@ index 0000000..ab4eb39
 +}
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/GpuStencilSampleTiler.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/GpuStencilSampleTiler.hpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/include/GpuStencilSampleTiler.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/GpuStencilSampleTiler.hpp
 new file mode 100644
 index 0000000..912d25b
 --- /dev/null
@@ -239,7 +239,7 @@ index 0000000..912d25b
 +};
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/StencilSampleTransfer.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/StencilSampleTransfer.hpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/include/StencilSampleTransfer.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/StencilSampleTransfer.hpp
 new file mode 100644
 index 0000000..ee47275
 --- /dev/null
@@ -331,7 +331,7 @@ index 0000000..ee47275
 +};
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/StencilZeroInvariant.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/StencilZeroInvariant.hpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/include/StencilZeroInvariant.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/StencilZeroInvariant.hpp
 new file mode 100644
 index 0000000..6cae412
 --- /dev/null
@@ -374,7 +374,7 @@ index 0000000..6cae412
 +};
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleReadback.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleReadback.comp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleReadback.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleReadback.comp
 new file mode 100644
 index 0000000..299f32e
 --- /dev/null
@@ -404,7 +404,7 @@ index 0000000..299f32e
 +    }
 +    destination.values[wordIndex] = result;
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling.comp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling.comp
 new file mode 100644
 index 0000000..cb937c2
 --- /dev/null
@@ -438,7 +438,7 @@ index 0000000..cb937c2
 +    if(RETILE==0u)destination.words[linearWord]=source.words[tiledWord];
 +    else destination.words[tiledWord]=source.words[linearWord];
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling_spv.h
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTiling_spv.h
 new file mode 100644
 index 0000000..4b32807
 --- /dev/null
@@ -605,7 +605,7 @@ index 0000000..4b32807
 +    0x0000006a, 0x0000006b, 0x000200fe, 0x0000006c, 0x00010038,
 +};
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTransfer_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTransfer_spv.h
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTransfer_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleTransfer_spv.h
 new file mode 100644
 index 0000000..6bb74ad
 --- /dev/null
@@ -836,7 +836,7 @@ index 0000000..6bb74ad
 +};
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.frag
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.frag
 new file mode 100644
 index 0000000..4b1d452
 --- /dev/null
@@ -851,7 +851,7 @@ index 0000000..4b1d452
 +    uint byteValue = (source.values[index / 4u] >> ((index % 4u) * 8u)) & 255u;
 +    if ((byteValue & (1u << parameters.bitIndex)) == 0u) discard;
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.vert b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.vert
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.vert b/core/libs/prx/libSceAgcDriver/Graphics/shaders/StencilSampleUpload.vert
 new file mode 100644
 index 0000000..281dcb6
 --- /dev/null
@@ -863,7 +863,7 @@ index 0000000..281dcb6
 +    gl_Position = vec4(position * 2.0 - 1.0, 0.0, 1.0);
 +}
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/DepthSurface.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/DepthSurface.cpp
-index b29e8d1..19a8dd3 100644
+index 0b5d5eb..beea3db 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/src/DepthSurface.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/src/DepthSurface.cpp
 @@ -6,6 +6,7 @@
@@ -905,11 +905,11 @@ index b29e8d1..19a8dd3 100644
              info.extent = {target.extent.width, target.extent.height, 1};
              info.mipLevels = 1;
 -            info.arrayLayers = 1;
--            info.samples = VK_SAMPLE_COUNT_1_BIT;
+-            info.samples = static_cast<VkSampleCountFlagBits>(target.samples);
 +            info.arrayLayers = layers;
 +            info.samples = nativeSamples;
              info.tiling = VK_IMAGE_TILING_OPTIMAL;
--            info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+-            info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | (target.samples == 1 ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u);
 +            info.usage = usage;
              info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
              info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -970,7 +970,7 @@ index b29e8d1..19a8dd3 100644
          std::array<std::uint32_t, 12> key{};
          std::copy_n(words.begin(), std::min<std::size_t>(words.size(), 8), key.begin());
          key[8] = components.r;
-@@ -140,25 +165,33 @@ public:
+@@ -141,18 +166,26 @@ public:
      const Context context;
      const DepthTarget target;
      VkImage image = VK_NULL_HANDLE;
@@ -1000,15 +1000,7 @@ index b29e8d1..19a8dd3 100644
          image = VK_NULL_HANDLE;
          memory = VK_NULL_HANDLE;
      }
- };
- 
- bool sameSurface(const DepthTarget& a, const DepthTarget& b) {
--    return a.address == b.address && a.stencilAddress == b.stencilAddress && a.extent.width == b.extent.width && a.extent.height == b.extent.height && a.format == b.format;
-+    return a.address == b.address && a.stencilAddress == b.stencilAddress && a.extent.width == b.extent.width && a.extent.height == b.extent.height && a.format == b.format && a.samples == b.samples;
- }
- 
- std::mutex& surfacesMutex() {
-@@ -186,7 +219,17 @@ std::uint64_t DepthSliceBytes(VkExtent2D extent, std::uint32_t bytesPerTexel) {
+@@ -187,7 +220,17 @@ std::uint64_t DepthSliceBytes(VkExtent2D extent, std::uint32_t bytesPerTexel) {
      return width * height * bytesPerTexel;
  }
  
@@ -1027,7 +1019,7 @@ index b29e8d1..19a8dd3 100644
      std::lock_guard lock(surfacesMutex());
      const bool cleared = target.htileAddress != 0 && clearedHtiles().erase(target.htileAddress) != 0;
      for (const auto& surface : surfaces()) {
-@@ -195,10 +238,25 @@ VkImageView DepthSurfaceView(const Context& context, const DepthTarget& target)
+@@ -196,10 +239,25 @@ VkImageView DepthSurfaceView(const Context& context, const DepthTarget& target)
          surface->clearStencil = target.clearStencil;
          if (cleared) surface->pendingClear |= VK_IMAGE_ASPECT_DEPTH_BIT;
          surface->ApplyFastClear();
@@ -1055,7 +1047,7 @@ index b29e8d1..19a8dd3 100644
  }
  
  std::uint64_t HtileDepthClearAddress(std::span<const std::uint32_t> code, std::span<const std::uint32_t> userData, const std::array<std::uint32_t, 3>& numThreads) {
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/DepthTargetLayout.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/DepthTargetLayout.cpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/src/DepthTargetLayout.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/DepthTargetLayout.cpp
 new file mode 100644
 index 0000000..3fb5ec1
 --- /dev/null
@@ -1198,7 +1190,7 @@ index 0000000..3fb5ec1
 +}
 +
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/GpuStencilSampleTiler.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/GpuStencilSampleTiler.cpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/src/GpuStencilSampleTiler.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/GpuStencilSampleTiler.cpp
 new file mode 100644
 index 0000000..11570e2
 --- /dev/null
@@ -1377,7 +1369,7 @@ index 0000000..11570e2
 +    Barrier(barrier, commands, destination, destinationBytes, consumerStage, consumerAccess);
 +}
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/StencilSampleTransfer.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/StencilSampleTransfer.cpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/src/StencilSampleTransfer.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/StencilSampleTransfer.cpp
 new file mode 100644
 index 0000000..e65b670
 --- /dev/null
@@ -1868,7 +1860,7 @@ index 0000000..e65b670
 +    imageBarrier(barrier, commands, ReadbackAccess, after);
 +}
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/StencilZeroInvariant.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/StencilZeroInvariant.cpp
+diff --git a/rebase/0007-grouped-depth-stencil-contracts/after/core/libs/prx/libSceAgcDriver/Graphics/src/StencilZeroInvariant.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/StencilZeroInvariant.cpp
 new file mode 100644
 index 0000000..101b3d1
 --- /dev/null

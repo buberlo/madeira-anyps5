@@ -1,0 +1,77 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+import ast,copy,importlib.util,json,unittest
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+def module(name):
+ s=importlib.util.spec_from_file_location('test60_'+name,HERE/(name+'.py'));m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+c=module('composition');p=module('probe');logs=module('log_contracts');tool=module('execution_tool')
+
+class Controls(unittest.TestCase):
+ def test_exact_installed_tuple(self):
+  self.assertEqual(c.sha(c.INSTALL),c.INSTALL_SHA)
+  b=c.load(c.INSTALL);self.assertEqual(len(b['inputs']),84025);self.assertEqual(b['observedBuild'],'60')
+  self.assertEqual(c.sha(c.ROOT/b['compositeInstallationResult']),c.RESULT_SHA)
+ def test_exact_current_source_reader(self):
+  self.assertEqual(c.sha(c.CURRENT/'composition.py'),c.CURRENT_COMPOSITION_SHA)
+  self.assertEqual(c.sha(c.CURRENT/'collector-source-review-freeze.json'),c.CURRENT_FREEZE_SHA)
+ def test_production_ast_is_only_native60_literals(self):
+  class Pins(ast.NodeTransformer):
+   def visit_Constant(self,n):
+    if type(n.value)is str:n.value={'actual_closed_native59_ownership_diagnostic_install_bound_not_cpu_or_launch_ready':'actual_closed_native60_preserved_install_bound_not_jit_or_cpu_ready','59':'60'}.get(n.value,n.value.replace('native59','native60').replace('Native59','Native60').replace('accepted59','accepted60').replace('current59','current60').replace('own59','own60'))
+    return n
+  self.assertEqual(c.sha(c.DONOR/'probe.py'),c.DONOR_PROBE_SHA)
+  self.assertEqual(ast.dump(Pins().visit(ast.parse((c.DONOR/'probe.py').read_bytes()))),ast.dump(ast.parse((HERE/'probe.py').read_bytes())))
+ def test_exact_sampler_scope(self):
+  old=c.module(c.DONOR/'composition.py','old59_scope_only')
+  self.assertEqual(c.diagnostic_scope(),old.diagnostic_scope())
+  self.assertEqual(p.EXECUTABLES,{'continuing-only-diagnostic':('raw/guest_raise_exception_tests.exe',[],45)})
+  self.assertEqual({k:p.BASE_ENV[k]for k in c.diagnostic_scope()['environmentAdditions']},c.diagnostic_scope()['environmentAdditions'])
+ def plan(self):
+  return {'phase':'continuing-only-diagnostic','nativeBuild':'60','observationSeconds':45,'continuingPrerequisite':None,'persistentProfiler':False,'continuingPrerequisiteAcceptanceAllowed':False,'boundedSampler':c.diagnostic_scope()}
+ def test_valid_scope(self):c.plan_scope(self.plan())
+ def test_wrong_build(self):
+  q=self.plan();q['nativeBuild']='59'
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_long_observation(self):
+  q=self.plan();q['observationSeconds']=120
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_cpu_acceptance_refused(self):
+  q=self.plan();q['continuingPrerequisiteAcceptanceAllowed']=True
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_other_phase_refused(self):
+  q=self.plan();q['phase']='cpu-avx2'
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_sampler_deadline_changed(self):
+  q=self.plan();q['boundedSampler']['deadlineSeconds']=30
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_persistent_profiler_refused(self):
+  q=self.plan();q['persistentProfiler']=True
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_no_original50_acceptance(self):
+  self.assertFalse(c.diagnostic_scope()['acceptedEightCpuPhases']);self.assertFalse(c.diagnostic_scope()['full803ExceptionGatePassed'])
+ def test_private_interpreter_only_probe_hash_changed(self):
+  original=ast.parse((c.DONOR/'execution_tool.py').read_bytes())
+  class Pin(ast.NodeTransformer):
+   def visit_Constant(self,n):
+    if n.value==c.DONOR_PROBE_SHA:n.value=c.sha(HERE/'probe.py')
+    return n
+  self.assertEqual(ast.dump(Pin().visit(original)),ast.dump(ast.parse((HERE/'execution_tool.py').read_bytes())))
+  self.assertEqual(tool.OLD_PLAN_SHA,'f2977cdfc19f78ed700c413c601c602d257e2f9c3559dde0ca5de4da5f63e020')
+ def old_log(self):
+  folder=c.DONOR/'plan-1c75d16781784669973bee8a3b51bcf9'
+  plan=json.loads((folder/'plan.json').read_text())
+  return (folder/'execution/__PRIVATE_LOG_LEAF__').read_bytes(),plan['windowsPath']
+ def test_old_observer_capture_only(self):
+  raw,path=self.old_log();q=logs.validate(raw,'continuing-only-diagnostic',path)
+  self.assertTrue(q['samplerBurstObserved']);self.assertFalse(q['continuingPrerequisiteAcceptanceAllowed'])
+  self.assertFalse(q['acceptedEightCpuPhases']);self.assertFalse(q['full803ExceptionGatePassed'])
+ def test_duplicate_burst_refused(self):
+  raw,path=self.old_log();raw+=b'\n[thread-sample] ml876 burst done\n'
+  with self.assertRaises(ValueError):logs.validate(raw,'continuing-only-diagnostic',path)
+ def test_failed_sampler_resume_refused(self):
+  raw,path=self.old_log();raw=raw.replace(b'v1 b0 resume=0',b'v1 b0 resume=1',1)
+  with self.assertRaises(ValueError):logs.validate(raw,'continuing-only-diagnostic',path)
+
+if __name__=='__main__':unittest.main()

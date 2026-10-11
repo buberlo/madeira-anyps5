@@ -1,0 +1,41 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Pure capped exception transition observations; never grants CPU acceptance."""
+import hashlib,importlib.util,re
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+OLD=HERE.parent/'continuing-only-diagnostic-collector-proposal/log_contracts.py'
+OLD_SHA='53e36dae41f40dd9cd5a9ead19b68b245feb541f07728caf254148dfe43dd61c'
+def need(ok,message):
+ if not ok:raise ValueError(message)
+def borrowed():
+ need(hashlib.sha256(OLD.read_bytes()).hexdigest()==OLD_SHA,'Held Original50 diagnostic reader changed')
+ s=importlib.util.spec_from_file_location('trace_original50_log',OLD);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+def duplicate_keys(pairs):return borrowed().duplicate_keys(pairs)
+def pointer(text):
+ if text=='(nil)':return 0
+ need(re.fullmatch(r'(?:0x)?[0-9a-fA-F]{1,16}',text)is not None,'Malformed RTCS pointer')
+ return int(text,16)
+PRE=re.compile(r'\[rtcs\] pre: code=([0-9a-fA-F]{8}) addr=(\S+) armPc=(\S+) ecRip=(\S+) rtcs=(\S+) insim=([01])(?:\r?\n|$)')
+POST=re.compile(r'\[rtcs\] post: code=([0-9a-fA-F]{8}) addr=(\S+) ecRip=(\S+) ecRsp=(\S+) armPc=(\S+)(?:\r?\n|$)')
+def transition_rows(text):
+ rows=[]
+ for kind,pattern in [('pre',PRE),('post',POST)]:
+  found=list(pattern.finditer(text))
+  need(text.count('[rtcs] '+kind+':')==len(found) and len(found)<=40,'Malformed or excessive capped RTCS records')
+  for m in found:
+   if kind=='pre':row={'kind':kind,'exceptionCode':int(m[1],16),'exceptionAddress':pointer(m[2]),'armPc':pointer(m[3]),'ecRip':pointer(m[4]),'resetToConsistentState':pointer(m[5]),'inSimulation':int(m[6])}
+   else:row={'kind':kind,'exceptionCode':int(m[1],16),'exceptionAddress':pointer(m[2]),'ecRip':pointer(m[3]),'ecRsp':pointer(m[4]),'armPc':pointer(m[5])}
+   row['sourceOffset']=m.start();rows.append(row)
+ return sorted(rows,key=lambda r:r['sourceOffset'])
+def validate(raw,phase,path):
+ observed=borrowed().validate(raw,phase,path);text=raw.replace(b'\0',b'').decode('utf-8',errors='strict')
+ need('[thread-sample]'not in text and '[critical-owner]'not in text,'Sampler unexpectedly active in exception-only diagnostic')
+ env={'WINEDEBUG':'-all,err+seh','MADEIRA_EXCEPTION_DIAGNOSTICS':'1','MADEIRA_DIAGNOSTICS_SECONDS':'25','MADEIRA_THREAD_SAMPLER':'0','MADEIRA_CRITICAL_OWNER_SAMPLER':'0','MADEIRA_DIAGNOSTICS':'0'}
+ for k,v in env.items():
+  need(text.count('[madeira-env] game '+k+'='+v+'\n')==1,'Exact installed per-game exception-only env readback missing: '+k)
+ rows=transition_rows(text);begin=text.index('CONTINUING_DIAGNOSTIC_BEGIN')
+ for r in rows:r['afterContinuingBegin']=r['sourceOffset']>begin
+ observed.update({'status':'native60_exception_return_trace_observation_not_cpu_qualification','exceptionTransitionTraceObserved':any(r['afterContinuingBegin']for r in rows),'exceptionTransitionRows':rows,'rtcsPreRecords':sum(r['kind']=='pre'for r in rows),'rtcsPostRecords':sum(r['kind']=='post'for r in rows),'privateSuspendExceptionObserved':any(r['exceptionCode']==0xe0425355 and r['afterContinuingBegin']for r in rows),'installedTraceEnvironmentReadbackVerified':True,'diagnosticDeadlineSecondsFromReviewedInstalledParser':25,'uncappedSehTraceEnabled':False,'samplerEnabled':False,'preserveEnterECNativeLinkBranchMatchClaimed':False,'directNativeTerminationCallerObserved':False,'continuingPrerequisiteAcceptanceAllowed':False,'acceptedEightCpuPhases':False,'full803ExceptionGatePassed':False})
+ return observed

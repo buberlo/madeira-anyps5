@@ -1,0 +1,53 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Pure sampler observation; collected diagnostics never qualify CPU delivery."""
+import hashlib, importlib.util, re
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+OLD=HERE.parent/'continuing-only-diagnostic-collector-proposal/log_contracts.py'
+OLD_SHA='53e36dae41f40dd9cd5a9ead19b68b245feb541f07728caf254148dfe43dd61c'
+def need(ok,message):
+ if not ok:raise ValueError(message)
+def borrowed():
+ need(hashlib.sha256(OLD.read_bytes()).hexdigest()==OLD_SHA,'Held50 diagnostic reader changed')
+ s=importlib.util.spec_from_file_location('sampler_original50_log',OLD);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+def duplicate_keys(pairs):return borrowed().duplicate_keys(pairs)
+def sampler_rows(text):
+ rows=[];begin=text.find('CONTINUING_DIAGNOSTIC_BEGIN')
+ for source_line in re.finditer(r'[^\n]+',text):
+  line=source_line.group(0).rstrip('\r')
+  if re.search(r'\[thread-sample\] ml876 b[0-9]',line) is None:continue
+  m=re.search(r'\[thread-sample\] ml876 b([0-3]) "([^"]{0,39})" teb=(0x[0-9a-f]+) cpu=([0-9]+)% (RUN|wait) pc=(\S+) lr=(\S+) sp=(0x[0-9a-f]+)(.*)$',line)
+  need(m is not None and len(line)<=16384,'Malformed sampler row')
+  rows.append({'pass':int(m[1]),'name':m[2],'teb':m[3],'state':m[5],
+               'pc':m[6],'lr':m[7],'sp':m[8],'guestResolved':' GUEST rip=' in m[9],
+               'candidateStackOnly':True,'afterContinuingBegin':begin>=0 and source_line.start()>begin})
+ need(len(rows)<=256 and all(sum(r['pass']==b for r in rows)<=64 for b in range(4)),
+      'More than one bounded four-pass burst')
+ return rows
+HEX=r'0x[0-9a-f]{1,16}'
+OWNER=re.compile(r'\[critical-owner\] v1 b([0-3]) resume=(\d+) teb=('+HEX+r') self=('+HEX+r') peb=('+HEX+r') pid=('+HEX+r') tid=('+HEX+r') pc=('+HEX+r') lr=('+HEX+r') reason=([0-7]) identity=([01]) image=([01]) mapping=([01]) fexPE=('+HEX+r') mappingOwner=('+HEX+r') ownerAddr=('+HEX+r') depthAddr=('+HEX+r') rpmRead=([01]) rpmEqual=([01]) rpmA=('+HEX+r')/(\d+) rpmB=('+HEX+r')/(\d+) targetOwns=([01]) criticalRead=([01]) criticalEqual=([01]) criticalShape=([01]) criticalA=('+HEX+r')/('+HEX+r')/(\d+)/(\d+)/(\d+)/(\d+) criticalB=('+HEX+r')/('+HEX+r')/(\d+)/(\d+)/(\d+)/(\d+) nodes=(\d+)$')
+def owner_rows(text):
+ rows=[];seen=set();begin=text.find('CONTINUING_DIAGNOSTIC_BEGIN')
+ for line in re.finditer(r'[^\n]+',text):
+  if '[critical-owner]'not in line[0]:continue
+  m=OWNER.search(line[0].rstrip('\r'));need(m is not None and len(line[0])<=2048,'Malformed bounded ownership row');g=m.groups();n=lambda k:int(g[k],16)if g[k].startswith('0x')else int(g[k]);v=[n(k)for k in range(len(g))]
+  need(v[1]==0 and all(x<=0xffffffff for x in [v[20],v[22],*v[29:33],*v[35:39]])and v[39]<=200,'Ownership width/loader/resume limits')
+  key=(v[0],v[2]);need(key not in seen,'Ambiguous pass/TEB ownership rows');seen.add(key)
+  need(not v[18]or(v[17]and v[19:21]==v[21:23]),'Claimed RPM equality differs')
+  need(not v[23]or(v[18]and v[19]==(v[2]|1)),'Claimed owner identity differs')
+  need(not v[25]or(v[24]and v[27:33]==v[33:39]),'Claimed critical equality differs')
+  a=v[27:33];shape=(v[25]and a[3]<=1 and a[4]<=1 and a[5]<=1 and ((not a[2]and not a[0]and not a[1])or(a[2]and a[1]==v[2]and ((a[3]==1 and not a[0])or(not a[3]and a[0])))))
+  need(bool(v[26])==bool(shape),'Reported critical shape differs from source')
+  need(not v[10]or(v[3]==v[2]and v[4]>0 and v[5]>0 and v[6]>0),'Claimed own identity differs')
+  need(v[9]!=0 or (v[10]and v[11]and v[12]and v[17]),'Successful ownership read lacks source gates')
+  rows.append({'pass':v[0],'resumeStatus':v[1],'teb':g[2],'self':g[3],'peb':g[4],'pid':g[5],'tid':g[6],'pc':g[7],'lr':g[8],'reason':v[9],'identityValid':bool(v[10]),'imageValid':bool(v[11]),'mappingValid':bool(v[12]),'fexPE':g[13],'mappingOwner':g[14],'ownerAddress':g[15],'depthAddress':g[16],'rpmRead':bool(v[17]),'rpmEqual':bool(v[18]),'rpmA':{'owner':g[19],'depth':v[20]},'rpmB':{'owner':g[21],'depth':v[22]},'targetOwnsRpm':bool(v[23]),'criticalRead':bool(v[24]),'criticalEqual':bool(v[25]),'criticalShape':bool(v[26]),'criticalA':{'token':g[27],'teb':g[28],'depth':v[29],'flags':v[30],'poisoned':v[31],'unregistered':v[32]},'criticalB':{'token':g[33],'teb':g[34],'depth':v[35],'flags':v[36],'poisoned':v[37],'unregistered':v[38]},'loaderNodes':v[39],'afterContinuingBegin':begin>=0 and line.start()>begin,'observationalDoubleReadOnly':True})
+ need(len(rows)<=256 and all(sum(r['pass']==p for r in rows)<=64 for p in range(4)),'One bounded ownership burst maximum');return rows
+
+def validate(raw,phase,path):
+ observed=borrowed().validate(raw,phase,path);text=raw.replace(b'\0',b'').decode('utf-8',errors='strict');samples=sampler_rows(text);owners=owner_rows(text)
+ armed=text.count('[thread-sample] ml876 armed (task-wide: burst of 4 passes / 250 ms every 20 s)');done=text.count('[thread-sample] ml876 burst done');need(armed<=1 and done<=1,'Repeated bounded sampler burst')
+ initialized=list(dict.fromkeys(re.findall(r'\[cpu-area\] ThreadInit-done tid=0x[0-9a-f]+ teb=(0x[0-9a-f]+)',text)));sampled={r['teb']for r in samples if r['pass']==0 and r['afterContinuingBegin']};owned={r['teb']for r in owners if r['pass']==0 and r['afterContinuingBegin']};both=len(initialized)==2 and set(initialized)<=sampled and set(initialized)<=owned
+ observed.update({'status':'native60_ownership_sampler_observation_not_cpu_qualification','samplerArmedRecords':armed,'samplerBurstDoneRecords':done,'samplerBurstObserved':bool(armed==done==1 and samples and owners and both),'nativeSamplerRows':samples,'ownershipRows':owners,'observedInitializedWineTebs':initialized,'bothObservedWineThreadTebsSampledAfterBegin':both,'rpmOwnerCorrelationProven':False,'globalRpmSharedSnapshotAtomic':False,'CodeInvalidationOwnerObserved':False,'newOwnershipRowsResumeStatusVerified':True,'samplingPerturbsScheduling':True,'authoritativeFullStackUnwind':False,'continuingPrerequisiteAcceptanceAllowed':False,'acceptedEightCpuPhases':False,'full803ExceptionGatePassed':False})
+ return observed

@@ -1,0 +1,84 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Bounded exception-return trace over the genuine current Original50 installation reader."""
+import importlib.util, json, hashlib, re
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+ROOT=HERE.parents[3]
+CURRENT=HERE.parent/'native60-fixture674-ordered-quiescence-original50-accepted-runtime-collector-proposal'
+CURRENT_COMPOSITION_SHA='8f52d6fdee2e2acdefaa2590e2d7ccefdbe324a81c97625a8e5f739ce3fdbfad'
+CURRENT_FREEZE_SHA='41693f888efa294f262ad0d13b2d9d4d0bc26c39662e88c0ca15b665168b9a08'
+DONOR=HERE.parent/'native60-current-original50-ownership-sampler-diagnostic-proposal'
+DONOR_PROBE_SHA='99859f60f6c79b53a99b45a1ba4b3d6b6ad4c3f3e8b175f29445c03384eb187e'
+SOURCE_FREEZE=HERE/'collector-source-review-freeze.json'
+STATUS='held_native60_current_original50_bounded_exception_return_trace_not_cpu_qualification'
+FILES=('probe.py','composition.py','launch_query.py','log_contracts.py','execution_tool.py','run.py','test_scope.py','make_review.py','README.md','normalization.json','diagnostic-source-evidence.json')
+
+def need(value,message):
+ if not value:raise ValueError(message)
+
+def sha(path):
+ h=hashlib.sha256()
+ with Path(path).open('rb')as f:
+  for block in iter(lambda:f.read(1<<20),b''):h.update(block)
+ return h.hexdigest()
+
+def module(path,name):
+ spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+
+need(sha(CURRENT/'composition.py')==CURRENT_COMPOSITION_SHA,'Current genuine60 reader changed')
+c=module(CURRENT/'composition.py','unchanged_genuine_original50_native60_composition')
+SELECT=c.SELECT;INSTALL=c.INSTALL;FREEZE=c.FREEZE
+INSTALL_SHA=c.SEALED_INSTALL_SHA;RESULT_SHA=c.SEALED_RESULT_SHA;INSTALL_INPUT_COUNT=c.SEALED_INPUT_COUNT
+regular=c.regular;load=c.load;predecessor=c.predecessor
+verify_input_map=c.verify_input_map;current_metadata_source=c.current_metadata_source
+selected_package=c.selected_package
+
+def diagnostic_scope():
+ return {'environmentAdditions': {'WINEDEBUG': '-all,err+seh', 'MADEIRA_EXCEPTION_DIAGNOSTICS': '1', 'MADEIRA_DIAGNOSTICS_SECONDS': '25', 'MADEIRA_THREAD_SAMPLER': '0', 'MADEIRA_CRITICAL_OWNER_SAMPLER': '0', 'MADEIRA_DIAGNOSTICS': '0'}, 'observationSeconds': 45, 'deadlineSeconds': 25, 'rtcsPreRecordsMaximum': 40, 'rtcsPostRecordsMaximum': 40, 'uncappedSehTraceEnabled': False, 'sehErrorChannelEnabled': True, 'samplerEnabled': False, 'persistentProfiler': False, 'mainWatchdogEnabled': False, 'guestRipProfileEnabled': False, 'debugserverAttach': False, 'duringFixtureLogReads': 0, 'postObservationPreCleanupLogReads': 1, 'maximumCollectedLogBytes': 8388608, 'wholeRuntimeLogHardCapClaimed': False, 'directNativeTerminationCallerObserved': False, 'preserveEnterECNativeLinkBranchMatchClaimed': False, 'continuingPrerequisiteAcceptanceAllowed': False, 'acceptedEightCpuPhases': False, 'full803ExceptionGatePassed': False}
+
+def symbolization_identity():
+ s=c.s
+ need(sha(s.SIGNED)==s.SIGNED_SHA and sha(s.BUILD_DIR/'inputs.json')==s.PREPARED_SHA,'Actual60 signing/preparation identity')
+ signed=load(s.SIGNED);prepared=load(s.BUILD_DIR/'inputs.json');s.signed_shape(signed,prepared)
+ app=Path(signed['app'])/'Madeira'
+ dwarf=Path(signed['app']).with_name('Madeira.app.dSYM')/'Contents/Resources/DWARF/Madeira'
+ need(sha(app)==signed['appMachOSha256'] and dwarf.is_file(),'Actual60 native and dSYM bytes')
+ return {'nativeBuild':'60','signedNative60ReceiptSha256':s.SIGNED_SHA,'nativeMachOUuid':signed['uuid'],'nativeMachOSha256':signed['appMachOSha256'],'dSymDwarfSha256':sha(dwarf),'fexRuntimeSha256':s.FEX_SHA,'ownershipSamplerReviewSha256':signed['ownershipSamplerReviewSha256'],'ASLRBasesFromCurrentLogOnly':True,'PEPoolAliasesRequireCurrentExactOwnerMappings':True,'authoritativeFullStackUnwind':False}
+
+def reviewed_paths():
+ need(sha(CURRENT/'collector-source-review-freeze.json')==CURRENT_FREEZE_SHA,'Unchanged actual Original50 source review')
+ return sorted({*c.reviewed_paths(),CURRENT/'collector-source-review-freeze.json',
+  *[DONOR/n for n in ('probe.py','composition.py','launch_query.py','log_contracts.py','execution_tool.py','run.py')],
+  *[HERE/n for n in FILES]},key=str)
+
+def source_contract(path):
+ need(path==SOURCE_FREEZE,'Exact bounded diagnostic source review')
+ r=load(path)
+ need(r['status']==STATUS and r['deviceActions']is r['executionPlanCreated']is False and
+  r['scope']==diagnostic_scope() and r['nativeSymbolization']==symbolization_identity() and
+  r['acceptedInstallationBindingSha256']==INSTALL_SHA and r['acceptedInstallationResultSha256']==RESULT_SHA and
+  r['installationInputCount']==INSTALL_INPUT_COUNT and
+  set(r['files'])=={str(p.relative_to(ROOT))for p in reviewed_paths()},'Exact current60 exception trace source and real installation pins')
+ for name,digest in r['files'].items():need(sha(regular(ROOT/name))==digest,'Bounded exception trace source drift')
+ return r
+
+def collector_bindings(proposal,runtime,install,phase='continuing-only-diagnostic'):
+ need(phase=='continuing-only-diagnostic'and runtime==SELECT and install==INSTALL,'Exact current60 diagnostic package/install route')
+ source_contract(proposal)
+ # Reuse the existing complete original50 installation/package/source replay.
+ # No copied or shortened installation proof and no new acceptance layer.
+ b,bound,view,payload=c.collector_bindings(c.SOURCE_FREEZE,runtime,install,phase)
+ for p in [SOURCE_FREEZE,*reviewed_paths()]:c.merge(bound,str(regular(p).relative_to(ROOT)),sha(p))
+ return b,bound,view,payload
+
+def plan_scope(p):
+ need(p['phase']=='continuing-only-diagnostic' and p['nativeBuild']=='60' and
+  p['observationSeconds']==45 and p['continuingPrerequisite']is None and
+  p['persistentProfiler']is False and p['continuingPrerequisiteAcceptanceAllowed']is False and
+  p['boundedExceptionTrace']==diagnostic_scope(),'Only45-second capped-RTCS Native60 diagnostic; never CPU acceptance')
+
+def plan_lineage(p):
+ plan_scope(p);c.plan_lineage(p)
+ need(p['nativeSymbolization']==symbolization_identity(),'Exact current60 signed/dSYM/FEX symbolization')

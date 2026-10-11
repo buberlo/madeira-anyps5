@@ -1,3 +1,5 @@
+diff --git a/core/libs/prx/libc/CMakeLists.txt b/core/libs/prx/libc/CMakeLists.txt
+index 3f303ca..e6f9266 100644
 --- a/core/libs/prx/libc/CMakeLists.txt
 +++ b/core/libs/prx/libc/CMakeLists.txt
 @@ -1,3 +1,21 @@
@@ -22,8 +24,8 @@
  target_sources(libc PRIVATE
          ${CMAKE_CURRENT_SOURCE_DIR}/Export.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/src/General.cpp
-@@ -584,3 +602,22 @@
-         set_tests_properties(windows_exceptions PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+@@ -610,3 +628,22 @@ if(MINGW)
+             PASS_REGULAR_EXPRESSION "aborting[^~]*SIGABRT. on thread[^~]*stack return address candidates:[^~]*rsp[+]0x")
      endif()
  endif()
 +
@@ -45,6 +47,9 @@
 +    # Preserve the original complete exception fixture and its source.
 +    set_tests_properties(windows_exceptions PROPERTIES TIMEOUT 60)
 +endif()
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/prx/libc/src/specifics/windows/caller_bridge.cpp b/core/libs/prx/libc/src/specifics/windows/caller_bridge.cpp
+new file mode 100644
+index 0000000..b198657
 --- /dev/null
 +++ b/core/libs/prx/libc/src/specifics/windows/caller_bridge.cpp
 @@ -0,0 +1,27 @@
@@ -75,6 +80,9 @@
 +    return __imp_APS5NativeCompilerOnce_nid_no_patch;
 +#endif
 +}
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/prx/libc/src/specifics/windows/compiler_once.hpp b/core/libs/prx/libc/src/specifics/windows/compiler_once.hpp
+new file mode 100644
+index 0000000..ff32dd3
 --- /dev/null
 +++ b/core/libs/prx/libc/src/specifics/windows/compiler_once.hpp
 @@ -0,0 +1,41 @@
@@ -119,6 +127,9 @@
 +    }
 +}
 +}
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def b/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def
+new file mode 100644
+index 0000000..8ca9a1d
 --- /dev/null
 +++ b/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def
 @@ -0,0 +1,1064 @@
@@ -1186,6 +1197,9 @@
 +  "wmemset_nid_postfix" @1060
 +  "wprintf_nid_postfix" @1061
 +  APS5NativeCompilerOnce_nid_no_patch @1062
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/prx/libc/src/specifics/windows/provider.cpp b/core/libs/prx/libc/src/specifics/windows/provider.cpp
+new file mode 100644
+index 0000000..d1aa70a
 --- /dev/null
 +++ b/core/libs/prx/libc/src/specifics/windows/provider.cpp
 @@ -0,0 +1,19 @@
@@ -1208,6 +1222,9 @@
 +    AddressWaiter waiter;
 +    return aps5::compiler_once::invoke(flag, initialize, waiter);
 +}
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/tests/CompilerOnce.cpp b/core/libs/tests/CompilerOnce.cpp
+new file mode 100644
+index 0000000..2014f79
 --- /dev/null
 +++ b/core/libs/tests/CompilerOnce.cpp
 @@ -0,0 +1,194 @@
@@ -1405,6 +1422,9 @@
 +        std::fprintf(stderr,"COMPILER_ONCE_FAILED %s\n",e.what()); return 1;
 +    } catch (...) { std::fputs("COMPILER_ONCE_FAILED unknown\n",stderr); return 1; }
 +}
+diff --git a/rebase/0012-native-compiler-once/after/core/libs/tests/CompilerOnceCross.cpp b/core/libs/tests/CompilerOnceCross.cpp
+new file mode 100644
+index 0000000..5380aa1
 --- /dev/null
 +++ b/core/libs/tests/CompilerOnceCross.cpp
 @@ -0,0 +1,14 @@
@@ -1422,9 +1442,11 @@
 +        if (fail) throw std::runtime_error("cross-module once");
 +    });
 +}
+diff --git a/core/libs/tests/WindowsExceptions.cpp b/core/libs/tests/WindowsExceptions.cpp
+index d214000..7d4fc66 100644
 --- a/core/libs/tests/WindowsExceptions.cpp
 +++ b/core/libs/tests/WindowsExceptions.cpp
-@@ -177,6 +177,30 @@
+@@ -248,6 +248,30 @@ static void testUnwindThroughGuestFrames() {
      }
  }
  
@@ -1452,10 +1474,10 @@
 +    }
 +}
 +
- int main() {
-     TestTypeInfoVtables();
-     testExceptionPointer();
-@@ -184,6 +208,7 @@
+ int main(int argc, char** argv) {
+     if (argc > 1) {
+         if (std::strcmp(argv[1], "throw-uncaught") == 0) return RunThrowChild();
+@@ -260,6 +284,7 @@ int main(int argc, char** argv) {
      testMadeExceptionPointer();
      testUncaughtExceptions();
      testUnwindThroughGuestFrames();
@@ -1463,9 +1485,11 @@
      try {
          Rethrow();
          return 1;
+diff --git a/docs/dev/TechnicalDebt.md b/docs/dev/TechnicalDebt.md
+index 4fb29ef..97ed308 100644
 --- a/docs/dev/TechnicalDebt.md
 +++ b/docs/dev/TechnicalDebt.md
-@@ -399,6 +399,7 @@
+@@ -429,6 +429,7 @@ Throughout the project, every function at every stage either **does exactly what
  - [setcontext](../../core/libs/prx/libkernel/System/src/UserContext.cpp) (libkernel) and [longjmp](../../core/libs/prx/libc/src/JumpBuffer.cpp) (libc) on Windows set the thread's stack bounds in the TEB to the stack they switch to: a `makecontext` stack, or else the committed region around the target stack pointer. A switch to any other guest stack, such as a context built by hand, gets the bounds of that region only
  - [sceKernelInstallExceptionHandler](../../core/libs/prx/libkernel/System/src/Exception.cpp) records the handler, but a host fault still ends the process: only signals raised with `sceKernelRaiseException` are delivered. Unity's PS5Util module installs a SIGUSR1 handler that reads `uc_mcontext.mc_rsp` (offset 0xf8 of the context) and raises SIGUSR1 on other threads to stop them for garbage collection
  - The Windows libc exception unwinder reads the project's `.ehmeta` and `.ehfram` tables, not PE `.pdata`/`.xdata`. WinLibs GCC 15.2's `libstdc++-6.dll` and `libwinpthread-1.dll` have empty `.eh_frame` sections, so guest exceptions cannot currently cross their frames (for example, the `std::call_once` path through `pthread_once`); `RtlVirtualUnwind` stepping and Windows cleanup handlers are not implemented

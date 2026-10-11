@@ -7,36 +7,44 @@ stroke are not established.
 
 ## Current full upstream refresh, 2026-10-12
 
-The complete AnyPS5 source is now pinned at **`0a8b1d32`**, including all
-1,735 merged commits after `c963432d` and Apple fixes #1776/#1831/#2015.
-All seventeen local patches apply and reverse exactly. Both the canonical
-checkout and actual build checkout match all 2,137 source entries and eleven
-initialized, clean dependency trees. Madeira main and official FEX main/
-FEX-2610 were already current; the FEX iOS port and #6021 bounds repair remain.
-[Exact source and scoped results](evidence/anyps5-0a8b-source-integration-20261012.json),
-[technical reconciliation](UPSTREAM-REFRESH-20261012.md).
+[Actual canonical and build-source integration](evidence/anyps5-43bc-source-integration-20261012.json).
 
-The new typed interpolation fallback repairs a concrete integration conflict:
-an unsafe fixed-function replacement now reaches upstream's exact barycentric
-emulator. It catches only the specific original-instruction proof failure;
-wave, BDA, format, capability and resource failures remain errors. All six
-fresh native shader suites pass. Their 355/538 public profiles combine direct
-proof checks with full compilation of admitted profiles; they do not claim
-that every negative profile compiles. The complete ShaderMemory fixture also
-passes, including the new sRGB depth-comparison checks.
+The complete AnyPS5 source target is frozen at **`43bc17f7`**, with 397 merged
+commits after `0a8b1d32` and 2,132 after `c963432d`, including Apple fixes
+#1776/#1831/#2015. Twenty local patches reconcile onto 2,199 source files and
+eleven unchanged vendor gitlinks; all 80 individual and four combined
+roundtrip commands pass. Madeira main, official FEX main/FEX-2610 and the iOS
+port retain their checked pins; FEX #6021 remains included.
+[Exact pins](UPSTREAMS.md), [reconciliation and scope](UPSTREAM-REFRESH-20261012.md).
 
-The full 47-library build and all 49 selected test executable targets compile.
-The runtime attempt passes 28 default targets, including memory and exception
-tests, before Graphics detects an incorrect thin-layout dispatch for 3D
-`SW_64KB_D_X` textures. The independent Addrlib size and address fixtures remain
-unchanged. Patch 0017 repairs the production dispatch; a fresh complete build
-and runtime test run is in progress.
-[Actual attempt](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
-The tests use the explicitly probed `0x7400000000` test-host arena.
-That result does not prove fixed-address allocation on the iPad. Stale graphics
-fixtures were corrected for real tiled MSAA backing, upstream stencil clears
-and cross-block XOR coordinates. Production memory/graphics validations stay
-active. No package prepared from older tools is relabelled as this update.
+The typed interpolation fallback keeps its specific proof-failure boundary;
+wave, BDA, format, capability and resource failures remain errors. Lazy arena,
+protected-memory/AVX state, owned thread/module teardown, save behavior,
+descriptor lifetime and strict sample/depth/transfer checks remain required.
+Default-profile MSAA policy positive cases are unresolved and unqualified.
+Source integration does not establish those positive cases, rendering or FPS.
+
+The older **110 native-tool CTests, six native shader suites and complete
+ShaderMemory fixture** belong to the preceding source. Their 355/538 profiles
+combine direct proof checks with compilation of admitted profiles. Fresh final-source
+conversion tools now pass all 120 actual configured CTests, including new alias,
+ELF range, rewrite-boundary and syscall-trap checks, with unchanged reviewed
+source and clean vendor identities before and after. Native guest execution
+remains limited by the existing host guards. The 47-library
+HLE runtime requires its separate complete build/run. No previous tool,
+prepared package, shader or runtime result is relabelled as final43b.
+[Historical native tool result](evidence/native-host-tools-latest17-20261012.json),
+[historical source/scoped result](evidence/anyps5-0a8b-source-integration-20261012.json).
+
+The earlier full runtime attempt stopped on the unchanged independent
+thick-volume Graphics fixture. Its production dispatch repair and subsequent
+fixture corrections retain the validation contracts. That attempt and the
+probed `0x7400000000` test-host arena do not prove iPad allocation or gameplay.
+[Historical attempt](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
+
+The installed Native60 host retains older HLE bytes to isolate CPU continuation.
+This source refresh is **not an installed 43b runtime**. The current CPU failure,
+all required CPU phases, GPU work and a playable course remain separate.
 
 **The preceding Native59 diagnostic** recorded
 an unhandled read at address 2 with PC/LR=2 after context restoration. The
@@ -60,6 +68,23 @@ owned-process closure pass; no cleanup errors occur. This rejects CPU
 qualification and does not identify the fault's cause. Later CPU phases, GPU
 and MiniGolf remain gated.
 [Actual CPU observation](evidence/native60-original50-observation-20261012.json).
+
+
+A separate 45-second exception diagnostic confirms the exact per-game settings
+but captures no RTCS pre/post records. It records twelve EC bounce handoffs and
+an unhandled native read with PC/LR/address zero; the direct caller and cause
+remain unproved. All 50 deliveries, PASS and guest zero exit are still absent.
+The collector finishes in 62.731 seconds, restores library/protected metadata
+and closes its own process without cleanup errors. This is an incomplete
+diagnostic, not CPU acceptance.
+[Actual bounded trace](evidence/native60-exception-trace-observation-20261012.json).
+
+The final43bc twenty-patch Windows HLE build currently stops at a missing
+`GuestArenaHighestFree_nid_no_patch` export while linking libkernel. Its
+configuration selected all 47 libraries and 74 executable targets; runtime
+tests and archive export are not reached. The implemented function needs a
+local export-list repair.
+[Actual full HLE attempt](evidence/anyps5-43bc-full-hle-attempt-20261012.json).
 
 ## Preceding package and Windows results
 

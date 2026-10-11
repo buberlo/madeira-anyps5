@@ -1,0 +1,76 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+import ast,importlib.util,json,unittest
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+def module(name):
+ s=importlib.util.spec_from_file_location('trace60_'+name,HERE/(name+'.py'));m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+c=module('composition');p=module('probe');logs=module('log_contracts');tool=module('execution_tool')
+class Controls(unittest.TestCase):
+ def test_installed_tuple(self):
+  self.assertEqual(c.sha(c.INSTALL),c.INSTALL_SHA);b=c.load(c.INSTALL);self.assertEqual(len(b['inputs']),84025);self.assertEqual(b['observedBuild'],'60');self.assertEqual(c.sha(c.ROOT/b['compositeInstallationResult']),c.RESULT_SHA)
+ def test_exact_current_reader(self):
+  self.assertEqual(c.sha(c.CURRENT/'composition.py'),c.CURRENT_COMPOSITION_SHA);self.assertEqual(c.sha(c.CURRENT/'collector-source-review-freeze.json'),c.CURRENT_FREEZE_SHA)
+ def test_production_ast_exact_normalization(self):
+  n=json.loads((HERE/'normalization.json').read_text());self.assertEqual(c.sha(c.DONOR/'probe.py'),n['donorProbeSha256'])
+  class Normalize(ast.NodeTransformer):
+   def visit_Constant(self,node):
+    if type(node.value)is str:node.value=n['allowedConstantChanges'].get(node.value,node.value)
+    return node
+   def visit_Assign(self,node):
+    if any(isinstance(t,ast.Name)and t.id=='BASE_ENV'for t in node.targets):node.value=ast.parse(repr(n['exactEnvironment']),mode='eval').body
+    return self.generic_visit(node)
+  self.assertEqual(ast.dump(Normalize().visit(ast.parse((c.DONOR/'probe.py').read_bytes()))),ast.dump(ast.parse((HERE/'probe.py').read_bytes())))
+ def test_exact_scope_and_card(self):
+  self.assertEqual(p.EXECUTABLES,{'continuing-only-diagnostic':('raw/guest_raise_exception_tests.exe',[],45)})
+  self.assertEqual({k:p.BASE_ENV[k]for k in c.diagnostic_scope()['environmentAdditions']},c.diagnostic_scope()['environmentAdditions'])
+  config=p.card('continuing-only-diagnostic','1'*32)['config']
+  for k,v in c.diagnostic_scope()['environmentAdditions'].items():self.assertEqual(config.count('env.'+k+' = '+v+'\n'),1)
+  self.assertNotIn('trace+seh',config);self.assertNotIn('warn+seh',config);self.assertNotIn('FEX_SILENTLOG',config)
+ def plan(self):return {'phase':'continuing-only-diagnostic','nativeBuild':'60','observationSeconds':45,'continuingPrerequisite':None,'persistentProfiler':False,'continuingPrerequisiteAcceptanceAllowed':False,'boundedExceptionTrace':c.diagnostic_scope()}
+ def test_valid_scope(self):c.plan_scope(self.plan())
+ def test_wrong_build(self):
+  q=self.plan();q['nativeBuild']='59'
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_long_observation(self):
+  q=self.plan();q['observationSeconds']=120
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_cpu_acceptance_refused(self):
+  q=self.plan();q['continuingPrerequisiteAcceptanceAllowed']=True
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_other_phase_refused(self):
+  q=self.plan();q['phase']='cpu-avx2'
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_deadline_refused(self):
+  q=self.plan();q['boundedExceptionTrace']['deadlineSeconds']=30
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_profiler_refused(self):
+  q=self.plan();q['persistentProfiler']=True
+  with self.assertRaises(ValueError):c.plan_scope(q)
+ def test_private_interpreter_only_probe_hash_changed(self):
+  class Pin(ast.NodeTransformer):
+   def visit_Constant(self,n):
+    if n.value==c.DONOR_PROBE_SHA:n.value=c.sha(HERE/'probe.py')
+    return n
+  self.assertEqual(ast.dump(Pin().visit(ast.parse((c.DONOR/'execution_tool.py').read_bytes()))),ast.dump(ast.parse((HERE/'execution_tool.py').read_bytes())))
+ def quiet_log(self):
+  f=c.DONOR/'plan-638a8de0c6d946a3b8fcc1021afbbfad';raw=(f/'execution/__PRIVATE_LOG_LEAF__').read_bytes().replace(b'\0',b'');q=json.loads((f/'plan.json').read_text())
+  raw=b'\n'.join(x for x in raw.split(b'\n')if b'[thread-sample]'not in x and b'[critical-owner]'not in x and not any(('[madeira-env] game '+k+'=').encode()in x for k in c.diagnostic_scope()['environmentAdditions']))
+  raw+=b'\n'+b''.join(('[madeira-env] game '+k+'='+v+'\n').encode()for k,v in c.diagnostic_scope()['environmentAdditions'].items());return raw,q['windowsPath']
+ def test_incomplete_log_stays_nonacceptance(self):
+  raw,path=self.quiet_log();r=logs.validate(raw,'continuing-only-diagnostic',path);self.assertFalse(r['fixturePassed']);self.assertFalse(r['exceptionTransitionTraceObserved']);self.assertFalse(r['continuingPrerequisiteAcceptanceAllowed'])
+ def test_source_shape_rtcs_observation(self):
+  raw,path=self.quiet_log();raw+=b'\n[rtcs] pre: code=e0425355 addr=0x1234 armPc=0x5678 ecRip=0x9abc rtcs=0x1111 insim=1\n[rtcs] post: code=e0425355 addr=0x1234 ecRip=0x2222 ecRsp=0x3333 armPc=0x4444\n';r=logs.validate(raw,'continuing-only-diagnostic',path);self.assertTrue(r['exceptionTransitionTraceObserved']);self.assertTrue(r['privateSuspendExceptionObserved']);self.assertFalse(r['preserveEnterECNativeLinkBranchMatchClaimed']);self.assertFalse(r['fixturePassed'])
+ def test_rtcs_cap_refused(self):
+  raw,path=self.quiet_log();raw+=b'\n'+b'[rtcs] post: code=e0425355 addr=0x1234 ecRip=0x2222 ecRsp=0x3333 armPc=0x4444\n'*41
+  with self.assertRaises(ValueError):logs.validate(raw,'continuing-only-diagnostic',path)
+ def test_sampler_and_trace_env_refused(self):
+  raw,path=self.quiet_log()
+  for bad in [raw+b'\n[thread-sample] armed\n',raw.replace(b'game WINEDEBUG=-all,err+seh\n',b'game WINEDEBUG=-all,trace+seh\n')]:
+   with self.assertRaises(ValueError):logs.validate(bad,'continuing-only-diagnostic',path)
+ def test_real_installed_cap_source(self):
+  d=json.loads((HERE/'diagnostic-source-evidence.json').read_text())
+  for name,r in d['sources'].items():self.assertEqual(c.sha(c.ROOT/r['path']),r['sha256'])
+  signal=(c.ROOT/d['sources']['arm64ecException']['path']).read_text();self.assertIn('madeira_exception_duration_ms = madeira_exception_seconds() * 1000;',signal);self.assertIn('rtcs_n < 40 && InterlockedIncrement( &rtcs_n ) <= 40',signal);self.assertIn('rtcs_m < 40 && InterlockedIncrement( &rtcs_m ) <= 40',signal)
+if __name__=='__main__':unittest.main()

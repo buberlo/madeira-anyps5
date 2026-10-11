@@ -1,0 +1,27 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Small held source marker; never prepares a device plan or replays its huge byte union."""
+import importlib.util,json,subprocess,sys,hashlib
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location('held_native60_sampler',HERE/'composition.py');c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
+need=c.need
+def main():
+ need(not c.SOURCE_FREEZE.exists(),'Refuse to overwrite source review')
+ installed=c.load(c.INSTALL);result=c.ROOT/installed['compositeInstallationResult']
+ need(c.sha(c.INSTALL)==c.INSTALL_SHA and c.sha(result)==c.RESULT_SHA and len(installed['inputs'])==c.INSTALL_INPUT_COUNT==84025,'Genuine current60 installation tuple')
+ child=subprocess.run([sys.executable,'-I','-B','-m','unittest','discover','-s',str(HERE),'-p','test_scope.py'],capture_output=True,timeout=30)
+ (HERE/'offline-tests.log').write_bytes(child.stdout+child.stderr)
+ need(child.returncode==0,'Portable bounded-scope controls failed')
+ record={'status':c.STATUS,'files':{str(p.relative_to(c.ROOT)):c.sha(c.regular(p))for p in c.reviewed_paths()},
+  'scope':c.diagnostic_scope(),'nativeSymbolization':c.symbolization_identity(),
+  'acceptedInstallationBindingSha256':c.INSTALL_SHA,'acceptedInstallationResultSha256':c.RESULT_SHA,
+  'installationInputCount':c.INSTALL_INPUT_COUNT,'actualOriginal50FailedReceiptSha256':'1babd854ceebaa3508acb354a95b49a223416dff0bcaec6e6e4833c686e50e93',
+  'deviceActions':False,'executionPlanCreated':False,'portableControlsPassed':True,
+  'completeInstallationUnionNotReplayedDuringSourcePreparation':True,
+  'completeExistingUnionFreshReplayRequiredBeforePlanAndDeviceActions':True,
+  'continuingPrerequisiteAcceptanceAllowed':False,'acceptedEightCpuPhases':False,'full803ExceptionGatePassed':False}
+ c.SOURCE_FREEZE.write_text(json.dumps(record,indent=2)+'\n')
+ print(c.SOURCE_FREEZE,c.sha(c.SOURCE_FREEZE))
+if __name__=='__main__':main()

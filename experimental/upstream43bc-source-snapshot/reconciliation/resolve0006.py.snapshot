@@ -1,0 +1,36 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import re,shutil,json
+OUT=Path(__file__).resolve().parent;case=OUT/'rebase/0006-grouped-color-samples-and-transfers';pattern=re.compile(r'^<<<<<<<[^\n]*\n(.*?)^=======[^\n]*\n(.*?)^>>>>>>>[^\n]*\n',re.M|re.S)
+for rel in ['core/libs/prx/libSceAgcDriver/Graphics/include/State.hpp','core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp','core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp']:
+ p=case/'merged'/rel;s=p.read_text();matches=list(pattern.finditer(s));out=[];at=0
+ for i,m in enumerate(matches):
+  theirs,ours=m.groups();replacement=ours
+  if rel.endswith('State.cpp'):
+   if i==2:
+    replacement=theirs.replace('decodeDepth(cx, depthControl, result);','decodeDepth(cx, depthControl, result, enableSampleGroups);')
+   elif i==3:
+    replacement=ours.replace('    result.samples = DecodeSampleConfiguration(cx, enableSampleGroups);\n','')
+   elif i==4:
+    # Local FMASK rejection remains stricter; upstream admission bits are unnecessary here.
+    replacement=ours+'    const std::uint32_t multisampleInfo = 0u;\n'
+   elif i==6:replacement=theirs
+  elif rel.endswith('Draw.cpp'):
+   if i==0:replacement=theirs+ours
+   elif i==3:
+    replacement=theirs+ours[ours.index('    std::vector<std::shared_ptr<Pipeline>> groupPipelines;'):]
+    replacement=replacement.replace('item->AcquireFramebuffer(views, owners, state.renderExtent)','item->AcquireFramebuffer(views, owners, state.renderExtent, persistent)')
+  out.extend([s[at:m.start()],replacement]);at=m.end()
+ out.append(s[at:]);new=''.join(out)
+ if rel.endswith('State.hpp'):
+  # Structured grouped configuration supersedes the newly added scalar field.
+  target='    std::array<float, 4> blendConstants;\n    std::uint32_t samples = 1;\n';assert target in new;new=new.replace(target,'    std::array<float, 4> blendConstants;\n')
+ elif rel.endswith('State.cpp'):
+  new=new.replace('    result.samples = decodeSamples(cx);','    result.samples = DecodeSampleConfiguration(cx, enableSampleGroups);')
+  new=new.replace('Require(color.samples == result.samples,','Require(color.samples == result.samples.count,')
+  assert 'const auto requireCovered' in new and 'if (resolve)' in new
+ assert '<<<<<<<' not in new and '>>>>>>>' not in new
+ q=case/'resolved'/rel;q.parent.mkdir(parents=True,exist_ok=True);q.write_text(new);shutil.copymode(p,q)
+(case/'resolution-review.json').write_text(json.dumps({'strategy':'Retain full upstream planeTests, metadata resolve decode, framebuffer persistent API and recipe exclusions while using stricter local opt-in grouped sample proof/import/writeback paths. Local targets never set native multisampled sentinel, persistent flags remain false. Keep full upstream tails/new array fields. Scalar State.samples replaced by existing complete SampleConfiguration; equivalent depth/color count assertions preserved. FMASK and unsafe MSAA loads remain rejected.','fullTailPreserved':True,'productionGuardsRemoved':False},indent=2)+'\n')

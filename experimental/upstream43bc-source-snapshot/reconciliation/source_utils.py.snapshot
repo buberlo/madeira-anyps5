@@ -1,0 +1,31 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import hashlib,subprocess,stat,os,json
+ROOT=Path('__LOCAL_PROJECT_ROOT__');OUT=Path(__file__).resolve().parent;BASE='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b'
+def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def git(src,*args):return subprocess.check_output(['git','-C',str(src),*args])
+def source_map(src,gitlinks=True):
+ src=Path(src);result={}
+ for n in sorted(set(git(src,'ls-files','--cached','--others','--exclude-standard','-z').split(b'\0'))):
+  if not n:continue
+  rel=n.decode();p=src/rel
+  if p.is_dir():continue
+  if not p.is_file() or p.is_symlink():raise ValueError('Source file missing or symlink: '+rel)
+  result[rel]={'mode':'100755' if p.stat().st_mode&stat.S_IXUSR else '100644','sha256':sha(p)}
+ if gitlinks:
+  for line in git(src,'ls-tree','-r','HEAD').decode().splitlines():
+   mode,typ,tail=line.split(' ',2);obj,rel=tail.split('\t')
+   if mode=='160000':result[rel]={'mode':mode,'gitlink':obj}
+ return dict(sorted(result.items()))
+def file_entries(m):return {k:v for k,v in m.items() if v['mode']!='160000'}
+def dump(p,d):p=Path(p);p.write_text(json.dumps(d,indent=2,sort_keys=True)+'\n');return sha(p)
+def verify_vendors(src,m):
+ result={}
+ for rel,v in m.items():
+  if v['mode']!='160000':continue
+  p=Path(src)/rel
+  if git(p,'rev-parse','HEAD').decode().strip()!=v['gitlink'] or git(p,'status','--porcelain','--untracked-files=all'):raise ValueError('Dirty/wrong vendor '+rel)
+  result[rel]=v['gitlink']
+ return result

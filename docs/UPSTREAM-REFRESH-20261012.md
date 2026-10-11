@@ -1,14 +1,24 @@
 # Complete upstream refresh, 2026-10-12
 
-The project now includes the complete checked AnyPS5 `main` snapshot at
-[`0a8b1d32`](https://github.com/boykopovar/AnyPS5/commit/0a8b1d32b12a6d6a3acd462787750b482bf78884):
-**1,735 merged commits after `c963432d`**, including Apple fixes #1776,
-#1831 and #2015. Both the canonical checkout and actual build checkout match
-all **2,137 source files and modes**. Eleven nested dependencies are initialized
-at their recorded commits and clean. All seventeen local patches pass the full
-68-command application/check/reversal roundtrip.
-[Actual source and scoped-test record](evidence/anyps5-0a8b-source-integration-20261012.json).
-[Additive 3D layout repair](evidence/anyps5-latest17-source-integration-20261012.json).
+The complete AnyPS5 `main` source is pinned at
+[`43bc17f7`](https://github.com/boykopovar/AnyPS5/commit/43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b):
+**397 merged commits after `0a8b1d32` and 2,132 after `c963432d`**, including
+Apple fixes #1776, #1831 and #2015. Twenty local patches reconcile onto the
+2,199-file source map with eleven unchanged vendor gitlinks. All 80 individual
+application/check/reversal commands and four combined roundtrip commands pass.
+The canonical checkout and actual build source match this map, with all eleven
+initialized dependency trees clean at their exact commits. The original
+seventeen-patch series is archived separately. Source integration does not
+establish a qualified HLE archive, installed 43bc runtime or gameplay.
+[Actual source integration](evidence/anyps5-43bc-source-integration-20261012.json).
+
+New merged conversion checks cover ELF/export aliases, instruction rewrite
+boundaries, program and section ranges, NONE relocations and SDK syscall traps.
+The alias fixture preserves raw symbol/index and rejection checks while naming
+exactly the ordinary alias plus the two owned lifecycle exports. New thread
+teardown runs key destructors before publishing completion or releasing thread
+identity. Linux-ASan arena constants retain their offset; Windows arena
+configuration, owned metadata handles and shared-memory dispatch stay distinct.
 
 Madeira main remains `48f97642`. Official FEX main and FEX-2610 remain
 `14c92681`; Madeira's FEX iOS-port baseline remains `3bec2ac4`. These match
@@ -45,7 +55,10 @@ The preceding series and its actual test results remain archived separately.
 - **Graphics resources:** pipe/bank XOR, logical sample count, descriptor
   ownership and real transfer restrictions remain. Grouped-sample profiles use
   separate device/cache/pipeline identity and disable GPL before construction;
-  normal profiles retain GPL. Single-sample depth clears use upstream semantics.
+  both fragment pipeline-library keys include the selected sample group. The new
+  grouped-library fixture preserves the upstream 4x counter assertions, but its
+  GPU execution and sample-location setup remain unqualified. Single-sample
+  depth clears use upstream semantics.
   General guest Z/HTILE import, CPU refresh and multisample depth writeback are
   not claimed where the implementation still rejects those combinations.
 - **CPU and platform contracts:** protected memory, AVX/flags preservation,
@@ -53,63 +66,65 @@ The preceding series and its actual test results remain archived separately.
   unsupported Audio3d errors remain. Native thread teardown unbinds its wait
   state before freeing it. Optional 60-Hz waits use TimedWait's own clock.
 
-## Test corrections and actual results
+## Current qualification boundaries and historical results
 
-Patch 0013 tests ENOENT and an unchanged directory timestamp without writing
-the current directory's timestamp. Patch 0014 supplies real R64KB_X backing
-for multisampled color fixtures, tests upstream stencil-clear semantics, and
-retains reserved-register rejection. Patch 0016 corrects a test oracle that
-masked global X coordinates in 4-KiB XOR layouts. Explicit X32/Y32 assertions
-now retain the cross-block bit contributions. These changes do not relax
-production tiling, MSAA, depth or reserved-register validation.
+The production safeguards remain: exact interpolation proof and typed fallback,
+request/cache policy identity, reserved-register rejection, guest-memory
+ownership, descriptor lifetime, grouped color/depth policy and transfer bounds.
+Default-profile MSAA policy positive cases are still **unqualified**; they are
+not converted into passing results by limiting the tested scope.
 
-All **six freshly compiled native shader suites pass**: placeholder images,
-device profiles, cache/request identity, unused barycentrics, LDS CPU behavior
-and extended public profiles. The latter suites retain their ordered **355
-and 538** cases. Unsafe fixed-function profiles test the original-instruction
-proof directly with the typed rejection; admitted profiles still execute
-Prepare/Capture/Materialize/Recompile and compare final SPIR-V and bindings.
-Forged metadata and nonstandard raw-register controls retain their direct proof
-assertions. These totals are mixed proof/compiler coverage, not a claim that
-all negative profiles compile through exact emulation.
+The fresh final-source native ARM64 relinker and NID build passes **all 120
+actual configured CTests**: 103 relinker cases, 14 root-tool cases, one portable
+cache-file-read case and two NID-patcher cases. All prior 110 names remain and
+all ten new regression names execute. Configured and executed names match;
+there are zero CTest failures or skips. All 2,199 source hashes/modes and eleven
+initialized, clean vendor identities match the final review before and after.
 
-The complete no-argument **ShaderMemory** fixture also passes, including the
-new sRGB depth-comparison checks. GPU execution on the iPad is separate.
-Earlier failed attempts and their logs remain unchanged locally.
-[Authored qualification source snapshots](../experimental/upstream-qualification-source-snapshot/README.md).
+This is a fresh build/run, not a relabelled older tool. Existing host guards
+still skip incompatible native guest execution inside the Linux guest-stack,
+guest-module-argument and lifecycle fixtures while validating their synthetic
+output. Those tests do not establish x86-64 guest execution on this ARM64 host
+or any iPad result.
 
-The complete **47-library Windows HLE rebuild and all 49 selected test
-executables compile**. The runtime attempt passes the first 28 default targets
-and stops in Graphics: a 3D `SW_64KB_D_X` texture is incorrectly dispatched to
-the thin layout, producing 1,048,576 bytes where the independent Addrlib fixture
-requires 262,144. Patch 0017 routes this format to the existing thick-volume
-layout; all 202 independent address expectations and rejection guards remain
-unchanged. A fresh complete seventeen-patch build and test run is underway.
-The remaining default targets and seven additional targets,
-including all four registered ShaderMemory cases, still require the full run.
-No qualified archive was exported from this failed attempt.
-[Actual build and failure](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
-The local test host
-uses the independently probed lazy arena at `0x7400000000`, 4 GiB reserved in
-256-MiB chunks. Earlier complete-refresh memory and exception tests passed with
-this arena; that result does not establish allocation on the iPad.
-[Actual test-host observations](../experimental/windows-placeholder-host-probe/actual-observation.json),
-[preceding runtime attempt](evidence/anyps5-latest-memory-host-run-20261012.json).
+The separate fresh Windows HLE route selects 47 libraries and 74 executable
+targets: 42 default and 32 additional. Configuration passes, but the two-job
+build stops while linking `libkernel.prx`: upstream APR now requires
+`GuestArenaHighestFree_nid_no_patch`, which the local libc export list omits.
+The function is implemented; a focused export repair is pending. No runtime
+tests execute and no qualified archive is exported. Source hashes/modes/mtimes
+and all eleven vendor trees remain unchanged; the owned Wine process joins.
+[Actual HLE attempt](evidence/anyps5-43bc-full-hle-attempt-20261012.json). The first single-job attempt was
+interrupted and retained when the native tools finished; a separate two-job
+producer resumes the same immutable source/build without repeating adoption. Loaded production-PRX, native GPU and physical
+iPad qualification remain separate.
 
-The native ARM64 conversion tools have also been freshly rebuilt for this
-seventeen-patch source. **All 110 registered CTest cases pass**: 95 relinker,
-13 root tooling and two NID-patcher regressions. Source and all eleven vendor
-trees match before and after the run. Existing host guards inspect emitted
-x86-64 images without attempting incompatible guest execution; this result
-qualifies the conversion tools, not the game or HLE runtime.
-[Actual native tool results](evidence/native-host-tools-latest17-20261012.json),
-[portable build harness](../tools/checks/experimental/native-host-tools/README.md).
+At the preceding `0a8b1d32` seventeen-patch checkpoint, **all 110 native CTests
+passed**: 95 relinker, 13 root-tool and two NID-patcher cases. Source and eleven
+vendor trees matched before and after.
+[Historical native tool result](evidence/native-host-tools-latest17-20261012.json),
+[portable harness](../tools/checks/experimental/native-host-tools/README.md).
 
-The earlier **95 host/relinker passes**, scoped once-provider execution and
-older 47-library/production-PRX results retain their source identities. They
-are not automatically results of the current seventeen-patch runtime.
-[Scoped once execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
-[historical thirteen-patch roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
+The **six native shader suites** and complete no-argument **ShaderMemory**
+fixture also passed at that earlier source checkpoint. The 355/538 public
+profiles mix direct proof rejection and compilation of admitted profiles;
+they do not establish that every negative profile compiles. These are historical
+CPU results, not final43b shader or GPU results.
+[Retained authored qualification snapshots](../experimental/upstream-qualification-source-snapshot/README.md).
+
+The earlier sixteen-patch runtime attempt compiled all 47 libraries and 49
+selected test executables, passed the first 28 default targets and stopped on
+the independent thick-volume Graphics fixture. Patch 0017 corrected production
+`SW_64KB_D_X` dispatch while preserving the fixture. Subsequent fixture repairs
+retain real tiled backing, upstream stencil semantics, cross-block XOR,
+format capability queries and the owned lifecycle export assertions. Earlier
+failed attempts retain their failure status; they do not qualify this runtime.
+[Historical runtime attempt](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
+
+Older 95-case host/relinker, once-provider, 47-library and actual production-PRX
+results likewise retain their recorded source identities.
+[Scoped once result](../experimental/compiler-once-execution/direct-attempt-observation.json),
+[historical roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
 
 ## Physical iPad and MiniGolf
 
@@ -142,6 +157,16 @@ the library and protected metadata and closes only its own process, with no
 cleanup error. The quiet log does not prove a fault cause or recurrence of
 Native59's PC/LR=2 failure. Further CPU phases and game execution stay gated.
 [Actual CPU observation](evidence/native60-original50-observation-20261012.json).
+
+
+A separate 45-second exception diagnostic confirms the exact per-game settings
+but captures no RTCS pre/post records. It records twelve EC bounce handoffs and
+an unhandled native read with PC/LR/address zero; the direct caller and cause
+remain unproved. All 50 deliveries, PASS and guest zero exit are still absent.
+The collector finishes in 62.731 seconds, restores library/protected metadata
+and closes its own process without cleanup errors. This is an incomplete
+diagnostic, not CPU acceptance.
+[Actual bounded trace](evidence/native60-exception-trace-observation-20261012.json).
 
 MiniGolf is **not yet demonstrated playable**. Next are complete linked-runtime
 and loaded-PRX qualification, fresh twelve-ELF preparation, the preserving host

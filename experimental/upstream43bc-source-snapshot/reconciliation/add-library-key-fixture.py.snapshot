@@ -1,0 +1,39 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import json,shutil,subprocess
+OUT=Path(__file__).resolve().parent;history=OUT/'before-distinct-library-group-fixture';history.mkdir()
+for n in ['source-candidate-review.json','candidate-source-map.json','candidate20-combined.patch','roundtrip20.json']:shutil.copy2(OUT/n,history/n)
+shutil.copytree(OUT/'patches',history/'patches')
+case=OUT/'rebase/0011-integration-and-regression-tests';rel='core/libs/prx/libSceAgcDriver/tests/Recorder.cpp'
+fixture='''    // Both native groups share one eight-sample guest configuration, but use
+    // different native locations and masks; their fragment libraries must not alias.
+    const auto beforeGroups = counters().built;
+    state.samples.count = 8;
+    state.samples.nativeCount = 4;
+    state.samples.groups = 2;
+    state.samples.mask = 255;
+    state.samples.positions = {{{0.5625f, 0.3125f}, {0.4375f, 0.6875f},
+                                {0.8125f, 0.5625f}, {0.3125f, 0.1875f},
+                                {0.1875f, 0.8125f}, {0.0625f, 0.4375f},
+                                {0.6875f, 0.9375f}, {0.9375f, 0.0625f}}};
+    state.colors.front().samples = 8;
+    state.colors.front().fragments = 8;
+    const auto group0 = CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 0);
+    const auto group1 = CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 1);
+    const auto afterGroups = counters().built;
+    Require(group0 != group1 && afterGroups[0] == beforeGroups[0] && afterGroups[1] == beforeGroups[1] &&
+            afterGroups[2] == beforeGroups[2] + 2u && afterGroups[3] == beforeGroups[3] + 2u,
+            "eight-sample groups shared fragment libraries with different sample locations");
+    Require(CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 0) == group0 &&
+            CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 1) == group1 &&
+            counters().built == afterGroups, "sample group replay rebuilt or reused the wrong libraries");
+    state.samples = singleSampleConfiguration;
+    state.colors.front().samples = 1;
+    state.colors.front().fragments = 1;
+'''
+for tree in [OUT/'source',case/'after']:
+ p=tree/rel;s=p.read_text();marker='    WaitForOptimizedPipelines(context.device);\n';assert s.count(marker)==1;s=s.replace(marker,fixture+marker);p.write_text(s)
+r=subprocess.run(['git','diff','--no-index','--binary','--',str((case/'before').relative_to(OUT)),str((case/'after').relative_to(OUT))],cwd=OUT,capture_output=True,text=True);assert r.returncode==1
+s=r.stdout.replace('a/'+str((case/'before').relative_to(OUT))+'/','a/').replace('b/'+str((case/'after').relative_to(OUT))+'/','b/');(OUT/'patches/0011-integration-and-regression-tests.patch').write_text(s)

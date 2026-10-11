@@ -1,0 +1,155 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Held local-source promotion. Inert unless root supplies exact reviewed execute argv."""
+import argparse,hashlib,json,os,re,shutil,stat,subprocess,time
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+PROPOSAL=HERE.parent
+ROOT=PROPOSAL.parents[1]
+CANON=ROOT/'upstreams/AnyPS5'
+SOURCE=PROPOSAL/'source'
+OLD_REVIEW=ROOT/'build/anyps5-full-main-update-20261012/latest-0a8b-seventeen-patch-proposal/source-candidate-review.json'
+OLD_REVIEW_SHA='dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44'
+OLD='0a8b1d32b12a6d6a3acd462787750b482bf78884'
+NEW='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b'
+NEW_REVIEW=PROPOSAL/'source-candidate-review.json'
+NEW_REVIEW_SHA='3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398'
+NEW_MAP=PROPOSAL/'candidate-source-map.json'
+NEW_MAP_SHA='604669fd791dd8fa9f9c0188fc7e05f2f90b08aa9b3443f7465ea5243e7eb7f9'
+COMBINED=PROPOSAL/'candidate20-combined.patch'
+PRESERVED=ROOT/'build/anyps5-full-main-update-20261012/preserved-latest17-source-and-build-after-failure/source'
+PRESERVE_RECEIPT=PRESERVED.parent/'receipt.json'
+PRESERVE_RECEIPT_SHA='ce70ebdf58685876f1f7f8349fcdfda7bf22dd779124334fb3023ed796eb0009'
+PUBLIC=ROOT/'patches/anyps5'
+LEGACY=PUBLIC/'legacy-0a8b1d32'
+REVIEW=HERE/'promotion-helper-review.json'
+GIT_ENV={**os.environ,'GIT_OPTIONAL_LOCKS':'0','GIT_TERMINAL_PROMPT':'0'}
+def need(ok,message):
+ if not ok:raise ValueError(message)
+def sha(path):
+ h=hashlib.sha256()
+ with Path(path).open('rb')as f:
+  for block in iter(lambda:f.read(1<<20),b''):h.update(block)
+ return h.hexdigest()
+def load(path):return json.loads(Path(path).read_text())
+def regular(path):
+ p=Path(path);need(p.is_absolute()and p.is_relative_to(ROOT),'Out-of-workspace source')
+ need(not any(x.is_symlink()for x in [p,*p.parents])and stat.S_ISREG(p.lstat().st_mode),'Linked/nonregular source: '+str(p));return p
+def name_ok(name):
+ need(isinstance(name,str)and name and '\n'not in name and '\0'not in name and not Path(name).is_absolute()and all(p not in ('','.','..')for p in name.split('/'))and not name.startswith('3rdparty/'),'Invalid mapped source name')
+def git(path,*args,ok=(0,),log=None):
+ argv=['git','-C',str(path),*map(str,args)];r=subprocess.run(argv,env=GIT_ENV,capture_output=True,timeout=120)
+ if log is not None:log.append({'argv':argv,'exit':r.returncode,'stdout':r.stdout.decode(errors='replace')[-3000:],'stderr':r.stderr.decode(errors='replace')[-3000:]})
+ need(r.returncode in ok,'Git command failed: '+repr(argv)+' '+r.stderr.decode(errors='replace')[-1000:]);return r
+
+def source_map(tree,expected):
+ entries=git(tree,'ls-files','--cached','--others','--exclude-standard','-z').stdout.split(b'\0')
+ names={x.decode()for x in entries if x and not x.decode().startswith('3rdparty/')}
+ need(names==set(expected),'Source path set differs at '+str(tree))
+ for name,want in expected.items():
+  name_ok(name);p=regular(tree/name);mode='100755'if p.stat().st_mode&0o111 else'100644'
+  need(set(want)=={'mode','sha256'}and mode==want['mode']and sha(p)==want['sha256'],'Mapped bytes/mode differ: '+str(p))
+ return {name:{'size':(tree/name).stat().st_size,'mtimeNs':(tree/name).stat().st_mtime_ns,'mode':(tree/name).stat().st_mode&0o777}for name in sorted(expected)}
+
+def vendor_state(tree,links,initialized=True):
+ index={}
+ for entry in git(tree,'ls-files','--stage','-z').stdout.split(b'\0'):
+  if not entry:continue
+  left,name=entry.split(b'\t',1);mode,digest,stage=left.decode().split()
+  if mode=='160000':index[name.decode()]=digest
+ need(index==links,'Exact11 gitlink index differs: '+str(tree))
+ state={}
+ for name,commit in sorted(links.items()):
+  v=tree/name;need(v.is_dir()and not v.is_symlink(),'Missing/linked vendor')
+  if not initialized and not (v/'.git').exists():
+   need(not any(v.iterdir()),'Uninitialized candidate vendor is not empty')
+   state[name]={'gitlink':commit,'initialized':False};continue
+  need(git(v,'rev-parse','HEAD').stdout.decode().strip()==commit and not git(v,'status','--porcelain=v1','--untracked-files=all').stdout,'Vendor HEAD/status differs: '+str(v))
+  st=v.stat();state[name]={'head':commit,'directoryMtimeNs':st.st_mtime_ns,'device':st.st_dev,'inode':st.st_ino}
+ return state
+
+def snapshots():
+ for p,want in [(OLD_REVIEW,OLD_REVIEW_SHA),(NEW_REVIEW,NEW_REVIEW_SHA),(NEW_MAP,NEW_MAP_SHA),(PRESERVE_RECEIPT,PRESERVE_RECEIPT_SHA)]:need(sha(regular(p))==want,'Frozen review identity differs')
+ old=load(OLD_REVIEW);new=load(NEW_REVIEW);fullmap=load(NEW_MAP);mapped={name:row for name,row in fullmap.items()if row.get('mode')!='160000'};preserved=load(PRESERVE_RECEIPT)
+ need(old['upstreamCommit']==OLD and old['patchCount']==17 and len(old['sourceTree'])==2137,'Original17 contract')
+ need(new['upstreamCommit']==NEW and new['patchCount']==20 and new['sourceTree']==mapped and len(mapped)==2199,'Exact final43bc+20 contract')
+ links=new['thirdPartyGitlinks'];need(len(links)==11 and links==preserved['vendorGitlinks'] and {name:row for name,row in fullmap.items()if row.get('mode')=='160000'}=={name:{'mode':'160000','gitlink':commit}for name,commit in links.items()},'Unchanged11 vendor identities')
+ oldlinks={row.split('\t')[1]:row.split()[2]for row in old['thirdPartyGitlinks']};need(oldlinks==links,'Original11 vendor identities differ')
+ need(preserved['sourceReviewSha256']==OLD_REVIEW_SHA and preserved['sourceEntriesVerified']==2137 and preserved['all11OriginalAndPreservedVendorsClean']and preserved['failedFullHleReceiptSha256']=='21bfb98485ed2e4ffced714385f26ce92624333c53ef385070fac83cb6d5ceb8','Failed17 preservation contract')
+ need(git(CANON,'rev-parse','HEAD').stdout.decode().strip()==OLD,'Canonical no longer at original0a8b')
+ need(git(CANON,'symbolic-ref','-q','HEAD',ok=(0,1)).returncode==1,'Expected detached canonical HEAD')
+ need(git(CANON,'diff','--cached','--quiet',ok=(0,1)).returncode==0,'Unexpected staged canonical edits')
+ need(git(SOURCE,'rev-parse','HEAD').stdout.decode().strip()==NEW,'Candidate upstream commit differs')
+ oldmap=old['sourceTree'];before=source_map(CANON,oldmap);source_map(PRESERVED,oldmap);source_map(SOURCE,mapped)
+ vendors=vendor_state(CANON,links);vendor_state(PRESERVED,links);vendor_state(SOURCE,links,initialized=False)
+ need(sha(regular(COMBINED))==new['combinedPatchSha256'],'Combined20 bytes differ')
+ for name,digest in new['patches'].items():need(re.fullmatch(r'\d{4}-[a-z0-9-]+\.patch',name)and sha(regular(PROPOSAL/'patches'/name))==digest,'Held20 patch differs')
+ public={name:sha(regular(PUBLIC/name))for name in [*sorted(old['patches']),'README.md']}
+ need({name:public[name]for name in old['patches']}==old['patches']and len(list(PUBLIC.glob('*.patch')))==17,'Published17 patch series differs')
+ need(not LEGACY.exists(),'Refuse to overwrite public legacy snapshot')
+ changed=sorted(name for name in oldmap.keys()&mapped.keys()if oldmap[name]!=mapped[name]);added=sorted(mapped.keys()-oldmap.keys());removed=sorted(oldmap.keys()-mapped.keys())
+ need(len(changed)==285 and len(added)==62 and removed==[],'Declared bounded delta differs')
+ for name in added:
+  target=CANON/name;need(not target.exists()and not target.is_symlink()and not any(v.is_symlink()for v in target.parents),'Added source collides with an existing file/link')
+ git(SOURCE,'apply','--reverse','--check',COMBINED)
+ raw={name for name in git(SOURCE,'ls-tree','-r','--name-only',NEW).stdout.decode().splitlines()if not name.startswith('3rdparty/')};local=sorted(mapped.keys()-raw)
+ return old,new,before,vendors,public,{'changed':changed,'added':added,'removed':removed,'unchanged':sorted(oldmap.keys()&mapped.keys()-set(changed)),'intentToAdd':local}
+
+def review():
+ need(not REVIEW.exists(),'Refuse to overwrite helper review')
+ old,new,before,vendors,public,delta=snapshots()
+ data={'status':'held_canonical43bc_promotion_helper_verified_not_executed','helperSha256':sha(Path(__file__)),'oldSourceReviewSha256':OLD_REVIEW_SHA,'newSourceReviewSha256':NEW_REVIEW_SHA,'newSourceMapSha256':NEW_MAP_SHA,'oldEntriesVerified':2137,'preservedOldEntriesVerified':2137,'newEntriesVerified':2199,'all11CanonicalAndPreservedVendorsExactAndClean':True,'candidateVendorGitlinksExactUninitializedEmptyTreesAllowed':True,'oldCanonicalHead':OLD,'newHead':NEW,'published17FileHashes':public,'delta':delta,'canonicalSourceStatBefore':before,'vendorStateBefore':vendors,'combinedReverseCheckPassedOnCandidate':True,'canonicalMutationsPerformed':False,'publicMutationsPerformed':False,'compilerWineDeviceActions':False,'gitHubActionsUsed':False,'mutationCommandsForRootOnly':[['git','-C',str(CANON),'fetch','--no-recurse-submodules','--no-tags',str(SOURCE),NEW],['git','-C',str(CANON),'update-ref','HEAD',NEW,OLD],['git','-C',str(CANON),'read-tree',NEW],['git','-C',str(CANON),'add','--intent-to-add','--',*delta['intentToAdd']],['git','-C',str(CANON),'apply','--reverse','--check',str(COMBINED)]],'publicArchiveOnlyOnExecute':str(LEGACY),'currentPublicSeriesAndREADMEUpdateReservedForRoot':True}
+ REVIEW.write_text(json.dumps(data,indent=2)+'\n');print(json.dumps({'review':str(REVIEW),'sha256':sha(REVIEW),'changed':len(delta['changed']),'added':len(delta['added']),'removed':len(delta['removed']),'unchanged':len(delta['unchanged']),'intentToAdd':len(delta['intentToAdd']),'executed':False}))
+
+def restore(old,before,delta,commands):
+ for name in delta['changed']+delta['removed']:
+  path=CANON/name
+  if path.exists():need(sha(path)in{old['sourceTree'][name]['sha256'],load(NEW_MAP).get(name,{}).get('sha256')},'Concurrent edit; refusing rollback overwrite')
+  path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(PRESERVED/name,path);os.chmod(path,before[name]['mode']);os.utime(path,ns=(path.stat().st_atime_ns,before[name]['mtimeNs']))
+ for name in delta['added']:
+  path=CANON/name
+  if path.exists():need(sha(path)==load(NEW_MAP)[name]['sha256'],'Concurrent new file; refusing rollback deletion');path.unlink()
+ head=git(CANON,'rev-parse','HEAD').stdout.decode().strip()
+ if head==NEW:git(CANON,'update-ref','HEAD',OLD,NEW,log=commands)
+ else:need(head==OLD,'Unexpected HEAD on rollback')
+ git(CANON,'read-tree',OLD,log=commands);source_map(CANON,old['sourceTree'])
+
+def execute(path,wanted):
+ need(path==REVIEW and sha(regular(path))==wanted,'Exact root-reviewed helper receipt required')
+ held=load(path);need(held['helperSha256']==sha(Path(__file__))and held['status']=='held_canonical43bc_promotion_helper_verified_not_executed','Held helper changed')
+ old,new,before,vendors,public,delta=snapshots();need(public==held['published17FileHashes']and delta==held['delta']and before==held['canonicalSourceStatBefore']and vendors==held['vendorStateBefore'],'Canonical source/public/mTime identity drifted since review')
+ stage=HERE/('execution-'+time.strftime('%Y%m%dT%H%M%S'));stage.mkdir(exist_ok=False);commands=[];result={'status':'canonical_promotion_failed','helperReviewSha256':wanted,'helperSha256':sha(Path(__file__)),'oldHead':OLD,'newHead':NEW,'changed':len(delta['changed']),'added':len(delta['added']),'removed':len(delta['removed']),'commands':commands,'compilerWineDeviceActions':False,'gitHubActionsUsed':False,'currentPublicSeriesAndREADMEUpdated':False,'legacyPublicSnapshotCreated':False,'canonicalMutationsStarted':False,'rollbackPerformed':False}
+ try:
+  git(CANON,'fetch','--no-recurse-submodules','--no-tags',SOURCE,NEW,log=commands)
+  need(git(CANON,'rev-parse',NEW+'^{commit}').stdout.decode().strip()==NEW,'Exact fetched commit not available')
+  LEGACY.mkdir(exist_ok=False)
+  for name,digest in public.items():shutil.copy2(PUBLIC/name,LEGACY/name);need(sha(LEGACY/name)==digest,'Legacy publication copy differs')
+  result['legacyPublicSnapshotCreated']=True
+  result['canonicalMutationsStarted']=True
+  for name in delta['changed']+delta['added']:
+   target=CANON/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(SOURCE/name,target);os.chmod(target,0o755 if new['sourceTree'][name]['mode']=='100755' else 0o644)
+  for name in delta['removed']:(CANON/name).unlink()
+  git(CANON,'update-ref','HEAD',NEW,OLD,log=commands);git(CANON,'read-tree',NEW,log=commands)
+  if delta['intentToAdd']:git(CANON,'add','--intent-to-add','--',*delta['intentToAdd'],log=commands)
+  after=source_map(CANON,new['sourceTree']);aftervendors=vendor_state(CANON,new['thirdPartyGitlinks'])
+  need(vendors==aftervendors,'Vendor trees/identities changed during promotion')
+  need(all(after[name]==before[name]for name in delta['unchanged']),'Unchanged source mtime/mode changed')
+  need(all(sha(PUBLIC/name)==digest and sha(LEGACY/name)==digest for name,digest in public.items()),'Current or archived public17 bytes changed unexpectedly')
+  git(CANON,'apply','--reverse','--check',COMBINED,log=commands)
+  result.update({'status':'actual_canonical43bc_plus20_source_promoted_not_runtime_qualified','exact2199FinalSourceEntriesAndModesVerified':True,'unchangedSourceMtimesPreserved':True,'all11VendorsExactCleanAndDirectoryIdentityPreserved':True,'combined20ReverseCheckPassed':True,'fullHleQualified':False,'gameplayVerified':False,'currentPublic17StillPendingRootPublication':True})
+ except Exception as exc:
+  result['error']=type(exc).__name__+': '+str(exc)
+  if result['canonicalMutationsStarted']:
+   try:restore(old,before,delta,commands);result['rollbackPerformed']=True;result['rollbackOldMapVerified']=True
+   except Exception as rollback:result['rollbackError']=type(rollback).__name__+': '+str(rollback)
+  raise
+ finally:
+  (stage/'receipt.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({'receipt':str(stage/'receipt.json'),'sha256':sha(stage/'receipt.json'),'status':result['status']}))
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--review',action='store_true');p.add_argument('--execute',type=Path);p.add_argument('--review-sha256');a=p.parse_args()
+ if a.review:need(a.execute is None and a.review_sha256 is None,'Choose one route');review()
+ elif a.execute:need(re.fullmatch('[0-9a-f]{64}',a.review_sha256 or'')is not None,'Exact review SHA required');execute(a.execute,a.review_sha256)
+ else:print(json.dumps({'status':'inert','canonicalMutation':False,'publicMutation':False,'deviceActions':False}))
+if __name__=='__main__':main()

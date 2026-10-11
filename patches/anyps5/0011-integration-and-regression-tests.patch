@@ -1,9 +1,9 @@
 diff --git a/core/libs/CMakeLists.txt b/core/libs/CMakeLists.txt
-index 2da76ed..adc1003 100644
+index 23a1608..f19d100 100644
 --- a/core/libs/CMakeLists.txt
 +++ b/core/libs/CMakeLists.txt
-@@ -330,3 +330,16 @@ if(BUILD_TESTING)
-             "PATH=path_list_prepend:$<TARGET_FILE_DIR:libScePosixForWebKit>")
+@@ -361,3 +361,16 @@ if(BUILD_TESTING)
+             "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceAcm>")
      endif()
  endif()
 +if(BUILD_TESTING)
@@ -46,10 +46,10 @@ index 49ec9e9..973665b 100644
 +
  #endif
 diff --git a/core/libs/SceTypes.hpp b/core/libs/SceTypes.hpp
-index bd63ff7..938ec5e 100644
+index 51d48be..0a41d3c 100644
 --- a/core/libs/SceTypes.hpp
 +++ b/core/libs/SceTypes.hpp
-@@ -571,6 +571,14 @@ struct Audio3dAttribute {
+@@ -579,6 +579,14 @@ struct Audio3dAttribute {
      std::uint64_t value_size;
  };
  
@@ -162,15 +162,16 @@ index 8a783ea..5a67826 100644
  
  using namespace ShaderRegs;
 diff --git a/core/libs/prx/libSceAgcDriver/CMakeLists.txt b/core/libs/prx/libSceAgcDriver/CMakeLists.txt
-index bef499a..64a1420 100644
+index e77f027..95b3afe 100644
 --- a/core/libs/prx/libSceAgcDriver/CMakeLists.txt
 +++ b/core/libs/prx/libSceAgcDriver/CMakeLists.txt
-@@ -172,14 +172,24 @@ set(agcDriverSources
+@@ -173,15 +173,25 @@ set(agcDriverSources
          ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/AspectFit.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/PresentationScaler.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/Draw.cpp
 +        ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ColorSampleSnapshotCopy.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/DepthSurface.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/MultisampleTarget.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ColorTargetLayout.cpp
 +        ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/DepthTargetLayout.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ColorTargetTransfer.cpp
@@ -190,7 +191,7 @@ index bef499a..64a1420 100644
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/Recorder.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ParallelCompare.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ShaderInputState.cpp
-@@ -242,11 +252,25 @@ add_shader_recompiler(shader_recompiler_agc_driver libc
+@@ -244,11 +254,25 @@ add_shader_recompiler(shader_recompiler_agc_driver libc
  
  target_link_libraries(libSceAgcDriver PRIVATE
          shader_recompiler_agc_driver
@@ -217,7 +218,7 @@ index bef499a..64a1420 100644
  
  set_target_properties(libSceAgcDriver PROPERTIES CXX_EXTENSIONS OFF)
  configure_windows_unwind(libSceAgcDriver)
-@@ -603,12 +627,17 @@ target_link_libraries(agc_shader_disk_cache_tests PRIVATE shader_recompiler_agc_
+@@ -625,12 +649,17 @@ target_link_libraries(agc_shader_disk_cache_tests PRIVATE shader_recompiler_agc_
  set_target_properties(agc_shader_disk_cache_tests PROPERTIES CXX_EXTENSIONS OFF)
  configure_windows_unwind(agc_shader_disk_cache_tests)
  
@@ -236,7 +237,7 @@ index bef499a..64a1420 100644
  add_test_executable(agc_shader_device_profile_tests EXCLUDE_FROM_ALL tests/ShaderDeviceProfile.cpp Execution/src/ShaderDeviceProfile.cpp)
  target_include_directories(agc_shader_device_profile_tests PRIVATE ${LIBS_INCLUDE_DIR} ${ANYPS5_VULKAN_HEADERS_INCLUDE_DIR})
  target_link_libraries(agc_shader_device_profile_tests PRIVATE shader_recompiler_agc_driver libc)
-@@ -825,7 +854,9 @@ configure_windows_unwind(agc_driver_pm4_tests)
+@@ -858,7 +887,9 @@ configure_windows_unwind(agc_driver_pm4_tests)
  
  add_test_executable(agc_driver_graphics_tests EXCLUDE_FROM_ALL
          tests/Graphics.cpp
@@ -246,12 +247,13 @@ index bef499a..64a1420 100644
          tests/BdaResources.cpp
          tests/GuestAllocations.cpp
          tests/LiveStack.cpp
-@@ -836,14 +867,24 @@ add_test_executable(agc_driver_graphics_tests EXCLUDE_FROM_ALL
+@@ -869,15 +900,25 @@ add_test_executable(agc_driver_graphics_tests EXCLUDE_FROM_ALL
          tests/TextureDetiler.cpp
          tests/DepthSurfaceReuse.cpp
          Graphics/src/Draw.cpp
 +        Graphics/src/ColorSampleSnapshotCopy.cpp
          Graphics/src/DepthSurface.cpp
+         Graphics/src/MultisampleTarget.cpp
          Graphics/src/Pipeline.cpp
          Graphics/src/PipelineLibrary.cpp
          Graphics/src/State.cpp
@@ -271,7 +273,7 @@ index bef499a..64a1420 100644
          Graphics/src/ShaderResources.cpp
          Graphics/src/ShaderAddressResources.cpp
          Graphics/src/GuestBufferMemory.cpp
-@@ -901,6 +942,13 @@ add_test_executable(agc_driver_bda_device_tests EXCLUDE_FROM_ALL
+@@ -935,6 +976,13 @@ add_test_executable(agc_driver_bda_device_tests EXCLUDE_FROM_ALL
          Execution/src/BdaFeatures.cpp
          Graphics/src/Resources.cpp
          Graphics/src/PlaceholderImages.cpp
@@ -285,7 +287,7 @@ index bef499a..64a1420 100644
          Graphics/src/BufferAddress.cpp
  )
  
-@@ -933,7 +981,14 @@ foreach(agcExecutionTestSource IN LISTS agcExecutionTestSources)
+@@ -967,7 +1015,14 @@ foreach(agcExecutionTestSource IN LISTS agcExecutionTestSources)
      get_filename_component(agcExecutionTestName ${agcExecutionTestSource} NAME_WE)
      string(REGEX REPLACE "([a-z0-9])([A-Z])" "\\1_\\2" agcExecutionTestName "${agcExecutionTestName}")
      string(TOLOWER "agc_driver_${agcExecutionTestName}_tests" agcExecutionTest)
@@ -301,24 +303,24 @@ index bef499a..64a1420 100644
      target_include_directories(${agcExecutionTest} PRIVATE
              ${LIBS_INCLUDE_DIR}
              ${CMAKE_SOURCE_DIR}/core/shader/recompiler
-@@ -1001,7 +1056,7 @@ if(BUILD_TESTING)
+@@ -1037,7 +1092,7 @@ if(BUILD_TESTING)
      if(WIN32)
-         set_tests_properties(agc_shader_bindless agc_shader_frontend_pair agc_shader_frontend_pair_off PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+         set_tests_properties(agc_shader_bindless agc_shader_srt_read_patching agc_shader_frontend_pair agc_shader_frontend_pair_off PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
      endif()
--    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_constant_bit_test_tests agc_scalar_select_mask_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_pass_hazards_tests agc_shader_disk_cache_tests agc_shader_device_profile_tests agc_placeholder_images_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests agc_driver_cmask_fast_clear_tests agc_formatted_buffer_once_tests ${agcExecutionTests})
-+    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_constant_bit_test_tests agc_scalar_select_mask_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_pass_hazards_tests agc_shader_disk_cache_tests agc_unused_barycentric_tests agc_shader_device_profile_tests agc_placeholder_images_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests agc_driver_cmask_fast_clear_tests agc_formatted_buffer_once_tests ${agcExecutionTests})
+-    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_vector_window_tests agc_constant_bit_test_tests agc_scalar_select_mask_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_pass_hazards_tests agc_shader_disk_cache_tests agc_shader_device_profile_tests agc_placeholder_images_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests agc_driver_cmask_fast_clear_tests agc_formatted_buffer_once_tests ${agcExecutionTests})
++    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_vector_window_tests agc_constant_bit_test_tests agc_scalar_select_mask_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_pass_hazards_tests agc_shader_disk_cache_tests agc_unused_barycentric_tests agc_shader_device_profile_tests agc_placeholder_images_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests agc_driver_cmask_fast_clear_tests agc_formatted_buffer_once_tests ${agcExecutionTests})
          if(agcTest STREQUAL "agc_driver_constant_store_tests" OR agcTest STREQUAL "agc_driver_flat_apertures_tests")
              continue()
          endif()
-@@ -1033,6 +1088,7 @@ if(BUILD_TESTING)
+@@ -1090,6 +1145,7 @@ if(BUILD_TESTING)
                  "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
      endif()
      set_tests_properties(agc_driver_provoking_vertex PROPERTIES TIMEOUT 30)
 +    set_tests_properties(agc_unused_barycentric PROPERTIES TIMEOUT 120)
      set_tests_properties(agc_driver_flat_store PROPERTIES RUN_SERIAL TRUE)
      set_target_properties(agc_driver_flat_apertures_tests PROPERTIES EXCLUDE_FROM_ALL OFF)
-     foreach(flatAperturesPart RANGE 5)
-@@ -1294,6 +1350,14 @@ if(BUILD_TESTING)
+     foreach(flatAperturesPart RANGE 13)
+@@ -1413,6 +1469,14 @@ if(BUILD_TESTING)
          set_tests_properties(ray_tracing_miss PROPERTIES ENVIRONMENT_MODIFICATION
              "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
      endif()
@@ -333,7 +335,7 @@ index bef499a..64a1420 100644
      add_test_executable(wave32_wide_subgroup_tests ${LIBS_INCLUDE_DIR}/tests/Wave32WideSubgroup.cpp)
      target_link_libraries(wave32_wide_subgroup_tests PRIVATE shader_recompiler_agc_driver libc)
      configure_windows_unwind(wave32_wide_subgroup_tests)
-diff --git a/core/libs/prx/libSceAgcDriver/tests/CheckExp2Boundary.py b/core/libs/prx/libSceAgcDriver/tests/CheckExp2Boundary.py
+diff --git a/rebase/0011-integration-and-regression-tests/after/core/libs/prx/libSceAgcDriver/tests/CheckExp2Boundary.py b/core/libs/prx/libSceAgcDriver/tests/CheckExp2Boundary.py
 new file mode 100644
 index 0000000..8dae3c2
 --- /dev/null
@@ -435,7 +437,7 @@ index 0000000..8dae3c2
 +        if execution.returncode != expected:
 +            raise SystemExit(name + ' returned ' + str(execution.returncode) + ': ' + execution.stderr)
 +print(json.dumps({'scope': 'Production FPExp2 IR branch evaluated by a deterministic host IR adapter', 'productionSourceSHA256': hashlib.sha256(source.encode()).hexdigest(), 'fixtures': 12, 'omittedClampNegativeControl': 'rejected', 'GPUExecution': False}))
-diff --git a/core/libs/prx/libSceAgcDriver/tests/ColorTargetSamples.cpp b/core/libs/prx/libSceAgcDriver/tests/ColorTargetSamples.cpp
+diff --git a/rebase/0011-integration-and-regression-tests/after/core/libs/prx/libSceAgcDriver/tests/ColorTargetSamples.cpp b/core/libs/prx/libSceAgcDriver/tests/ColorTargetSamples.cpp
 new file mode 100644
 index 0000000..f4d533d
 --- /dev/null
@@ -788,7 +790,7 @@ index 63ddb1a..2c3301e 100644
 +    Require(liveImages == 0, "depth surface reuse fixture leaked mock images");
  }
 diff --git a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
-index 78a2e9a..e282917 100644
+index 0103b5a..5edfa54 100644
 --- a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
 +++ b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
 @@ -1,3 +1,6 @@
@@ -798,9 +800,9 @@ index 78a2e9a..e282917 100644
  #include "BdaTests.hpp"
  #include "GraphicsTests.hpp"
  #include "prx/libSceAgcDriver/Execution/include/GuestMemory.hpp"
-@@ -8,10 +11,12 @@
- #include "prx/libSceAgcDriver/Graphics/include/Draw.hpp"
- #include "prx/libSceAgcDriver/Graphics/include/BufferPool.hpp"
+@@ -10,10 +13,12 @@
+ #include "prx/libSceAgcDriver/Graphics/include/DepthSurface.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/MultisampleTarget.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/ShaderInputState.hpp"
 +#include "prx/libSceAgcDriver/Graphics/include/SplitDrawShaderValidation.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/DccMetadata.hpp"
@@ -809,9 +811,9 @@ index 78a2e9a..e282917 100644
  #include "prx/libSceAgcDriver/Graphics/include/Texture.hpp"
 +#include "prx/libc/include/GuestAllocations.hpp"
  #include "SceShaders.hpp"
+ #include "prx/libSceAgc/Shader/include/ShaderConstants.hpp"
  #include "ControlFlow/RequestSerializer.hpp"
- #include "CacheKey.hpp"
-@@ -28,6 +33,11 @@
+@@ -31,6 +36,11 @@
  #include <exception>
  #include <initializer_list>
  #include <iostream>
@@ -823,7 +825,7 @@ index 78a2e9a..e282917 100644
  #include <map>
  #include <optional>
  #include <set>
-@@ -318,6 +328,10 @@ void stateTests() {
+@@ -344,6 +354,10 @@ void stateTests() {
      queue.shader.erase(0x008);
      queue.shader.erase(0x009);
      Require(AgcDriver::Graphics::PixelProgramSkipped(queue), "an unwritten pixel program address was not read as unset");
@@ -834,7 +836,7 @@ index 78a2e9a..e282917 100644
      Require(AgcDriver::Graphics::DrawRejection(queue, true).find("writes color") != std::string::npos, "a draw with an unwritten pixel program that writes color was accepted");
      queue.context[0x8e] = 0;
      Require(AgcDriver::Graphics::DrawRejection(queue, true).empty(), "a depth-only draw with an unwritten pixel program was rejected");
-@@ -403,6 +417,21 @@ void srgb8TargetTests() {
+@@ -429,6 +443,21 @@ void srgb8TargetTests() {
      setProxyVariable("");
  }
  
@@ -856,7 +858,7 @@ index 78a2e9a..e282917 100644
  void hardwareScreenOffsetTests() {
      auto queue = makeState();
      queue.context[0x90] = 0x80010003;
-@@ -941,6 +970,96 @@ void CompactedExportTests() {
+@@ -1055,6 +1084,96 @@ void CompactedExportTests() {
      Require(state.blends[1].colorWriteMask == 0 && !state.blends[1].blendEnable && state.blends[2].blendEnable, "the write-masked export 1 was not left unused");
  }
  
@@ -953,7 +955,7 @@ index 78a2e9a..e282917 100644
  void DepthStencilTests() {
      auto queue = makeState();
      queue.context[0x000] = 0;
-@@ -1044,14 +1163,18 @@ void DepthStencilTests() {
+@@ -1158,14 +1277,18 @@ void DepthStencilTests() {
      queue.context[0x002] = 0;
      queue.context[0x00b] = 0;
      queue.context[0x000] = 0x22;
@@ -974,7 +976,7 @@ index 78a2e9a..e282917 100644
      queue.context[0x002] = 0x02000000;
      expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "writable stencil plane");
      Require(AgcDriver::Graphics::DrawRejection(queue, false).find("writable stencil plane") != std::string::npos, "precheck accepted read-only stencil clear");
-@@ -1072,6 +1195,12 @@ void DepthStencilTests() {
+@@ -1186,6 +1309,12 @@ void DepthStencilTests() {
      queue.context[0x10d] = 0x090000ff;
      for (const auto control : {0u, 1u, 0x81u}) {
          queue.context[0x200] = control;
@@ -987,8 +989,26 @@ index 78a2e9a..e282917 100644
          state = AgcDriver::Graphics::DecodeState(queue);
          Require(state.stencilTest && clears(state.stencilFront) && clears(state.stencilBack), "stencil clear used the overridden stencil operations");
          Require(state.depth && !state.depthTest && !state.depthWrite, "stencil clear changed depth state");
-@@ -1607,6 +1736,146 @@ void uint16ExportTests() {
-     expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "color export format 8");
+@@ -1738,7 +1867,7 @@ void multisampleTests() {
+     };
+     auto queue = multisampled();
+     auto state = DecodeState(queue);
+-    Require(state.samples == 2 && state.colors.size() == 1 && state.colors[0].samples == 2 && state.colors[0].cmaskAddress == 0, "2x multisampling did not decode");
++    Require(state.samples.count == 2 && state.colors.size() == 1 && state.colors[0].samples == 2 && state.colors[0].cmaskAddress == 0, "2x multisampling did not decode");
+     const auto rejection = AgcDriver::Graphics::DrawRejection(queue, false);
+     Require(rejection.empty(), "the precheck refused 2x multisampling: " + rejection);
+     queue.context[0x302] = 0x44cc;
+@@ -1751,7 +1880,7 @@ void multisampleTests() {
+         queue.context[0x2ff + pixel * 4u] = 0x9773f95bu;
+     }
+     state = DecodeState(queue);
+-    Require(state.samples == 8 && state.colors.size() == 1 && state.colors[0].samples == 8, "the standard 8x pattern (sample 7 at (7, -7), PPSA99902's registers) did not decode as standard");
++    Require(state.samples.count == 8 && state.colors.size() == 1 && state.colors[0].samples == 8, "the standard 8x pattern (sample 7 at (7, -7), PPSA99902's registers) did not decode as standard");
+     queue = multisampled();
+     queue.context[0x31d] = 0x1000;
+     expectFailure([&] { DecodeState(queue); }, "fewer fragments than samples");
+@@ -1847,6 +1976,146 @@ void multisampleTests() {
+     Require(!unaddressed.TakeClear(), "a target without a CMASK cleared");
  }
  
 +void ReplayUnobservedViewport(const char* registersPath, const char* fragmentPath) {
@@ -1134,7 +1154,7 @@ index 78a2e9a..e282917 100644
  void DepthClipTests() {
      auto queue = makeState();
      const auto direct = AgcDriver::Graphics::DecodeState(queue);
-@@ -1727,6 +1996,8 @@ struct MockDescriptorWrite {
+@@ -1967,6 +2236,8 @@ struct MockDescriptorWrite {
      std::uint32_t count;
      VkDescriptorType type;
      std::vector<VkDescriptorBufferInfo> buffers;
@@ -1143,7 +1163,7 @@ index 78a2e9a..e282917 100644
  };
  
  struct MockVulkan {
-@@ -1745,6 +2016,12 @@ struct MockVulkan {
+@@ -1985,6 +2256,12 @@ struct MockVulkan {
      std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
      VkDescriptorSetLayoutCreateFlags layoutFlags = 0;
      std::vector<VkDescriptorBindingFlags> layoutBindingFlags;
@@ -1156,7 +1176,7 @@ index 78a2e9a..e282917 100644
      std::vector<VkDescriptorPoolSize> poolSizes;
      std::uint32_t poolMaxSets = 0;
      VkDescriptorPoolCreateFlags poolFlags = 0;
-@@ -1845,19 +2122,26 @@ VKAPI_ATTR VkResult VKAPI_CALL mockCreateDescriptorSetLayout(VkDevice, const VkD
+@@ -2085,19 +2362,26 @@ VKAPI_ATTR VkResult VKAPI_CALL mockCreateDescriptorSetLayout(VkDevice, const VkD
      *layout = makeHandle<VkDescriptorSetLayout>();
      mock.layoutBindings.assign(info->pBindings, info->pBindings + info->bindingCount);
      mock.layoutFlags = info->flags;
@@ -1186,7 +1206,7 @@ index 78a2e9a..e282917 100644
      mock.poolSizes.assign(info->pPoolSizes, info->pPoolSizes + info->poolSizeCount);
      mock.poolMaxSets = info->maxSets;
      mock.poolFlags = info->flags;
-@@ -1868,16 +2152,26 @@ VKAPI_ATTR VkResult VKAPI_CALL mockCreateDescriptorPool(VkDevice, const VkDescri
+@@ -2108,16 +2392,26 @@ VKAPI_ATTR VkResult VKAPI_CALL mockCreateDescriptorPool(VkDevice, const VkDescri
  
  VKAPI_ATTR void VKAPI_CALL mockDestroyDescriptorPool(VkDevice, VkDescriptorPool pool, const VkAllocationCallbacks*) {
      mock.descriptorPools.erase(pool);
@@ -1213,7 +1233,7 @@ index 78a2e9a..e282917 100644
      return VK_SUCCESS;
  }
  
-@@ -1888,6 +2182,19 @@ VKAPI_ATTR VkResult VKAPI_CALL mockResetDescriptorPool(VkDevice, VkDescriptorPoo
+@@ -2128,6 +2422,19 @@ VKAPI_ATTR VkResult VKAPI_CALL mockResetDescriptorPool(VkDevice, VkDescriptorPoo
      if (result != VK_SUCCESS) return result;
      pool.allocated = 0;
      ++pool.resets;
@@ -1233,7 +1253,7 @@ index 78a2e9a..e282917 100644
      return VK_SUCCESS;
  }
  
-@@ -1896,7 +2203,15 @@ VKAPI_ATTR void VKAPI_CALL mockUpdateDescriptorSets(VkDevice, std::uint32_t coun
+@@ -2136,7 +2443,15 @@ VKAPI_ATTR void VKAPI_CALL mockUpdateDescriptorSets(VkDevice, std::uint32_t coun
      if (copyCount != 0) mock.copies.insert(mock.copies.end(), copies, copies + copyCount);
      for (std::uint32_t i = 0; i < count; ++i) {
          MockDescriptorWrite write{writes[i].dstBinding, writes[i].dstArrayElement, writes[i].descriptorCount, writes[i].descriptorType, {}};
@@ -1250,7 +1270,7 @@ index 78a2e9a..e282917 100644
          mock.writes.push_back(write);
      }
  }
-@@ -2060,6 +2375,7 @@ AgcDriver::Graphics::Context mockContext() {
+@@ -2300,6 +2615,7 @@ AgcDriver::Graphics::Context mockContext() {
      context.limits.maxBoundDescriptorSets = 1;
      context.limits.maxStorageBufferRange = 16384;
      context.nullDescriptors = true;
@@ -1258,7 +1278,7 @@ index 78a2e9a..e282917 100644
      context.limits.maxPerStageDescriptorStorageBuffers = 16;
      context.limits.maxPerStageResources = 128;
      context.limits.maxDescriptorSetStorageBuffers = 32;
-@@ -2203,6 +2519,139 @@ void descriptorPoolResetFailureTest() {
+@@ -2479,6 +2795,139 @@ void descriptorPoolResetFailureTest() {
      _ZSt13set_terminatePFvvE_nid_postfix(previous);
  }
  
@@ -1398,7 +1418,7 @@ index 78a2e9a..e282917 100644
  void pushConstantTests() {
      ShaderRecompiler::RecompileResult vertex;
      ShaderRecompiler::RecompileResult fragment;
-@@ -2255,7 +2704,7 @@ void descriptorSnapshotTests() {
+@@ -2531,7 +2980,7 @@ void descriptorSnapshotTests() {
              const auto state = AgcDriver::Graphics::DecodeState(makeState());
              ShaderResources resources(context, vertex, fragment, state.color, 0, 0);
              const auto original = findWrite(0).buffers;
@@ -1407,7 +1427,7 @@ index 78a2e9a..e282917 100644
              std::vector<ShaderResources::MovedBuffer> moved;
              for (std::size_t index = 0; index < 2; ++index) {
                  if ((selected & (1u << index)) == 0) continue;
-@@ -2265,11 +2714,16 @@ void descriptorSnapshotTests() {
+@@ -2541,11 +2990,16 @@ void descriptorSnapshotTests() {
              mock.writes.clear();
              const auto snapshots = resources.PrepareDrawBindings(recorder, moved);
              Require(snapshots != nullptr && snapshots->snapshots.size() == moved.size(), "draw snapshots are missing");
@@ -1429,7 +1449,7 @@ index 78a2e9a..e282917 100644
              Require(write.binding == 0 && write.arrayElement == 0 && write.count == 2, "snapshot update did not start from array element zero");
              std::size_t snapshot = 0;
              for (std::size_t index = 0; index < 2; ++index) {
-@@ -2428,6 +2882,9 @@ void resourceTests() {
+@@ -2704,6 +3158,9 @@ void resourceTests() {
          updateAfterBind.descriptorIndexingLimits.maxPerStageUpdateAfterBindResources = 128;
          updateAfterBind.descriptorIndexingLimits.maxDescriptorSetUpdateAfterBindStorageBuffers = 32;
          mock = MockVulkan{};
@@ -1439,7 +1459,7 @@ index 78a2e9a..e282917 100644
          {
              AgcDriver::Graphics::ShaderResources resources(updateAfterBind, vertex, fragment, state.color, 0, 0);
              Require(mock.layoutFlags == VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT, "buffers above the per-stage limit did not get an update-after-bind layout");
-@@ -2498,6 +2955,142 @@ void resourceTests() {
+@@ -2774,6 +3231,142 @@ void resourceTests() {
      }
  }
  
@@ -1582,8 +1602,8 @@ index 78a2e9a..e282917 100644
  void descriptorCacheTests() {
      mock = MockVulkan{};
      auto context = mockContext();
-@@ -3029,6 +3622,106 @@ void rectListTests() {
-     expectFailure([&] { Draw(context, state, draw, {}); }, "incomplete rect-list");
+@@ -3317,6 +3910,106 @@ void rectListTests() {
+     }
  }
  
 +void guestWriteClassificationTests() {
@@ -1689,7 +1709,7 @@ index 78a2e9a..e282917 100644
  ShaderRecompiler::RecompileResult recompilePixel(std::initializer_list<std::uint32_t> controls, std::span<const std::uint32_t> code) {
      auto queue = makeState();
      queue.context[0x1b3] = 0x2u;
-@@ -3280,6 +3973,15 @@ void orderedPixelShaderTests() {
+@@ -3568,6 +4261,15 @@ void orderedPixelShaderTests() {
      auto faulting = orderedPixelRequest(0x30600u, bdaInterlock, OrderedBdaPixelCode);
      faulting.target.supportedExtensions = bdaExtensions;
      faulting.target.bdaAbiVersion = ShaderRecompiler::BdaAbi::Version;
@@ -1705,7 +1725,7 @@ index 78a2e9a..e282917 100644
      std::size_t kills = 0;
      const auto exits = interlockExits(ShaderRecompiler::Recompile(faulting).spirv.Words(), kills);
      Require(exits.empty() && kills == 6u, "a primitive-ordered pixel shader with BDA reads: " + (exits.empty() ? std::to_string(kills) + " OpKill, not the valid-mask kill and 5 BDA fault kills" : exits));
-@@ -4253,6 +4955,24 @@ int main(int argc, char** argv) {
+@@ -4546,6 +5248,24 @@ int main(int argc, char** argv) {
              std::cerr << "descriptor pool reset failure did not terminate\n";
              return 1;
          }
@@ -1730,7 +1750,7 @@ index 78a2e9a..e282917 100644
          {
              const AgcDriver::Graphics::Context context{};
              const AgcDriver::Graphics::State state{};
-@@ -4283,12 +5003,32 @@ int main(int argc, char** argv) {
+@@ -4576,12 +5296,32 @@ int main(int argc, char** argv) {
              unrestricted.depthRangeUnrestricted = true;
              AgcDriver::Graphics::ValidateDepthBounds(unrestricted, bounded);
          }
@@ -1764,7 +1784,7 @@ index 78a2e9a..e282917 100644
          DepthClipTests();
          DepthStencilTests();
          OneDimensionalColorTests();
-@@ -4324,6 +5064,8 @@ int main(int argc, char** argv) {
+@@ -4621,6 +5361,8 @@ int main(int argc, char** argv) {
          pushConstantTests();
          resourceTests();
          descriptorSnapshotTests();
@@ -1773,7 +1793,7 @@ index 78a2e9a..e282917 100644
          descriptorCacheTests();
          misalignedShaderDataTests();
          debugBranchTests();
-@@ -4345,6 +5087,7 @@ int main(int argc, char** argv) {
+@@ -4642,6 +5384,7 @@ int main(int argc, char** argv) {
          rectListTests();
          floatControlsModeTests();
          barycentricEmulationTests();
@@ -1826,7 +1846,7 @@ index 0539db1..651f7d8 100644
  
      Fields blockSize = base;
      blockSize.maxUncompBlkSize = 1;
-diff --git a/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp
+diff --git a/rebase/0011-integration-and-regression-tests/after/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp
 new file mode 100644
 index 0000000..776e9bc
 --- /dev/null
@@ -2160,6 +2180,61 @@ index 72fb292..8af6f51 100644
          std::cout << "profile output tests passed\n";
          return 0;
      } catch (const std::exception& error) {
+diff --git a/core/libs/prx/libSceAgcDriver/tests/Recorder.cpp b/core/libs/prx/libSceAgcDriver/tests/Recorder.cpp
+index 5484435..9f713af 100644
+--- a/core/libs/prx/libSceAgcDriver/tests/Recorder.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/Recorder.cpp
+@@ -5285,13 +5285,48 @@ void pipelineLibraryTests(const Device& device) {
+     state.colors.front().format = VK_FORMAT_R16G16B16A16_SFLOAT;
+     static_cast<void>(lookup());
+     Require(counters().built == std::array<std::uint64_t, 4>{2, 2, 3, 3}, "another target format rebuilt more than the fragment output library");
+-    state.samples = 4;
++    const auto singleSampleConfiguration = state.samples;
++    state.samples.count = 4;
++    state.samples.nativeCount = 4;
++    state.samples.groups = 1;
++    state.samples.mask = 15;
++    state.samples.positions[0] = {0.375f, 0.125f};
++    state.samples.positions[1] = {0.875f, 0.375f};
++    state.samples.positions[2] = {0.125f, 0.625f};
++    state.samples.positions[3] = {0.625f, 0.875f};
+     state.colors.front().samples = 4;
++    state.colors.front().fragments = 4;
+     const auto multisampled = lookup();
+     Require(counters().built == std::array<std::uint64_t, 4>{2, 2, 4, 4}, "a 4x pipeline shared the 1x fragment shader or fragment output library");
+-    state.samples = 1;
++    state.samples = singleSampleConfiguration;
+     state.colors.front().samples = 1;
++    state.colors.front().fragments = 1;
+     Require(lookup() != multisampled && counters().built == std::array<std::uint64_t, 4>{2, 2, 4, 4}, "the 1x pipeline after a 4x one built its libraries again");
++    // Both native groups share one eight-sample guest configuration, but use
++    // different native locations and masks; their fragment libraries must not alias.
++    const auto beforeGroups = counters().built;
++    state.samples.count = 8;
++    state.samples.nativeCount = 4;
++    state.samples.groups = 2;
++    state.samples.mask = 255;
++    state.samples.positions = {{{0.5625f, 0.3125f}, {0.4375f, 0.6875f},
++                                {0.8125f, 0.5625f}, {0.3125f, 0.1875f},
++                                {0.1875f, 0.8125f}, {0.0625f, 0.4375f},
++                                {0.6875f, 0.9375f}, {0.9375f, 0.0625f}}};
++    state.colors.front().samples = 8;
++    state.colors.front().fragments = 8;
++    const auto group0 = CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 0);
++    const auto group1 = CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 1);
++    const auto afterGroups = counters().built;
++    Require(group0 != group1 && afterGroups[0] == beforeGroups[0] && afterGroups[1] == beforeGroups[1] &&
++            afterGroups[2] == beforeGroups[2] + 2u && afterGroups[3] == beforeGroups[3] + 2u,
++            "eight-sample groups shared fragment libraries with different sample locations");
++    Require(CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 0) == group0 &&
++            CachedPipeline(context, state, input, resources, shaders, VK_IMAGE_LAYOUT_GENERAL, 1) == group1 &&
++            counters().built == afterGroups, "sample group replay rebuilt or reused the wrong libraries");
++    state.samples = singleSampleConfiguration;
++    state.colors.front().samples = 1;
++    state.colors.front().fragments = 1;
+     WaitForOptimizedPipelines(context.device);
+     const auto lto = std::getenv("APS5_NO_PIPELINE_LTO") == nullptr && context.pipelineLinkTimeOptimization;
+     Require(counters().optimized == (lto ? counters().linked : 0u), "a linked pipeline was not optimized in the background");
 diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp
 index c5f9c8d..34c0cd4 100644
 --- a/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp
@@ -2236,7 +2311,7 @@ index c5f9c8d..34c0cd4 100644
          return 0;
      } catch (const std::exception& error) {
 diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
-index fee50cb..10edcc1 100644
+index b0822a4..3aecc7e 100644
 --- a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
 +++ b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
 @@ -19,6 +19,7 @@
@@ -2247,7 +2322,7 @@ index fee50cb..10edcc1 100644
  #include <stdexcept>
  #include <string>
  #include <string_view>
-@@ -41,7 +42,7 @@ void setEnvironment(const char* name, const std::string& value) {
+@@ -50,7 +51,7 @@ void setEnvironment(const char* name, const std::string& value) {
  }
  
  bool sameBinding(const DescriptorBinding& left, const DescriptorBinding& right) {
@@ -2256,7 +2331,7 @@ index fee50cb..10edcc1 100644
  }
  
  bool sameBindings(const std::vector<DescriptorBinding>& left, const std::vector<DescriptorBinding>& right) {
-@@ -116,6 +117,7 @@ DescriptorBinding sampleBinding(std::uint32_t seed) {
+@@ -125,6 +126,7 @@ DescriptorBinding sampleBinding(std::uint32_t seed) {
      binding.imageDepthCompare = {false, true, false};
      binding.imageWritten = {false, true, true};
      binding.imageAtomic = {false, true, false};
@@ -2264,7 +2339,7 @@ index fee50cb..10edcc1 100644
      binding.bufferAtomic = {true};
      binding.bufferWritten = {false, false, true, true, false};
      binding.samplerUnnormalized = {false, true, true};
-@@ -124,6 +126,8 @@ DescriptorBinding sampleBinding(std::uint32_t seed) {
+@@ -133,6 +135,8 @@ DescriptorBinding sampleBinding(std::uint32_t seed) {
      binding.imageUnnormalizedBaseLevel = {false, true, seed % 3 == 0};
      binding.imageSamplers = {0x5u, 0u, 0x80000000u};
      binding.bufferRead = {true, false, false, true, true, false};
@@ -2273,7 +2348,7 @@ index fee50cb..10edcc1 100644
      return binding;
  }
  
-@@ -402,7 +406,9 @@ void verifyKeySensitivity() {
+@@ -411,7 +415,9 @@ void verifyKeySensitivity() {
      changes("non-constant texel offsets", [](SampleRequest& sample) { sample.request.target.nonConstantImageOffsets = true; });
      changes("the sRGB formats decoded in the shader", [](SampleRequest& sample) { sample.request.target.srgbDecodeFormats = 2u; });
      changes("the narrow subgroup clock", [](SampleRequest& sample) { sample.request.target.narrowSubgroupClock = true; });
@@ -2283,8 +2358,8 @@ index fee50cb..10edcc1 100644
      changes("the workgroup size limit", [](SampleRequest& sample) { sample.request.target.maxWorkgroupSize[2] = 128; });
      changes("the invocation limit", [](SampleRequest& sample) { sample.request.target.maxWorkgroupInvocations = 512; });
      changes("the shared memory limit", [](SampleRequest& sample) { sample.request.target.maxWorkgroupSharedMemoryBytes = 32768; });
-@@ -487,6 +493,117 @@ void verifyFloatModeSerialization() {
-     require(back.request.context.floatMode == mode, "the float mode did not survive serialization");
+@@ -553,6 +559,117 @@ void verifyAtomicReplacement(const std::filesystem::path& directory) {
+     require(std::filesystem::remove(root), "cannot remove the empty replacement directory");
  }
  
 +std::vector<std::uint8_t> requestBytes(std::string_view text) {
@@ -2401,7 +2476,7 @@ index fee50cb..10edcc1 100644
  void verifyStore() {
      require(ShaderDiskCache::Enabled(), "the disk cache is not enabled");
      SampleRequest sample;
-@@ -542,6 +659,168 @@ struct ComputeRequest {
+@@ -608,6 +725,168 @@ struct ComputeRequest {
      }
  };
  
@@ -2570,7 +2645,7 @@ index fee50cb..10edcc1 100644
  int runLoadingProcess() {
      ComputeRequest cached(true);
      const auto loaded = Recompile(cached.request);
-@@ -577,8 +856,8 @@ struct ClockRequest {
+@@ -643,8 +922,8 @@ struct ClockRequest {
      explicit ClockRequest(std::uint32_t stride = 0) {
          userData[1] = stride << 16u;
          ShaderPixelStageInfo pixel{};
@@ -2581,7 +2656,7 @@ index fee50cb..10edcc1 100644
          pixel.targetOutputMode[0] = 9u;
          pixel.targetExportMapping.fill(0xe4u);
          request.shader = {ShaderStage::Fragment, 0x30000u, code, 0, {}};
-@@ -1028,6 +1307,7 @@ void verifyDefaultDirectory(const char* self) {
+@@ -1094,6 +1373,7 @@ void verifyDefaultDirectory(const char* self) {
  int main(int argc, char** argv) {
      try {
          if (argc == 2 && std::string_view(argv[1]) == "--load") return runLoadingProcess();
@@ -2589,7 +2664,7 @@ index fee50cb..10edcc1 100644
          if (argc == 2 && std::string_view(argv[1]) == "--no-failure-memo") return runWithoutFailureMemo();
          const auto directory = std::filesystem::temp_directory_path() / ("aps5-shader-disk-cache-test-" + std::to_string(std::random_device{}()));
          std::filesystem::remove_all(directory);
-@@ -1039,8 +1319,11 @@ int main(int argc, char** argv) {
+@@ -1106,8 +1386,11 @@ int main(int argc, char** argv) {
          verifyArtifactStorageIsolation();
          verifyKeySensitivity();
          verifyFloatModeSerialization();
@@ -2602,10 +2677,10 @@ index fee50cb..10edcc1 100644
          verifyFailureMemoSwitch(argv[0]);
          verifyInvocationIsolation();
 diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderMemory.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderMemory.cpp
-index 1a8234e..8b7168b 100644
+index 2a86162..b1a75f1 100644
 --- a/core/libs/prx/libSceAgcDriver/tests/ShaderMemory.cpp
 +++ b/core/libs/prx/libSceAgcDriver/tests/ShaderMemory.cpp
-@@ -1524,12 +1524,12 @@ void verifyPixelRequestSerialization() {
+@@ -1625,12 +1625,12 @@ void verifyPixelRequestSerialization() {
      minimal.context.waveSize = 64;
      minimal.context.pixel = ShaderPixelStageInfo{};
      const auto encoded = serializer.Serialize(minimal);
@@ -2919,10 +2994,10 @@ index dff923f..e5a2bab 100644
 +    endif()
 +endif()
 diff --git a/core/libs/prx/libc/CMakeLists.txt b/core/libs/prx/libc/CMakeLists.txt
-index ddfe856..cc4c042 100644
+index d68768c..3f303ca 100644
 --- a/core/libs/prx/libc/CMakeLists.txt
 +++ b/core/libs/prx/libc/CMakeLists.txt
-@@ -56,6 +56,13 @@ if(WIN32)
+@@ -57,6 +57,13 @@ if(WIN32)
  endif()
  
  if(BUILD_TESTING)
@@ -2936,7 +3011,7 @@ index ddfe856..cc4c042 100644
      add_test_executable(guest_time_conversion_tests ${LIBS_INCLUDE_DIR}/tests/GuestTimeConversion.cpp)
      target_include_directories(guest_time_conversion_tests PRIVATE ${LIBS_INCLUDE_DIR})
      target_link_libraries(guest_time_conversion_tests PRIVATE libc)
-@@ -420,15 +427,21 @@ if(BUILD_TESTING)
+@@ -431,15 +438,21 @@ if(BUILD_TESTING)
          set_tests_properties(guest_wcsrtombs_s PROPERTIES ENVIRONMENT_MODIFICATION
              "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
      endif()
@@ -2963,7 +3038,7 @@ index ddfe856..cc4c042 100644
          target_include_directories(guest_exit_order_tests PRIVATE ${LIBS_INCLUDE_DIR})
          target_link_libraries(guest_exit_order_tests PRIVATE libc)
 diff --git a/core/libs/prx/libkernel/CMakeLists.txt b/core/libs/prx/libkernel/CMakeLists.txt
-index 41cb245..6192f4c 100644
+index 9347227..bd0fc69 100644
 --- a/core/libs/prx/libkernel/CMakeLists.txt
 +++ b/core/libs/prx/libkernel/CMakeLists.txt
 @@ -159,6 +159,28 @@ if(BUILD_TESTING)
@@ -2996,7 +3071,7 @@ index 41cb245..6192f4c 100644
      target_include_directories(guest_dynamic_loader_tests PRIVATE ${LIBS_INCLUDE_DIR})
      target_link_libraries(guest_dynamic_loader_tests PRIVATE libkernel libc)
 diff --git a/core/relinker/CMakeLists.txt b/core/relinker/CMakeLists.txt
-index 4561113..5ae85fd 100644
+index 0959157..2a1938b 100644
 --- a/core/relinker/CMakeLists.txt
 +++ b/core/relinker/CMakeLists.txt
 @@ -8,6 +8,7 @@ add_executable(relinker
@@ -3007,7 +3082,7 @@ index 4561113..5ae85fd 100644
          ${CMAKE_CURRENT_SOURCE_DIR}/relinker/src/guest/GuestImageReader.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/relinker/src/guest/GuestModuleBuilder.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/elfpatcher/src/windows/WindowsPePatcher.cpp
-@@ -87,6 +88,8 @@ if(WIN32)
+@@ -101,6 +102,8 @@ if(WIN32)
  endif()
  
  if(WIN32)
@@ -3016,8 +3091,8 @@ index 4561113..5ae85fd 100644
      add_test_executable(windows_dependency_diagnostics_tests EXCLUDE_FROM_ALL
          ${CMAKE_CURRENT_SOURCE_DIR}/elfpatcher/tests/WindowsDependencyDiagnosticsTests.cpp
          ${CMAKE_CURRENT_SOURCE_DIR}/elfpatcher/src/windows/WindowsDependencyStubBuilder.cpp
-@@ -299,6 +302,8 @@ if(BUILD_TESTING)
-             ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_intel_trampolines.py $<TARGET_FILE:relinker>)
+@@ -381,6 +384,8 @@ if(BUILD_TESTING)
+             ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_syscall_trap.py $<TARGET_FILE:relinker>)
          add_test(NAME guest_tls COMMAND ${Python3_EXECUTABLE}
              ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_tls.py $<TARGET_FILE:relinker>)
 +        add_test(NAME guest_optional_notes COMMAND ${Python3_EXECUTABLE}
@@ -3025,7 +3100,7 @@ index 4561113..5ae85fd 100644
          add_test(NAME guest_needed_modules COMMAND ${Python3_EXECUTABLE}
              ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_needed_modules.py $<TARGET_FILE:relinker>)
          add_test(NAME guest_module_dir COMMAND ${Python3_EXECUTABLE}
-@@ -324,6 +329,20 @@ if(BUILD_TESTING)
+@@ -406,6 +411,20 @@ if(BUILD_TESTING)
          add_test(NAME guest_module_args COMMAND ${Python3_EXECUTABLE}
              ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_module_args.py
              $<TARGET_FILE:relinker> $<TARGET_FILE:guest_module_args_host>)
@@ -3047,7 +3122,7 @@ index 4561113..5ae85fd 100644
              ${CMAKE_CURRENT_SOURCE_DIR}/relinker/tests/test_guest_absolute_symbols.py $<TARGET_FILE:relinker>)
          add_test(NAME guest_module_identity COMMAND ${Python3_EXECUTABLE}
 diff --git a/core/shader/recompiler/CMakeLists.txt b/core/shader/recompiler/CMakeLists.txt
-index 1c3e673..5227a49 100644
+index 88aafc8..75eb85c 100644
 --- a/core/shader/recompiler/CMakeLists.txt
 +++ b/core/shader/recompiler/CMakeLists.txt
 @@ -210,7 +210,10 @@ function(add_shader_recompiler target runtimeTarget)
@@ -3082,9 +3157,9 @@ index 1c3e673..5227a49 100644
 +            TextureFragmentCount
              ThreadOwned
              UnresolvableSwappcTarget
-             FindUserDataCalls
+             ValidateAndOptimizeSpirv
 diff --git a/docs/dev/TechnicalDebt.md b/docs/dev/TechnicalDebt.md
-index 0c72b62..f4c31b4 100644
+index a907d34..4fb29ef 100644
 --- a/docs/dev/TechnicalDebt.md
 +++ b/docs/dev/TechnicalDebt.md
 @@ -2,6 +2,8 @@
@@ -3096,17 +3171,17 @@ index 0c72b62..f4c31b4 100644
  - Building on Windows requires a specific version of mingw - MinGW-w64 GCC 15.2.0 (`winlibs-gcc15`, `x86_64-ucrt-posix-seh`)
  - Even compiled prx libraries on Windows require nearby (static linking of these dependencies causes conflicts):
    - libgcc_s_seh-1.dll
-@@ -33,7 +35,8 @@ Throughout the project, every function at every stage either **does exactly what
+@@ -34,7 +36,8 @@ Throughout the project, every function at every stage either **does exactly what
  - [sceVideoOutOpen](../../core/libs/prx/libSceVideoOut/src/Output.cpp) validates the priority and CPU affinity that the open param requests for the VideoOut service thread but does not apply them: the port's present and vblank threads are host threads, and guest priorities and affinities do not reach host scheduling
  - [sceVideoOutAddVrrStatusFlagsPrivilege](../../core/libs/prx/libSceVideoOut/src/Output.cpp) returns 0 and does nothing: the host output has no VRR state to report. The name comes from an assert message in a title that requires `SCE_VIDEO_OUT_OK`; the NID hashes to it, the arguments are unknown (it is called without any)
  - [sceVideoOutVrrPegToFixedRate, sceVideoOutVrrUnpegFromFixedRate](../../core/libs/prx/libSceVideoOut/src/Output.cpp) (libSceVideoOut) - PPSA05684 passes the handle to both, two further zero arguments to `sceVideoOutVrrPegToFixedRate`, and ignores the results. The meaning of those two arguments is unknown, so only zeros are accepted. VRR is not modelled and the output always runs at a fixed rate, so both calls only validate the handle and return 0
 -- [libSceAudio3d](../../core/libs/prx/libSceAudio3d/Export.cpp) - the port produces no sound: objects can be reserved and `sceAudio3dObjectSetAttributes` accepts their attributes, but the library has no bed exports or mixing to give them audio, the attributes have no effect and `sceAudio3dPortPush` only paces the queue at `granularity` samples per frame at 48 kHz. `sceAudio3dPortSetAttribute` accepts the late reverb level and the downmix spread attributes and ignores them. `sceAudio3dObjectSetAttributes` validates the port, the reserved object and the attribute array (an object id that was never reserved returns the invalid-object error, while shadPS4 returns success for it and the error only for a released object; neither is measured on a console), treating the reset-state attribute as valid with a null value and requiring a value for the others; the attribute identifiers and the value of each are not interpreted. `sceAudio3dPortFlush` drops the frames queued by `sceAudio3dPortAdvance` instead of mixing and submitting them to an output, as there is no output
 +- Without `VK_KHR_fragment_shader_barycentric`, fixed-function interpolation is permitted only after the raw instruction, control-flow and register-lifetime proof passes. Non-interpolation barycentric use remains rejected; a failed host-interpolation check retranslates only the already proven fixed-function case. No barycentric values are fabricated.
 +- [libSceAudio3d](../../core/libs/prx/libSceAudio3d/Export.cpp) - the port produces no sound: it has no bed exports, object PCM renderer or mixing sink. `sceAudio3dObjectSetAttributes` validates the batch and the PCM/gain ABI but returns `NOT_SUPPORTED` for rendering attributes; only `RESET_STATE` succeeds on the empty object audio state and preserves its reservation. `sceAudio3dPortPush` paces empty frames at `granularity` samples per frame at 48 kHz, and `sceAudio3dPortFlush` submits any advanced frames and waits for all queued frames to finish. Their ABI, reset and drain semantics follow [shadPS4's Audio3d header/source](https://github.com/shadps4-emu/shadPS4/tree/main/src/core/libraries/audio3d), not a PS5 hardware measurement. `sceAudio3dPortSetAttribute` still accepts the late reverb level and downmix spread attributes and ignores them
- - [libSceTextToSpeech2](../../core/libs/prx/libSceTextToSpeech2/Export.cpp) has no speech engine: `sceTextToSpeech2Initialize` fails and the other exports throw. PPSA01317 skips its narration set-up when initialization fails
+ - [libSceTextToSpeech2](../../core/libs/prx/libSceTextToSpeech2/Export.cpp) has no speech engine: `sceTextToSpeech2Initialize` and the other exports return `EOPNOTSUPP`. PPSA01317 skips its narration set-up when initialization fails
  - [libSceAvPlayer](../../core/libs/prx/libSceAvPlayer/Export.cpp): `sceAvPlayerSetLogCallback` accepts a callback that is never called, as the player produces no log messages, and `sceAvPlayerSetAvailableBandwidth` has no effect, as it governs HLS sources, which `sceAvPlayerAddSource` does not implement.
- - [libSceHttp2](../../core/libs/prx/libSceHttp2/Export.cpp) - no request reaches the network, so `sceHttp2SetMinSslVersion` has no TLS connection to restrict and returns success for any `id`, like `sceHttp2SslEnableOption` (prosper returns the invalid-id error for an unknown one)
-@@ -332,7 +335,7 @@ Throughout the project, every function at every stage either **does exactly what
+ - [libSceHttp2](../../core/libs/prx/libSceHttp2/Export.cpp) - no request reaches the network, so `sceHttp2SetMinSslVersion` has no TLS connection to restrict and its value is ignored, as for `sceHttp2SslEnableOption` and `sceHttp2SslDisableOption`. The three setters validate `id` against the live handle registry and return `SCE_HTTP2_ERROR_INVALID_ID` (`0x817B1100`) for a handle that was never allocated, was deleted, or belonged to a terminated context, following [prosper](https://github.com/mattias800/prosper). Whether the console restricts the object kind these setters accept, and what it does with an id from a previous init/term cycle, is unverified, so any live handle kind is accepted and ids are never reused. `sceHttp2Term`, `sceHttp2DeleteTemplate`, `sceHttp2DeleteRequest`, `sceHttp2CreateTemplate`, `sceHttp2CreateRequestWithURL`, `sceHttp2CreateCookieBox` and `sceHttp2SendRequestAsync` also return the invalid-id error for a handle of the wrong kind or no longer live, following prosper (not measured on a console)
+@@ -347,7 +350,7 @@ Throughout the project, every function at every stage either **does exactly what
  - [sceNgs2VoiceControl sampler filter](../../core/libs/prx/libSceNgs2.native/src/Voice.cpp) (libSceNgs2.native) - param `0x1000000a`, its layout and meaning follow KytyPS5 only: location 1 type 1 is an RBJ low-pass biquad at the system sample rate after resampling, scaled by `level`, a set `channel_mask` bit bypasses that channel, type 0 turns the filter off. Other locations and types throw. The voice keeps playing a filter tail after its last block until the history is zero, with outputs below 1e-20 flushed to zero (a KytyPS5 choice); the console's tail length is unknown
  - [sceNgs2PanInit / sceNgs2PanGetVolumeMatrix](../../core/libs/prx/libSceNgs2.native/src/Pan.cpp) (libSceNgs2.native) - follow the PS4 firmware 11.00 `libSceNgs2.sprx`, read and checked against its output for 2, 4, 5 and 7 speakers into 1, 2, 6 and 8 channels; not yet confirmed on the PS5 library. Speakers are taken in the order L R, L R Ls Rs, L R C Ls Rs or L R C Ls Rs Lb Rb and kept in a fixed circular order, not sorted; without angles the defaults are 90/270, 40/110/250/320, 0/40/110/250/320 and 0/40/110/150/210/250/320 degrees. As in that library, defaults converted to radians keep the wrap-around entry in degrees, so angles past the last speaker pan almost fully to it. Error codes are not known for the PS5, so invalid arguments throw, including a speaker angle equal to the unit angle, on which that library loops forever. Angles so large that adding or subtracting a turn leaves them unchanged throw for the same reason
  - [sceRtcGetDosTime, sceRtcSetDosTime](../../core/libs/prx/libSceRtc/Export.cpp) (libSceRtc) - bit layout from shadPS4 (PS4, the standard FAT date/time). A year outside 1980-2107 makes `GetDosTime` return `INVALID_YEAR` after writing 0 for an earlier one and `0xff9fbf7d` (2107-12-31 23:59:58, the largest encodable time) for a later one, and `SetDosTime` decodes the year as the unsigned 7-bit FAT field (1980-2107) without validating the fields, as the disassembly-derived [fpPS4](https://github.com/red-prig/fpPS4) reimplementation of the PS4 library does; not confirmed on a PS5 title, and shadPS4 instead masks out-of-range years into the packed value and sign-extends the 16-bit date
@@ -3114,11 +3189,11 @@ index 0c72b62..f4c31b4 100644
 +- [sce::Json::InitParameter2](../../core/libs/prx/libSceJson2/Export.cpp) (libSceJson2) - SDK layout remains unknown. The observed caller reserves a 40-byte span and accesses the parameter only through imported methods. HLE retains its 24-byte API-owned representation; explicit virtual/RTTI setters select distinct policies in an alignment bit of the allocator token. Virtual allocation/free/notify use guest ABI slots 2/3/4 and preserve creating object/context/release code per block. The caller must keep its allocator object and code alive until all its storage is released. Default base notification is diagnostic only, and base deleting-destructor ownership is explicitly unsupported. No file-parser API is implemented; fileBufferSize is retained configuration, not a buffering promise.
  - [sceAjmBatchJobSetResampleParameters, sceAjmBatchJobGetResampleInfo](../../core/libs/prx/libSceAjm.native/src/Ajm.cpp) (libSceAjm) - the ratio is taken as decoded samples per output sample and num_samples as the decoded samples the resampler holds, both inferred from FMOD (Hades II); the console's interpolation is unknown, a 4-point Catmull-Rom is used. The flags argument is ignored, as in shadPS4 and Kyty
  - [scePlayerReviewDialogOpen, scePlayerReviewDialogGetResult](../../core/libs/prx/libSceCdlgPlayerReview/Export.cpp) (libSceCdlgPlayerReview) - the PS5-only dialog has no public reference: the parameter is not read and the result is assumed to start with the 32-bit common dialog result, as `sceWebBrowserDialogGetResult` assumes
- - [sceHttpWaitRequest](../../core/libs/prx/libSceHttp/Export.cpp) (libSceHttp) - the timeout is assumed to be in microseconds and a negative timeout to wait without limit; the invalid-value error for a null handle or event array or a non-positive event count is assumed, not measured. No request is ever pending, so the call waits for the timeout and returns 0 events, and a wait without limit throws
-@@ -597,3 +600,8 @@ Throughout the project, every function at every stage either **does exactly what
- - [_fstatfs](../../core/libs/prx/libkernel/File/src/Stdio.cpp) (libkernel) fills the FreeBSD 11 `struct statfs` of the PS5 payload SDK with the host volume that holds the file: block size, transfer size, total, free and available blocks, maximum name length and the read-only, `nosuid` and `noexec` flags (on Windows only read-only, and `f_files` and `f_ffree` are 0, as NTFS has no fixed number of files). The filesystem type number and name, mount paths, owner, filesystem id and I/O counters are left 0 or empty, since they would describe a host mount, not a console one. Sockets and pipes return `EINVAL`, as FreeBSD's `getvnode` does; a Windows descriptor that is neither a file nor a pipe throws. Stremio Plus (PPSA74126) reads the free space before a download and only logs the other fields
+ - [sceHttpWaitRequest](../../core/libs/prx/libSceHttp/Export.cpp) (libSceHttp) - the timeout is assumed to be in microseconds and a negative timeout to wait without limit; the invalid-value error for a null handle or event array or a non-positive event count is assumed, not measured. No request is ever pending, so a wait returns 0 events when its timeout passes
+@@ -645,3 +648,8 @@ Throughout the project, every function at every stage either **does exactly what
  - [_WStoul](../../core/libs/prx/libc/src/Strings.cpp), [_Iswctype](../../core/libs/prx/libc/src/RuneLocale.cpp) and [swscanf_s](../../core/libs/prx/libc/src/ScanningWide.cpp) (libc) - `_WStoul` is `wcstoul` and throws for a base other than 0 or 2 to 36. `_Iswctype` takes the class numbers of Dinkumware's [xwcc.h](https://github.com/superna9999/ti-cgt6x/blob/cgt6x_7_3_4/include/xwcc.h) (1 `alnum` to 11 `xdigit`, 12 `blank`) and throws for any other value, including the FreeBSD masks `wctype` returns; the numbering is not confirmed on the console's `libc.prx`. `swscanf_s` follows C11 7.29.2.2 and K.3.9.1.5, but reads the size argument as `unsigned int` like `sscanf_s` where K.3.9.1.5 specifies `rsize_t`; the console's width is unverified. A runtime-constraint violation (null buffer, format or receiving pointer) only returns `EOF`, and a too small array gets a null first element as in `sscanf_s`. A literal mismatch is a matching failure and a field that is only a prefix, such as `0x` or `1e`, does not convert, as C11 requires; FreeBSD's `vfwscanf` reports an input failure for the first and converts the second. Integers out of range are truncated from `strtoll`/`strtoull`. It throws for `%p`, `%S`, `%C`, unknown length modifiers, scanset ranges, `%n` with suppression or width, and narrow `%s`, `%c` or `%[` input that the C-locale `wcrtomb` cannot convert
  - [sceSharePlayGetCurrentConnectionInfoA](../../core/libs/prx/libSceSharePlay/Export.cpp) (libSceSharePlay) - reports no Share Play session, as the library keeps none: status 0 (DORMANT), mode 0, empty online IDs, account IDs 0 and both user IDs -1 (`SCE_USER_SERVICE_USER_ID_INVALID`). A null pointer returns `SCE_SHARE_PLAY_ERROR_INVALID_ARGS` (0x810E0001). The 72-byte `SceSharePlayConnectionInfoA` layout and the error code follow [KytyPS5](https://github.com/KytyPS5/KytyPS5/blob/main/src/libs/libNet.cpp) and [fpPS4](https://github.com/red-prig/fpPS4/blob/trunk/src/ps4_libsceshareplay.pas), which agree on both; KytyPS5 sets the user IDs to -1 and fpPS4 leaves them 0, and which one the console returns is not verified. KytyPS5 also returns `SCE_SHARE_PLAY_ERROR_NOT_INITIALIZED` before `sceSharePlayInitialize`; this library keeps no initialization state and does not.
+ - [sceAgcCreatePrimState](../../core/libs/prx/libSceAgc/Shader/src/PrimState.cpp) (libSceAgc) - the `ge_user_vgpr_en` special is passed to the user configuration registers at whatever offset the shader header stores, as the SPRX does according to [OpenAGC](https://github.com/OpenAGC/OpenAGC/blob/3c7e8072f0d7684e930454794fd5c02056946d73/src/game_compat.c#L1181-L1252), which copies all four specials verbatim (KytyPS5 stops on any other offset). PPSA99039, PPSA99505, PPSA99515 and PPSA99997 build their headers by hand with it at 0x25c (`GE_USER_VGPR1`) instead of 0x262 (`GE_USER_VGPR_EN`), value 0, and run on the console; it is not moved to 0x262, and the driver reads neither register. `ge_cntl`, `vgt_shader_stages_en` and a used `vgt_gs_out_prim_type` must still be at their own offsets, since the driver reads those registers there, so a header that stores one elsewhere throws naming the offset, although by OpenAGC the SPRX would copy it as well
 +
 +- Typed image placeholders (merged upstream implementation with local policy integration) are real 1x1 zero-initialized images, distinct from Vulkan native-null descriptors. Sampling and fetches observe the chosen heap format, valid extent and fixed sample count (4 for MS heaps); image size/sample queries, comparison sampling, out-of-range access, storage writes and atomics do not acquire native-null semantics. Storage descriptors in a heap alias its placeholder and writes may survive later draws. A missing format, sample, portability-array or atomic feature leaves that heap unavailable and its first null use fails explicitly. `RequiresValidImages` continues to reject zero guest descriptors and zero Vulkan views; `NativeNull` still requires the actually enabled robustness2 feature. `TypedPlaceholders` has a separate request17/cache28 identity. No bare zero Vulkan image view is used in the fallback.
 +

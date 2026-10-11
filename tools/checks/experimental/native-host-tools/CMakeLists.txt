@@ -40,3 +40,43 @@ add_test(NAME nid_patcher_macho COMMAND "${Python3_EXECUTABLE}"
     "${ANYPS5_SOURCE}/core/libs/nid/tests/test_macho_nids.py" "$<TARGET_FILE:nid_patcher>")
 add_test(NAME nid_patcher_symbol_versions COMMAND "${Python3_EXECUTABLE}"
     "${ANYPS5_SOURCE}/core/libs/nid/tests/test_symbol_versions.py" "$<TARGET_FILE:nid_patcher>")
+
+# The upstream Windows alias regression reads/writes synthetic ELF/PE only.
+# Keep its production reader/writer and exact assertions available on this host.
+if(NOT TARGET windows_guest_export_alias_tests)
+    set(nativeAliasSources
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/guest/GuestImageReader.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/parsing/ElfReader.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsGuestModuleWriter.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsLoadImage.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsTlsBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsPeWriter.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsRelocationBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsTrampolineBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsGuestLifecycleBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsStubEmitter.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsPeFormat.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/io/src/BufferUtils.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/codegen/src/x86/StubBodyBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/CodeInstructionCollector.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/codegen/src/x86/X64InstructionDecoder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/EhFrameReader.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/EntryPointCollector.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/StrictReachability.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/codegen/src/x86/DecodedInstruction.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/ControlFlowGraph.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsImportBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/elfpatcher/src/windows/WindowsTlsTemplateBuilder.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/CallSiteResolver.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/GotAccessIndex.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/relinker/src/analysis/UnusedNidFilter/RelativeRelocationIndex.cpp"
+        "${ANYPS5_SOURCE}/core/relinker/codegen/src/InstructionScanner.cpp"
+    )
+    add_executable(windows_guest_export_alias_tests
+        "${ANYPS5_SOURCE}/core/relinker/relinker/tests/WindowsExportAliasTests.cpp"
+        ${nativeAliasSources})
+    get_target_property(nativeAliasIncludes relinker INCLUDE_DIRECTORIES)
+    target_include_directories(windows_guest_export_alias_tests PRIVATE ${nativeAliasIncludes})
+    add_test(NAME windows_guest_export_aliases COMMAND windows_guest_export_alias_tests)
+    set_tests_properties(windows_guest_export_aliases PROPERTIES TIMEOUT 30)
+endif()

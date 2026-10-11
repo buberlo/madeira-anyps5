@@ -1,0 +1,23 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import subprocess,json,shutil
+OUT=Path(__file__).resolve().parent;case=OUT/'rebase/0006-grouped-color-samples-and-transfers'
+rels=['core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp','core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp']
+for rel in rels:
+ for tree in [OUT/'source',case/'after']:
+  p=tree/rel;s=p.read_text()
+  if rel.endswith('State.cpp'):
+   s=s.replace('(depth->second & 0xbu) != 0 && depthSurfaceBound(cx)', 'planeTests(cx, depth->second) != 0 && depthSurfaceBound(cx)')
+   s=s.replace('(depth->second & 0xbu) != 0u &&\n            depthSurfaceBound(cx)', 'planeTests(cx, depth->second) != 0u &&\n            depthSurfaceBound(cx)')
+  else:
+   mark='    if (pass.mode == ColorMetadataPass::Mode::Resolve) {\n';assert s.count(mark)==1
+   s=s.replace(mark,mark+'        Require(false, "CB metadata resolve requires original guest geometry and validated guest sample import/writeback; use the checked draw resolve path");\n')
+  p.write_text(s)
+r=subprocess.run(['git','diff','--no-index','--binary','--',str((case/'before').relative_to(OUT)),str((case/'after').relative_to(OUT))],cwd=OUT,capture_output=True,text=True);assert r.returncode==1
+s=r.stdout.replace('a/'+str((case/'before').relative_to(OUT))+'/','a/').replace('b/'+str((case/'after').relative_to(OUT))+'/','b/')
+(OUT/'patches/0006-grouped-color-samples-and-transfers.patch').write_text(s)
+p=case/'resolution-review.json';j=json.loads(p.read_text());j['newNativeMetadataResolveExplicitlyRefusedWithoutOriginalGeometryAndGuestImportWriteback']=True;j['groupedPrecheckUsesPlaneTestsForAbsentPlanes']=True;j['unresolvedUpstreamDefaultMsaaPolicyPositivesRetained']=True;p.write_text(json.dumps(j,indent=2)+'\n')
+u=Path('build/anyps5-latestca4-source-proposal-20261012/source_utils.py').read_text().replace("BASE='ca4ab0d5d66f3855991fa95eec6e7e15e34e24c6'", "BASE='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b'");(OUT/'source_utils.py').write_text(u)
+print('Source guards and patch6 successor regenerated')

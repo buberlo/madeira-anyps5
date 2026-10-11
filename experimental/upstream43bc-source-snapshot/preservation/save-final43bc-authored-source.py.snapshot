@@ -1,0 +1,96 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Save authored source as inert public snapshots, excluding private evidence."""
+import ast
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path('__LOCAL_PROJECT_ROOT__')
+OUT = ROOT / 'experimental/upstream43bc-source-snapshot'
+FINAL = ROOT / 'build/anyps5-latest43bc-source-proposal-20261012'
+TRACE = ROOT / 'build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-exception-return-trace-diagnostic-proposal'
+SAMPLER = ROOT / 'build/minigolf-upstream-20261010/cpu-device-probe-prep/native60-current-original50-ownership-sampler-diagnostic-proposal'
+GUARD = '# Archival source only; never execute or import.\nraise RuntimeError("Snapshot only; use reviewed current tooling.")\n\n'
+sha = lambda data: hashlib.sha256(data).hexdigest()
+
+def main():
+    selected = {}
+    for name in ('source_utils.py', 'reconcile.py', 'resolve0001.py', 'resolve0006.py', 'finalize-guards.py', 'finalize-library-api.py', 'add-library-key-fixture.py', 'freeze.py', 'prepare-route.py'):
+        selected['reconciliation/' + name + '.snapshot'] = FINAL / name
+    for name in ('run_incremental.py', 'build-hle-final43bc.py'):
+        selected['hle/' + name + '.snapshot'] = FINAL / 'incremental-route' / name
+    selected['hle/run_runtime_only.py.snapshot'] = FINAL / 'runtime-twojob-route/run_runtime_only.py'
+    for name in ('run.py', 'probe.py', 'composition.py', 'launch_query.py', 'log_contracts.py', 'execution_tool.py', 'test_scope.py', 'make_review.py'):
+        selected['exception-trace/' + name + '.snapshot'] = TRACE / name
+        selected['ownership-sampler/' + name + '.snapshot'] = SAMPLER / name
+    helper = FINAL / 'canonical-promotion-helper' / 'promote.py'
+    if helper.exists():
+        selected['promotion/promote.py.snapshot'] = helper
+    selected['preservation/save-final43bc-authored-source.py.snapshot'] = Path(__file__).resolve()
+    OUT.mkdir(exist_ok=True)
+    prior = OUT / 'source-manifest.json'
+    if prior.exists():
+        old = json.loads(prior.read_text())
+        assert set(old['sourceFiles']).issubset(selected)
+        for name, row in old['sourceFiles'].items():
+            assert sha((OUT / name).read_bytes()) == row['snapshotSha256']
+    records = {}
+    transformations = [
+        (str(ROOT), '__LOCAL_PROJECT_ROOT__'),
+        ('__LOCAL_HOME__', '__LOCAL_HOME__'),
+        ('__LOCAL_DEVICE_ID__', '__LOCAL_DEVICE_ID__'),
+        ('__PRIVATE_LOG_LEAF__', '__PRIVATE_LOG_LEAF__'),
+        ('__LOCAL_USERS_PREFIX__', '__LOCAL_USERS_PREFIX__'),
+    ]
+    for name, path in selected.items():
+        original = path.read_bytes()
+        body = original.decode('utf-8')
+        changes = []
+        for old, replacement in transformations:
+            count = body.count(old)
+            body = body.replace(old, replacement)
+            changes.append({'replacement': replacement, 'occurrences': count})
+        assert '__LOCAL_USERS_PREFIX__' not in body and '__PRIVATE_LOG_LEAF__' not in body
+        for change in changes:
+            change['normalizedOccurrences'] = body.count(change['replacement'])
+        ast.parse(body)
+        data = (GUARD + body).encode('utf-8')
+        dest = OUT / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        dest.chmod(0o644)
+        records[name] = {
+            'originalRelativePath': str(path.relative_to(ROOT)),
+            'originalSha256': sha(original),
+            'normalizedSha256': sha(body.encode('utf-8')),
+            'snapshotSha256': sha(data),
+            'guardPrefixBytes': len(GUARD.encode('utf-8')),
+            'redactions': changes,
+        }
+        assert path.read_bytes() == original
+    manifest = {
+        'schema': 1, 'sourceFiles': records, 'snapshotCount': len(records),
+        'guardPrefix': GUARD, 'authoredLogicPreservedExceptDeclaredRedactions': True,
+        'originalFilesUnchanged': True, 'snapshotModulesExecuted': False,
+        'sourceMapsRawLogsPairingAssetsIncluded': False,
+        'runtimeOrGameplayQualifiedByArchive': False,
+    }
+    (OUT / 'source-manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
+    (OUT / 'README.md').write_text(
+        '# Final43bc authored source archive\n\n'
+        'These inert snapshots preserve the locally authored reconciliation, incremental HLE, '
+        'promotion and bounded exception-trace recipes. They are source records, not runnable '
+        'product tooling or device instructions. Every snapshot raises before any original logic.\n\n'
+        'The manifest binds original and saved bytes and declares the local path/device/log-leaf '
+        'redactions. Private source maps, runtime logs, pairing data and game assets are excluded. '
+        'The archive does not grant build, CPU, GPU or gameplay acceptance. Historical assertions '
+        'remain historical; use current reviewed tooling for new work.\n\n'
+        'Verify as data: `python3 -I -B -m unittest discover -s '
+        'experimental/upstream43bc-source-snapshot -p test_snapshot.py`.\n\n'
+        'All work is local; no GitHub Actions.\n')
+    print(json.dumps({'savedAuthoredSources': len(records), 'publicDirectory': str(OUT)}, indent=2))
+
+if __name__ == '__main__':
+    main()

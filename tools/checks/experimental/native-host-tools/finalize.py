@@ -30,6 +30,8 @@ def main():
     parser.add_argument("--clang", required=True, type=Path)
     parser.add_argument("--python", required=True, type=Path)
     parser.add_argument("--harness", required=True, type=Path)
+    parser.add_argument("--jobs", required=True, type=int, choices=(1, 2))
+    parser.add_argument("--prior-inventory", required=True, type=Path)
     args = parser.parse_args()
     effective_clang_result = subprocess.run(["xcrun", "--find", "clang++"],
                                              capture_output=True, text=True, check=True)
@@ -38,8 +40,16 @@ def main():
     before = json.loads((directory / "source-before.json").read_text())
     after = json.loads((directory / "source-after.json").read_text())
     inventory = json.loads((directory / "test-inventory.json").read_text())
+    prior_inventory = json.loads(args.prior_inventory.read_text())
+    prior_names = {test["name"] for test in prior_inventory["tests"]}
+    current_names = {test["name"] for test in inventory["tests"]}
+    new_cases = {"release_package", "elf_reader_bounds", "none_relocations", "windows_guest_export_aliases",
+                 "shader_cache_file_read", "rewrite_boundaries", "program_layout_ranges",
+                 "param_json_utf8", "section_header_ranges", "guest_syscall_trap"}
     root_tools = [test["name"] for test in inventory["tests"]
                   if any("/tools/" in argument for argument in test.get("command", []))]
+    root_cpp_tests = [test["name"] for test in inventory["tests"]
+                      if test["name"] == "shader_cache_file_read"]
     nid_tests = [test["name"] for test in inventory["tests"]
                  if test["name"].startswith("nid_patcher_")]
     junit = ET.parse(directory / "tests.xml").getroot()
@@ -68,34 +78,43 @@ def main():
         "patchCount": before["patchCount"],
         "sourceEntryCount": before["sourceEntryCount"],
         "sourceMapSha256": before["sourceMapSha256"],
-        "sourceBeforeAfterUnchanged": before["sourceFiles"] == after["sourceFiles"],
-        "sourceMatchesPreparationAndReviewBeforeAfter":
-            before["sourceMatchesPreparationAndReview"] and after["sourceMatchesPreparationAndReview"],
+        "sourceBeforeAfterUnchanged": before["sourceFiles"] == after["sourceFiles"] and before["sourceModes"] == after["sourceModes"],
+        "sourceMatchesFrozenReviewBeforeAfter":
+            before["sourceMatchesFrozenReview"] and after["sourceMatchesFrozenReview"],
         "allElevenDependenciesCleanAtExpectedGitlinksBeforeAfter":
             before["allElevenDependenciesCleanAtExpectedGitlinks"]
             and after["allElevenDependenciesCleanAtExpectedGitlinks"],
-        "preparationSha256": before["preparationSha256"],
+        "adoptionReceiptSha256": before["adoptionReceiptSha256"],
         "sourceReviewSha256": before["sourceReviewSha256"],
+        "sameFrozenReviewBeforeAfter": before["sourceReviewSha256"] == after["sourceReviewSha256"],
         "configureExitCode": args.configure_exit,
         "buildExitCode": args.build_exit,
         "ctestExitCode": args.ctest_exit,
-        "maxBuildJobs": 2,
+        "maxBuildJobs": args.jobs,
+        "priorInventorySha256": digest(args.prior_inventory),
+        "retainedPriorCaseCount": len(prior_names & current_names),
+        "newRegisteredCases": sorted(current_names - prior_names),
+        "requiredLatestRegressionNames": sorted(new_cases),
+        "missingPriorCases": sorted(prior_names - current_names),
+        "retainedPriorAndRequiredRegressions": len(prior_names) == 110 and prior_names | new_cases <= current_names,
         "resolvedEquivalentCommands": {
             "configure": [str(args.cmake), "-S", str(args.harness), "-B",
                           str(directory / "build"), "-G", "Ninja",
                           "-DANYPS5_SOURCE=" + before["source"],
                           "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_CXX_COMPILER=" + str(args.clang),
-                          "-DCMAKE_OSX_ARCHITECTURES=arm64", "-DPython3_EXECUTABLE=" + str(args.python)],
-            "build": [str(args.cmake), "--build", str(directory / "build"), "--parallel", "2"],
+                          "-DCMAKE_OSX_ARCHITECTURES=arm64", "-DCMAKE_MAKE_PROGRAM=" + str(args.ninja),
+                          "-DPython3_EXECUTABLE=" + str(args.python)],
+            "build": [str(args.cmake), "--build", str(directory / "build"), "--parallel", str(args.jobs)],
             "ctest": [str(args.cmake.parent / "ctest"), "--test-dir", str(directory / "build"),
-                      "--output-on-failure", "--timeout", "30", "--parallel", "2",
+                      "--output-on-failure", "--timeout", "30", "--parallel", str(args.jobs),
                       "--output-junit", str(directory / "tests.xml")],
             "environment": {"PYTHONDONTWRITEBYTECODE": "1"},
         },
         "registeredTestCount": len(inventory["tests"]),
         "registeredRootToolTestCount": len(root_tools),
         "registeredNidPatcherTestCount": len(nid_tests),
-        "registeredRelinkerTestCount": len(inventory["tests"]) - len(root_tools) - len(nid_tests),
+        "registeredRootPortableCppTestCount": len(root_cpp_tests),
+        "registeredRelinkerTestCount": len(inventory["tests"]) - len(root_tools) - len(nid_tests) - len(root_cpp_tests),
         "executedCTestCaseCount": len(cases),
         "passedCTestCaseCount": sum(not t["failed"] and not t["skipped"] for t in test_results),
         "failedCTestCaseCount": sum(t["failed"] for t in test_results),
@@ -119,13 +138,24 @@ def main():
                  "inspect emitted x86-64 PE/ELF without incompatible execution. "
                  "No HLE, GPU, game import/launch, device or gameplay qualification.",
     }
+    receipt["qualified"] = (
+        args.configure_exit == args.build_exit == args.ctest_exit == 0
+        and receipt["sameFrozenReviewBeforeAfter"]
+        and receipt["sourceBeforeAfterUnchanged"]
+        and receipt["sourceMatchesFrozenReviewBeforeAfter"]
+        and receipt["allElevenDependenciesCleanAtExpectedGitlinksBeforeAfter"]
+        and receipt["retainedPriorAndRequiredRegressions"]
+        and receipt["registeredAndExecutedTestNamesMatch"]
+        and receipt["failedCTestCaseCount"] == receipt["skippedCTestCaseCount"] == 0)
     path = directory / "receipt.json"
     path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(json.dumps({"receipt": str(path), "receiptSha256": digest(path),
                       "passed": receipt["passedCTestCaseCount"],
                       "failed": receipt["failedCTestCaseCount"],
-                      "skipped": receipt["skippedCTestCaseCount"]}))
+                      "skipped": receipt["skippedCTestCaseCount"],
+                      "qualified": receipt["qualified"]}))
+    return 0 if receipt["qualified"] else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

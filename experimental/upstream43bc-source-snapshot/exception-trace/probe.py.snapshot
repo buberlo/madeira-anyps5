@@ -1,0 +1,500 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Prepare/collect one fresh CPU probe. Inert by default, root lease required online."""
+import argparse
+import asyncio
+import copy
+import hashlib
+import importlib.util
+import json
+import math
+import os
+from pathlib import Path
+import re
+import sys
+import time
+import urllib.parse
+import uuid
+sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+RECIPE = HERE.parent.parent
+ROOT = HERE.parents[3]
+RUNTIME = HERE / 'composition.py'
+PREDECESSOR = HERE.parent / 'qualified-package-path-collector-proposal'
+ORIGINAL_COLLECTOR = HERE.parent / 'probe.py'
+ORIGINAL_COLLECTOR_SHA = 'ff6a9776554c0ad43e20fa44614921bda4f9c65c074f242c7944a525e72a694f'
+ORIGINAL = RECIPE / 'native56-device-prep/accessible-backup-proposal/native56.py'
+ORIGINAL_SHA = '6bd6f243ddc83d66b6eb0e07f0cc306a485c9d93c8161421b74ba643bbac77dc'
+OLD_PLAN = ORIGINAL.with_name('plan.json')
+OLD_PLAN_SHA = 'f2977cdfc19f78ed700c413c601c602d257e2f9c3559dde0ca5de4da5f63e020'
+ATOMIC = RECIPE / 'ipad-import/atomic_library.py'
+ATOMIC_SHA = '70b0edc83381c4d44dd4486df6a10f52bf1cc9e542cb4460209160555400033b'
+DEVICE = '__LOCAL_DEVICE_ID__'
+BUNDLE = 'com.buberlo.anyps5ipad'
+BUILD = '60'
+TOTAL = 330
+SETUP = 120
+CLEANUP = 90
+MARGIN = 60
+LIBRARY = '/Documents/madeira-library.json'
+LOG = '/Documents/madeira-log.txt'
+MAX_LOG = 8 * 1024 ** 2
+MAX_PACKAGE = 128 * 1024 ** 2
+PACKAGE_RECEIPT = None
+PACKAGE_SHA = None
+FREEZE = '6d7718b775d286ec788936b16251aa413ffecaa413c7818d29159ce2e1d95b92'
+EXECUTABLES = {'continuing-only-diagnostic': ('raw/guest_raise_exception_tests.exe', [], 45)}
+BASE_ENV = {'MADEIRA_FEX_AVX': '1', 'APS5_X64_SIGNAL_SUSPEND': '1', 'APS5_PRESERVE_ASYNC_AVX': '1', 'APS5_PRESERVE_ASYNC_FLAGS': '1', 'APS5_VEH_CONTEXT_BRIDGE': '1', 'APS5_SAFE_SELF_READ': '1', 'WINEDEBUG': '-all,err+seh', 'MVK_CONFIG_LOG_LEVEL': '1', 'APS5_GUEST_ARENA_LAZY': '1', 'APS5_GUEST_ARENA_BASE': '0x7400000000', 'APS5_GUEST_ARENA_SIZE': '0x100000000', 'APS5_GUEST_ARENA_CHUNK': '0x10000000', 'MADEIRA_THREAD_SAMPLER': '0', 'MADEIRA_DIAGNOSTICS_SECONDS': '25', 'MADEIRA_CRITICAL_OWNER_SAMPLER': '0', 'MADEIRA_EXCEPTION_DIAGNOSTICS': '1', 'MADEIRA_DIAGNOSTICS': '0'}
+VOLATILE = {'lastPlayed', 'folderBytes', 'metadataChecked', 'metadataRevision', 'graphicsAPI'}
+
+def need(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+def sha(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as f:
+        for data in iter(lambda : f.read(1024 ** 2), b''):
+            h.update(data)
+    return h.hexdigest()
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def load(path):
+    return json.loads(Path(path).read_text())
+
+def save(path, value):
+    with Path(path).open('x') as f:
+        f.write(json.dumps(value, indent=2) + '\n')
+
+def regular(path):
+    path = Path(path).absolute()
+    need(path.is_relative_to(ROOT) and path.is_file() and (not any((p.is_symlink() for p in [path, *path.parents]))), 'Linked/missing/out-of-project proof')
+    return path
+
+def module(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+def own_base(base):
+    need(isinstance(base, str) and re.fullmatch('/private/var/containers/Bundle/Application/[0-9A-Fa-f-]{36}/Madeira\\.app', base), 'Malformed own60 bundle URL')
+    uuid.UUID(base.split('/')[-2])
+    return base
+
+def source_inputs():
+    fixed = {ORIGINAL: ORIGINAL_SHA, OLD_PLAN: OLD_PLAN_SHA, ATOMIC: ATOMIC_SHA, ORIGINAL_COLLECTOR: ORIGINAL_COLLECTOR_SHA}
+    for (path, wanted) in fixed.items():
+        need(sha(regular(path)) == wanted, 'Immutable device helper changed')
+    reader = module(RUNTIME, 'package_path_collector_source_reader')
+    reader.predecessor()
+    paths = [*reader.reviewed_paths(), HERE / 'collector-source-review-freeze.json', reader.SELECT, reader.INSTALL, ROOT / 'scripts/with-ipad-lease.py', *fixed]
+    return {str(regular(p).relative_to(ROOT)): sha(p) for p in paths}
+
+def package_members(files):
+    """Validate the entire exact63 map before any AFC operation or mutation."""
+    need(type(files) is dict and len(files) == 63, 'Exact63 package map required')
+    special = {'guest/libs/libstdc++-6.dll', 'raw/libstdc++-6.dll'}
+    for (name, value) in files.items():
+        need(type(name) is str and (re.fullmatch('(host|raw|guest)/(?:libs/)?[A-Za-z0-9_.-]+', name) is not None or name in special) and all((part not in ('', '.', '..') for part in name.split('/'))), 'Unexpected package member')
+        need(type(value) is str and re.fullmatch('[0-9a-f]{64}', value) is not None, 'Malformed package member digest')
+    return tuple(sorted(files.items()))
+
+def library(data):
+    need(type(data) is bytes and 0 < len(data) <= 2 * 1024 ** 2, 'Bounded exact library bytes required')
+    value = json.loads(data, object_pairs_hook=module(HERE / 'log_contracts.py', 'duplicate_reader').duplicate_keys)
+    need(isinstance(value, dict) and value.get('version') == 1 and isinstance(value.get('entries'), list), 'Library schema differs')
+    identities = [r.get('id') for r in value['entries'] if isinstance(r, dict)]
+    need(len(identities) == len(value['entries']) and all((isinstance(v, str) and v for v in identities)) and (len(identities) == len(set(identities))), 'Library entry identity ambiguity')
+    return value
+
+def card(phase, probe_id):
+    need(phase in EXECUTABLES and re.fullmatch('[0-9a-f]{32}', probe_id), 'Initial CPU phase/ID differs')
+    (executable, args, seconds) = EXECUTABLES[phase]
+    folder = 'MadeiraCPU-' + probe_id
+    config = 'pool = 512\n' + ''.join(('env.' + k + ' = ' + v + '\n' for (k, v) in BASE_ENV.items()))
+    return {'id': str(uuid.UUID(probe_id)).upper(), 'title': 'CPU probe: ' + phase, 'bits': 64, 'relativePath': folder + '/' + executable, 'arguments': ' '.join(args), 'workingDirectory': 'C:\\' + folder + '\\' + executable.rsplit('/', 1)[0], 'launchMode': 'direct', 'startServices': False, 'resolution': '1280x720', 'fpsMode': 1, 'reducedX87': False, 'avx': True, 'frameGeneration': False, 'liveLogs': False, 'performance': False, 'touchControls': False, 'config': config}
+
+def append_card(before, entry):
+    need(entry['id'] not in {r['id'] for r in before['entries']}, 'Probe UUID collision')
+    need(not any((r.get('relativePath', '').startswith(entry['relativePath'].split('/')[0] + '/') for r in before['entries'])), 'Probe folder collision')
+    after = copy.deepcopy(before)
+    after['entries'].append(copy.deepcopy(entry))
+    return after
+
+def preserved_card(before, current, entry):
+    wanted = append_card(before, entry)
+    need(set(current) == set(wanted) and len(current['entries']) == len(wanted['entries']), 'Unknown library structure/entry mutation')
+    for key in wanted:
+        if key != 'entries':
+            need(current[key] == wanted[key], 'Top-level library setting changed')
+    now = time.time() - 978307200 + 300
+    for (original, observed) in zip(before['entries'], current['entries'][:-1]):
+        need(type(observed) is dict and json_equal({k: v for (k, v) in observed.items() if k != 'metadataChecked'}, {k: v for (k, v) in original.items() if k != 'metadataChecked'}), 'Existing game profiles/order/settings changed')
+        if not json_equal(original.get('metadataChecked'), observed.get('metadataChecked')):
+            need('metadataChecked' in observed and date_value(observed['metadataChecked'], now) and ('metadataChecked' not in original or (date_value(original['metadataChecked'], now) and observed['metadataChecked'] >= original['metadataChecked'])), 'Existing metadata timestamp invalid or moved backward')
+    observed = current['entries'][-1]
+    need(isinstance(observed, dict) and observed.get('id') == entry['id'], 'Single-use card moved/replaced')
+    defaults = {'controlLayout': 'builtin.xbox', 'controlOpacity': 0.7, 'controlSize': 1, 'display': 'fit', 'overlayFields': ['FPS', 'Frame time', 'RAM', 'Battery']}
+    need(set(entry) <= set(observed) and all((json_equal(observed[k], v) for (k, v) in entry.items())), 'Own card launch profile mutated')
+    additions = set(observed) - set(entry)
+    need(additions <= VOLATILE | set(defaults) | {'controls'}, 'Unknown own card addition')
+    for key in additions & set(defaults):
+        need(json_equal(observed[key], defaults[key]), 'Own card nondefault setting added')
+    for key in additions & {'lastPlayed', 'metadataChecked'}:
+        need(date_value(observed[key], now), 'Own card date invalid')
+    if 'folderBytes' in additions:
+        need(type(observed['folderBytes']) is int and 0 <= observed['folderBytes'] <= MAX_PACKAGE, 'Own card metadata size invalid')
+    if 'metadataRevision' in additions:
+        need(type(observed['metadataRevision']) is int and observed['metadataRevision'] == 12, 'Own card metadata revision differs')
+    if 'graphicsAPI' in additions:
+        api = observed['graphicsAPI']
+        need(type(api) is str and 0 < len(api) <= 64 and all((32 <= ord(c) <= 126 for c in api)), 'Own card graphics metadata invalid')
+    if 'controls' in additions:
+        default_controls(observed['controls'])
+
+def json_equal(a, b):
+    return json.dumps(a, sort_keys=True, allow_nan=False) == json.dumps(b, sort_keys=True, allow_nan=False)
+
+def date_value(value, maximum):
+    return type(value) in (int, float) and math.isfinite(value) and (0 <= value <= maximum)
+
+def default_controls(controls):
+    names = ['LS', 'RS', 'LT', 'LB', 'RB', 'RT', 'D↑', 'D←', 'D→', 'D↓', 'Y', 'X', 'B', 'A', 'View', 'Menu', 'L3', 'R3']
+    need(type(controls) is list and len(controls) == 18, 'Exact18 own default controls required')
+    ids = set()
+    for (row, name) in zip(controls, names):
+        need(type(row) is dict and set(row) == {'action', 'id', 'nx', 'ny', 'scale'} and (row['action'] == {'pad': {'_0': name}}), 'Own default control action/order/fields differ')
+        value = row['id']
+        need(type(value) is str and re.fullmatch('[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}', value), 'Own control UUID malformed')
+        need(value == str(uuid.UUID(value)).upper() and value not in ids, 'Own control UUID repeated')
+        ids.add(value)
+        for key in ['nx', 'ny', 'scale']:
+            v = row[key]
+            need(type(v) in (int, float) and math.isfinite(v) and (0.5 <= v <= 3 if key == 'scale' else 0 <= v <= 1), 'Own default control geometry invalid')
+
+def package_contract(path=None, phase='cpu-avx2'):
+    need(phase == 'continuing-only-diagnostic', 'Only the Original50 Continuing package is permitted')
+    global PACKAGE_RECEIPT, PACKAGE_SHA
+    reader = module(RUNTIME, 'current_package_selection_reader')
+    (selection, receipt, unused) = reader.selected_package(phase)
+    PACKAGE_RECEIPT = ROOT / selection['packageReceipt']['path']
+    PACKAGE_SHA = selection['packageReceipt']['sha256']
+    need(path is None or path == PACKAGE_RECEIPT, 'Only the exact newly selected package is accepted')
+    return receipt
+
+def bindings(proposal_path, runtime_path, install_path, phase):
+    need(load(regular(install_path)).get('status') == 'actual_closed_native60_preserved_install_bound_not_jit_or_cpu_ready', 'Actual accepted new reconciliation binding required')
+    return module(RUNTIME, 'current_cpu_composition_bindings').collector_bindings(proposal_path, runtime_path, install_path, phase)
+
+def prepare(phase, proposal_path, runtime_path, install_path):
+    need(phase == 'continuing-only-diagnostic', 'Only Original50 Continuing is permitted by this successor')
+    pkg = package_contract(phase=phase)
+    package_members(pkg['files'])
+    (install, bound, baseline, payload) = bindings(proposal_path, runtime_path, install_path, phase)
+    probe_id = uuid.uuid4().hex
+    entry = card(phase, probe_id)
+    current = module(RUNTIME, 'accepted60_metadata_provider_reader')
+    before_path = current.current_metadata_source(baseline, 'Documents/madeira-library.json')
+    global_path = current.current_metadata_source(baseline, 'Documents/madeira.cfg')
+    for (name, path) in [('Documents/madeira-library.json', before_path), ('Documents/madeira.cfg', global_path)]:
+        need(baseline['inventory'][name]['sha256'] == sha(path), 'Accepted backed-up settings identity differs')
+    original = before_path.read_bytes()
+    before = library(original)
+    after = append_card(before, entry)
+    protected = {'/Documents/madeira.cfg': sha(global_path)}
+    for row in baseline['activeGames']:
+        name = row['root'] + '/private-game-manifest.json'
+        need(baseline['inventory'][name]['sha256'] == row['manifestSha256'], 'Active title metadata proof differs')
+        path = current.current_metadata_source(baseline, name)
+        need(sha(path) == row['manifestSha256'], 'Protected game manifest copy changed')
+        protected['/' + name] = sha(path)
+    need(len(protected) == 3, 'Exactly two protected active titles plus global settings required')
+    stage = HERE / ('plan-' + probe_id)
+    stage.mkdir(exist_ok=False)
+    (stage / 'original-library.json').write_bytes(original)
+    save(stage / 'probe-library.json', after)
+    save(stage / 'card.json', entry)
+    exe = 'C:\\' + entry['relativePath'].replace('/', '\\')
+    plan = {'schema': 1, 'status': 'frozen_single_use_native60_bounded_exception_trace_diagnostic_not_executed', 'phase': phase, 'probeID': probe_id, 'device': DEVICE, 'bundle': BUNDLE, 'nativeBuild': BUILD, 'expectedBundlePath': install['observedBundlePath'], 'entry': entry, 'windowsPath': exe, 'launchURL': 'anyps5ipad://play?exe=' + urllib.parse.quote(exe, safe=''), 'launchArguments': ['-madeiraJITMethod', 'builtIn'], 'observationSeconds': EXECUTABLES[phase][2], 'totalSeconds': TOTAL, 'setupSeconds': SETUP, 'cleanupSeconds': CLEANUP, 'marginSeconds': MARGIN, 'probeFolder': '/Documents/wine/drive_c/MadeiraCPU-' + probe_id, 'package': pkg['package'], 'packageFiles': pkg['files'], 'packageReceiptSha256': PACKAGE_SHA, 'inputs': {**source_inputs(), **bound}, 'originalLibrarySha256': digest(original), 'probeLibrarySha256': sha(stage / 'probe-library.json'), 'cardSha256': sha(stage / 'card.json'), 'protectedMetadata': protected, 'acceptedInstallationBindingSha256': sha(install_path), 'acceptedInstallationResultSha256': install['compositeInstallationResultSha256'], 'signedNative60ReceiptSha256': install['signedNative60ReceiptSha256'], 'fexRuntimeSha256': install['fexRuntimeSha256'], 'continuingPrerequisite': None, 'persistentProfiler': False, 'boundedExceptionTrace': current.diagnostic_scope(), 'continuingPrerequisiteAcceptanceAllowed': False, 'nativeSymbolization': current.symbolization_identity(), 'duringFixtureLogReads': 0, 'postObservationPreCleanupLogReads': 1, 'gpuOrGameQualification': False, 'existingLibraryEntriesModified': False, 'pairingOrGameSavesWrittenByCollector': False, 'fullGameSaveInventoryRechecked': False, 'opaqueContentsVerified': False, 'installedBinaryBytesRead': False, 'keepNewProbePackageForEvidence': True, 'deviceActionsExecuted': False}
+    save(stage / 'plan.json', plan)
+    return stage / 'plan.json'
+
+def verify_plan(path, wanted):
+    path = regular(path)
+    need(path.parent.parent == HERE and re.fullmatch('plan-[0-9a-f]{32}', path.parent.name) and (path.name == 'plan.json') and (sha(path) == wanted), 'Exact reviewed single-use plan hash required')
+    p = load(path)
+    need(p['status'] == 'frozen_single_use_native60_bounded_exception_trace_diagnostic_not_executed' and p['device'] == DEVICE and (p['bundle'] == BUNDLE) and (p['nativeBuild'] == '60') and (p['phase'] == 'continuing-only-diagnostic') and (p['probeID'] == path.parent.name[5:]) and (p['entry'] == card(p['phase'], p['probeID'])) and (p['totalSeconds'] == TOTAL) and (p['setupSeconds'] == SETUP) and (p['cleanupSeconds'] == CLEANUP) and (p['marginSeconds'] == MARGIN) and (p['observationSeconds'] == EXECUTABLES[p['phase']][2]) and (p['duringFixtureLogReads'] == 0) and (p['postObservationPreCleanupLogReads'] == 1) and (p['deviceActionsExecuted'] is False), 'Reviewed initial CPU scope changed')
+    own_base(p['expectedBundlePath'])
+    pkg = package_contract(phase=p['phase'])
+    package_members(pkg['files'])
+    exe = 'C:\\' + p['entry']['relativePath'].replace('/', '\\')
+    need(p['windowsPath'] == exe and p['launchURL'] == 'anyps5ipad://play?exe=' + urllib.parse.quote(exe, safe='') and (p['launchArguments'] == ['-madeiraJITMethod', 'builtIn']) and (p['probeFolder'] == '/Documents/wine/drive_c/MadeiraCPU-' + p['probeID']) and (p['package'] == pkg['package']) and (p['packageFiles'] == pkg['files']) and (p['packageReceiptSha256'] == PACKAGE_SHA), 'Executable/URL/package scope drift')
+    module(RUNTIME, 'exact_declared_provider_plan_replay').verify_input_map(p['inputs'])
+    need(all((p['inputs'].get(name) == value for (name, value) in source_inputs().items())), 'Complete collector source closure missing')
+    need(sha(path.parent / 'original-library.json') == p['originalLibrarySha256'] and sha(path.parent / 'probe-library.json') == p['probeLibrarySha256'] and (sha(path.parent / 'card.json') == p['cardSha256']), 'Prepared card/library bytes changed')
+    before = library((path.parent / 'original-library.json').read_bytes())
+    need(library((path.parent / 'probe-library.json').read_bytes()) == append_card(before, p['entry']), 'Existing library mutation in prepared plan')
+    need(p['protectedMetadata'].get('/Documents/madeira.cfg') and len(p['protectedMetadata']) == 3 and all((re.fullmatch('/Documents/(?:madeira\\.cfg|wine/drive_c/(?:MiniGolf-PPSA03647|Solitaire15in1-PPSA15706)-[A-Za-z0-9_.-]+/private-game-manifest\\.json)', name) and re.fullmatch('[0-9a-f]{64}', value) for (name, value) in p['protectedMetadata'].items())), 'Only exact two title manifests/global settings may be read')
+    reader = module(RUNTIME, 'current60_prelaunch_lineage_check')
+    reader.plan_lineage(p)
+    return p
+
+class AFC:
+
+    def __init__(self, service, session):
+        (self.service, self.s) = (service, session)
+
+    async def call(self, name, *args):
+        return await asyncio.wait_for(getattr(self.service, name)(*args), min(25, self.s.guard()))
+
+    async def read(self, path, cap):
+        need(path.startswith('/Documents/') and '\\' not in path and all((part not in ['.', '..', ''] for part in path.split('/')[1:])), 'Unsafe exact remote read')
+        for parent in reversed(Path(path).parents):
+            if str(parent) == '/':
+                continue
+            info = await self.call('stat', str(parent))
+            need(info.get('st_ifmt') == 'S_IFDIR' and 'LinkTarget' not in info, 'Linked remote read ancestor')
+        info = await self.call('stat', path)
+        need(info.get('st_ifmt') == 'S_IFREG' and 'LinkTarget' not in info and (int(info.get('st_nlink', 1)) == 1), 'Linked/special remote evidence')
+        size = int(info['st_size'])
+        need(0 < size <= cap, 'Remote evidence size exceeds bound')
+        fd = await self.call('fopen', path, 'r')
+        try:
+            data = await self.call('fread', fd, size)
+        finally:
+            await self.call('fclose', fd)
+        need(len(data) == size, 'Short exact remote read')
+        after = await self.call('stat', path)
+        need(all((info.get(k) == after.get(k) for k in ['st_ifmt', 'st_size', 'st_nlink', 'st_birthtime'])), 'Remote read identity changed')
+        return (data, info)
+
+    async def stage(self, p):
+        members = package_members(p['packageFiles'])
+        root = p['probeFolder']
+        need(root == '/Documents/wine/drive_c/MadeiraCPU-' + p['probeID'], 'Unique own probe root differs')
+        for path in ['/Documents', '/Documents/wine', '/Documents/wine/drive_c']:
+            info = await self.call('stat', path)
+            need(info.get('st_ifmt') == 'S_IFDIR' and 'LinkTarget' not in info, 'Linked existing container ancestor')
+        need(not await self.call('exists', root), 'Single-use probe package folder already exists')
+        await self.call('makedirs', root)
+        created = {''}
+        for (name, value) in members:
+            parent = name.rsplit('/', 1)[0]
+            if parent not in created:
+                await self.call('makedirs', root + '/' + parent)
+                created.add(parent)
+            dest = root + '/' + name
+            source = regular(ROOT / p['package'] / name)
+            need(sha(source) == value, 'Fresh package copy source changed')
+            fd = await self.call('fopen', dest, 'w')
+            try:
+                with source.open('rb') as stream:
+                    for block in iter(lambda : stream.read(1024 ** 2), b''):
+                        await self.call('fwrite', fd, block)
+            finally:
+                await self.call('fclose', fd)
+            (data, _) = await self.read(dest, MAX_PACKAGE)
+            need(digest(data) == value, 'Staged actual package file readback differs')
+
+async def close_exact_main(s, pid, result):
+    need(pid is None or (type(pid) is int and pid > 0), 'Malformed returned owned PID')
+    (build, owned) = await s.snapshot(['60'])
+    if pid is None:
+        need(not owned, 'No returned owned main PID; refuse guessing process cleanup')
+    elif pid in owned:
+        need(type(pid) is int and pid > 0 and (owned[pid] == s.base + '/Madeira'), 'Returned main PID reused')
+        (_, fresh) = await s.snapshot(['60'])
+        need(fresh.get(pid) == s.base + '/Madeira', 'Main identity changed before exact cleanup')
+        result['ownedTerminationAttemptedMonotonic'] = time.monotonic()
+        await s.query(['process', 'terminate', '--kill', '--pid', str(pid)], 'close-exact-launched-main', cap=10)
+    await s.closed(['60'])
+    result['ownProcessesClosed'] = True
+
+def returned_main_pid(row, base, decode):
+    need(isinstance(row, dict), 'Malformed actual launch process result')
+    value = row.get('processIdentifier')
+    need(type(value) is int and value > 0 and (decode(row.get('executable', '')) == base + '/Madeira'), 'Wrong returned fresh main identity')
+    return value
+
+async def restore_library(publisher, afc, result, before, entry, original):
+    need(result['ownProcessesClosed'], 'Cannot restore library while own main/helper remains')
+    current = (await afc.read(LIBRARY, 2 * 1024 ** 2))[0]
+    if current != original:
+        preserved_card(before, library(current), entry)
+        await publisher.publish(original, digest(current), rollback=True)
+    need((await afc.read(LIBRARY, 2 * 1024 ** 2))[0] == original, 'Original exact library restore failed')
+    result['libraryRestored'] = True
+
+async def read_final_cpu_log(afc, p, stage, result):
+    need(result['preCleanupLogReads'] == 0 and (not result.get('preCleanupLogReadAttempted')), 'Single pre-cleanup log read already attempted')
+    need('ownedTerminationAttemptedMonotonic' not in result, 'CPU terminal evidence must precede any collector termination')
+    result['preCleanupLogReadAttempted'] = True
+    (raw, info) = await afc.read(LOG, MAX_LOG)
+    result['preCleanupLogReads'] = 1
+    (stage / '__PRIVATE_LOG_LEAF__').write_bytes(raw)
+    need(digest(raw) != result['priorLogSha256'], 'Stale unchanged own log')
+    result['logReview'] = module(HERE / 'log_contracts.py', 'actual_initial_cpu_log').validate(raw, p['phase'], p['windowsPath'])
+    result['guestZeroExitObservedBeforeAnyTermination'] = result['logReview']['guestExitCode'] == 0
+    result['diagnosticCaptureCollected'] = result['logReview']['exceptionTransitionTraceObserved']
+    result['continuingPrerequisiteAcceptanceAllowed'] = False
+    result['logReadFinishedBeforeCleanupMonotonic'] = time.monotonic()
+
+def bounded_completion(seconds):
+    return type(seconds) in (int, float) and math.isfinite(seconds) and (0 <= seconds <= TOTAL)
+INITIAL_BASE = None
+
+def initial_main_snapshot(build, owned, base):
+    need(build == '60' and type(owned) is dict and (len(owned) <= 1), 'Initial own60 cleanup requires at most one exact main')
+    own_base(base)
+    need(all((type(pid) is int and pid > 0 and (type(path) is str) and (path == base + '/Madeira') for (pid, path) in owned.items())), 'Initial helper/foreign/malformed identity refused')
+    return dict(owned)
+
+async def close_initial_owned_main(s, p, result):
+    """Ordinary own-app cleanup before publication/launch, no prewarm attribution."""
+    need(result.get('launchAttempted') is result.get('libraryPublicationAttempted') is False and p['expectedBundlePath'] == s.base, 'Ordinary cleanup is only before the first strict prelaunch boundary')
+    (build, owned) = await s.snapshot(['60'])
+    first = initial_main_snapshot(build, owned, s.base)
+    record = {'boundary': 'initial_before_staging_publication_or_fixture_launch', 'observedBuild': '60', 'bundlePath': s.base, 'firstOwned': [{'pid': pid, 'path': path} for (pid, path) in first.items()], 'terminationAttempted': False, 'terminatedPID': None, 'causeClaimed': False}
+    result['initialOrdinaryOwnMainClose'] = record
+    if first:
+        (build, fresh) = await s.snapshot(['60'])
+        second = initial_main_snapshot(build, fresh, s.base)
+        need(second == first, 'Initial exact main identity changed before ordinary cleanup')
+        record['twoFreshMatchingSnapshots'] = True
+        pid = next(iter(first))
+        record['terminationAttempted'] = True
+        record['terminationAttemptedMonotonic'] = time.monotonic()
+        await s.query(['process', 'terminate', '--kill', '--pid', str(pid)], 'initial-close-exact-existing-own60-main', cap=10)
+        record['terminatedPID'] = pid
+    (build, closed) = await s.snapshot(['60'])
+    post = initial_main_snapshot(build, closed, s.base)
+    need(not post, 'Initial ordinary own60 cleanup did not produce an empty process set')
+    record['freshPostCloseEmpty'] = True
+
+async def execute(path, wanted):
+    p = verify_plan(path, wanted)
+    n = module(ORIGINAL, 'original_cpu_device_primitives')
+    original_plan = n.verify_plan(OLD_PLAN, OLD_PLAN_SHA)
+    need(sys.version_info[:2] == (3, 12) and Path(sys.executable).resolve() == Path(original_plan['afcPython']).resolve() and (sha(sys.executable) == original_plan['afcPythonSha256']), 'Frozen existing Python3.12 AFC interpreter required')
+    stage = path.parent / 'execution'
+    need(not stage.exists(), 'Single-use CPU plan already attempted')
+    s = module(HERE / 'launch_query.py', 'exact_cpu_launch_session').session_type(n, p)(original_plan, stage, TOTAL)
+    s.base = p['expectedBundlePath']
+    s.guard()
+    stage.mkdir()
+    s.deadline = s.started + SETUP
+    result = {'schema': 1, 'status': 'native60_bounded_exception_trace_diagnostic_failed_or_incomplete', 'success': False, 'planSha256': wanted, 'phase': p['phase'], 'probeID': p['probeID'], 'device': DEVICE, 'bundle': BUNDLE, 'nativeBuild': BUILD, 'launchAttempted': False, 'ownedNativePID': None, 'preCleanupLogReads': 0, 'libraryPublicationAttempted': False, 'libraryRestored': False, 'ownProcessesClosed': False, 'packageKeptForEvidence': True, 'collectorGameSaveOrPairingWrites': False, 'fullGameSaveInventoryRechecked': False, 'opaqueContentsVerified': False, 'installedBinaryBytesRead': False, 'gpuQualified': False, 'gamePlayable': False, 'performanceQualified': False, 'persistentProfiler': False, 'duringFixtureLogReads': 0, 'deviceActions': True, 'inputHashes': p['inputs'], 'sourceSha256': sha(__file__), 'acceptedInstallationBindingSha256': p['acceptedInstallationBindingSha256'], 'acceptedInstallationResultSha256': p['acceptedInstallationResultSha256'], 'signedNative60ReceiptSha256': p['signedNative60ReceiptSha256'], 'fexRuntimeSha256': p['fexRuntimeSha256'], 'cpuPackageSourceFreezeSha256': FREEZE, 'continuingPrerequisite': p['continuingPrerequisite']}
+    lockdown = service = None
+    publisher = None
+    afc = None
+    pid = None
+    original = (path.parent / 'original-library.json').read_bytes()
+    before = library(original)
+    failure = None
+    cleanup_errors = []
+    try:
+        await close_initial_owned_main(s, p, result)
+        await s.closed(['60'])
+        from pymobiledevice3.lockdown import create_using_usbmux
+        from pymobiledevice3.services.house_arrest import HouseArrestService
+        for name in ['lockdown', 'services.house_arrest', 'services.afc', 'services.lockdown_service', 'service_connection', 'usbmux']:
+            actual = str(Path(sys.modules['pymobiledevice3.' + name].__file__).resolve())
+            need(original_plan['afcRuntimeSourceHashes'].get(actual) == sha(actual), 'Actually loaded AFC module differs')
+        s.guard()
+        lockdown = await asyncio.wait_for(create_using_usbmux(serial=DEVICE, identifier=DEVICE, autopair=False, connection_type='USB'), 25)
+        await asyncio.wait_for(lockdown.__aenter__(), 25)
+        need(lockdown.udid == DEVICE and lockdown.paired is True, 'Exact existing-paired own USB device required')
+        service = await asyncio.wait_for(HouseArrestService.create(lockdown, BUNDLE, documents_only=False), 25)
+        await asyncio.wait_for(service.__aenter__(), 25)
+        afc = AFC(service, s)
+        publisher = module(ATOMIC, 'single_use_cpu_atomic').AtomicLibrary(service, s.guard)
+        need((await afc.read(LIBRARY, 2 * 1024 ** 2))[0] == original, 'Fresh closed raw library differs from accepted baseline')
+        for (name, value) in p['protectedMetadata'].items():
+            need(digest((await afc.read(name, 8 * 1024 ** 2))[0]) == value, 'Protected game/global metadata differs')
+        await afc.stage(p)
+        await s.closed(['60'])
+        await publisher.probe()
+        result['libraryPublicationAttempted'] = True
+        await publisher.publish((path.parent / 'probe-library.json').read_bytes(), p['originalLibrarySha256'])
+        result['libraryPublished'] = True
+        (prior, info) = await afc.read(LOG, MAX_LOG)
+        (stage / 'before.owned-log').write_bytes(prior)
+        result['priorLogSha256'] = digest(prior)
+        result['priorLogStat'] = n.stat_fingerprint(info) if hasattr(n, 'stat_fingerprint') else {k: str(info.get(k)) for k in ['st_size', 'st_birthtime', 'st_mtime']}
+        await s.closed(['60'])
+        result['launchAttempted'] = True
+        launch = await s.query(['process', 'launch', '--payload-url', p['launchURL'], '--', BUNDLE, *p['launchArguments']], 'launch-own-single-use-cpu', cap=20)
+        pid = returned_main_pid(launch['process'], s.base, n.decoded)
+        result['ownedNativePID'] = pid
+        start = time.monotonic()
+        s.deadline = min(s.total - CLEANUP, start + p['observationSeconds'] + 55)
+        await asyncio.sleep(p['observationSeconds'])
+        s.guard()
+        (build, owned) = await s.snapshot(['60'])
+        need(owned.get(pid) == s.base + '/Madeira', 'Original launched main continuity lost before log read')
+        await read_final_cpu_log(afc, p, stage, result)
+    except Exception as error:
+        failure = type(error).__name__ + ': ' + str(error)
+    finally:
+        s.deadline = min(s.total, time.monotonic() + CLEANUP)
+        try:
+            await close_exact_main(s, pid, result)
+        except Exception as error:
+            cleanup_errors.append({'step': 'exact-main-close', 'error': type(error).__name__ + ': ' + str(error)})
+        try:
+            if publisher and result['libraryPublicationAttempted']:
+                await restore_library(publisher, afc, result, before, p['entry'], original)
+            if afc and result['ownProcessesClosed']:
+                for (name, value) in p['protectedMetadata'].items():
+                    need(digest((await afc.read(name, 8 * 1024 ** 2))[0]) == value, 'Protected metadata changed after probe')
+                result['protectedMetadataPreserved'] = True
+        except Exception as error:
+            cleanup_errors.append({'step': 'library-and-metadata', 'error': type(error).__name__ + ': ' + str(error)})
+        for (name, connection) in [('afc', service), ('lockdown', lockdown)]:
+            try:
+                if connection is not None:
+                    await asyncio.wait_for(connection.__aexit__(None, None, None), 10)
+            except Exception as error:
+                cleanup_errors.append({'step': name + '-finite-close', 'error': type(error).__name__ + ': ' + str(error)})
+        result['failure'] = failure
+        result['cleanupErrors'] = cleanup_errors
+        result['seconds'] = time.monotonic() - s.started
+        result['totalBudgetSatisfied'] = bounded_completion(result['seconds'])
+        result['success'] = bool(result['totalBudgetSatisfied'] and (not failure) and (not cleanup_errors) and result.get('diagnosticCaptureCollected') and result['ownProcessesClosed'] and result['libraryRestored'] and result.get('protectedMetadataPreserved'))
+        if result['success']:
+            result['status'] = 'actual_native60_bounded_exception_trace_capture_and_cleanup_complete_not_cpu_qualification'
+        result['continuingPrerequisiteAcceptanceAllowed'] = False
+        result['acceptedEightCpuPhases'] = False
+        result['full803ExceptionGatePassed'] = False
+        result['exceptionTraceDiagnosticScope'] = p['boundedExceptionTrace']
+        result['nativeSymbolization'] = p['nativeSymbolization']
+        result['evidence'] = {x.name: sha(x) for x in stage.iterdir() if x.is_file()}
+        save(stage / 'receipt.json', result)
+    return 0 if result['success'] else 1
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--prepare', choices=['continuing-only-diagnostic'])
+    group.add_argument('--execute', type=Path)
+    parser.add_argument('--proposal', type=Path)
+    parser.add_argument('--runtime-binding', type=Path)
+    parser.add_argument('--installation-binding', type=Path)
+    parser.add_argument('--plan-sha256')
+    args = parser.parse_args()
+    if args.prepare:
+        need(all([args.proposal, args.runtime_binding, args.installation_binding]) and args.plan_sha256 is None, 'Prepare requires actual runtime/accepted60install bindings')
+        print(prepare(args.prepare, args.proposal, args.runtime_binding, args.installation_binding))
+        return 0
+    if args.execute:
+        need(args.plan_sha256 and (not any([args.proposal, args.runtime_binding, args.installation_binding])), 'Execute requires exact root-reviewed plan SHA only')
+        return asyncio.run(execute(args.execute, args.plan_sha256))
+    need(not any([args.proposal, args.runtime_binding, args.installation_binding, args.plan_sha256]), 'Options require explicit action')
+    print(json.dumps({'status': 'inert_native60_bounded_exception_trace_diagnostic_not_published', 'deviceActions': False, 'runtimeExecuted': False, 'acceptedNative60InstallationRequired': True, 'continuingPrerequisiteAcceptanceAllowed': False}))
+    return 0
+if __name__ == '__main__':
+    raise SystemExit(main())

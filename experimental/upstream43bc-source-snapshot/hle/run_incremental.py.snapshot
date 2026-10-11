@@ -1,0 +1,71 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Root-authorized private source adoption and incremental HLE producer; never devices/canonical."""
+from pathlib import Path
+import argparse,hashlib,json,subprocess,os,sys,shutil,time,runpy,ast
+OUT=Path(__file__).resolve().parents[1];ROUTE=OUT/'incremental-route';ROOT=Path('__LOCAL_PROJECT_ROOT__')
+u=runpy.run_path(str(OUT/'source_utils.py'));sha=u['sha'];source_map=u['source_map'];verify_vendors=u['verify_vendors'];dump=u['dump'];git=u['git'];file_entries=u['file_entries']
+REVIEW_SHA='3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398';BASE='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b';OLD='ca4ab0d5d66f3855991fa95eec6e7e15e34e24c6';HELPER_SHA='f1973446d099eed367bc5146639cd8a9d1692689c92b9893e0714c73ddd9e565'
+TARGETED=ROOT/'build/graphics-depth-capability-current17-proposal-20261012/actual-targeted-run';PRESERVED=ROOT/'build/anyps5-full-main-update-20261012/preserved-latest17-source-and-build-after-failure';BASE_DIR=ROOT/'build/anyps5-full-main-update-20261012';SOURCE=BASE_DIR/'qualification-source-v5';BUILD=BASE_DIR/'winlibs-build-latest17';PARENT_CANON=ROOT/'upstreams/AnyPS5';PYTHON=Path('__LOCAL_HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12');WINE=ROOT/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine';ARENA={'APS5_GUEST_ARENA_BASE':'0x7400000000','APS5_GUEST_ARENA_SIZE':'0x100000000','APS5_GUEST_ARENA_LAZY':'1','APS5_GUEST_ARENA_CHUNK':'0x10000000'}
+def main():
+ ap=argparse.ArgumentParser();ap.add_argument('--execute',action='store_true');args=ap.parse_args()
+ plan=json.loads((ROUTE/'plan.json').read_text());review=json.loads((OUT/'source-candidate-review.json').read_text());expected=json.loads((OUT/'candidate-source-map.json').read_text());newfiles=file_entries(expected)
+ assert sha(OUT/'source-candidate-review.json')==REVIEW_SHA
+ assert source_map(OUT/'source')==expected
+ assert review['upstreamCommit']==BASE and len(newfiles)==2199 and review['patchCount']==20
+ assert sha(ROUTE/'build-hle-final43bc.py')==HELPER_SHA
+ assert sha(PYTHON)=='4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc'
+ assert sha(TARGETED/'receipt.json')=='a5cd77306544735be0bf07d73e02c7ff8bad0c3836757f4b90623693078dd512'
+ assert sha(TARGETED/'source-after.json')=='33a57fdc7b74e14a7834ebe3b28ee181606c5ee8c109ccbb88a9332bf05c9b34'
+ assert sha(PRESERVED/'receipt.json')=='ce70ebdf58685876f1f7f8349fcdfda7bf22dd779124334fb3023ed796eb0009'
+ previous_full=json.loads((ROOT/'build/anyps5-latestca4-source-proposal-20261012/candidate-source-map.json').read_text());previous=file_entries(previous_full);assert source_map(SOURCE)==previous_full
+ assert sha(ROOT/'build/anyps5-latestca4-source-proposal-20261012/actual-incremental-run/source-adoption-receipt.json')=='bbb140da988fde77f161bf4d9667d038b248f0dac568f2f86c1307a08328c38a'
+ assert git(SOURCE,'rev-parse','HEAD').decode().strip()==OLD
+ assert Path(git(SOURCE,'rev-parse','--absolute-git-dir').decode().strip()).is_relative_to(SOURCE)
+ vendors=verify_vendors(SOURCE,expected);assert len(vendors)==11
+ canonical=source_map(PARENT_CANON,False)
+ assert canonical==json.loads((ROOT/'build/anyps5-latest14a-source-proposal-20261012/frozen-inputs-before.json').read_text())['canonicalSource']
+ old_times={k:(SOURCE/k).stat().st_mtime_ns for k in previous};changed=[k for k,v in newfiles.items() if previous.get(k)!=v];deleted=sorted(previous.keys()-newfiles.keys());unchanged=sorted(k for k,v in newfiles.items() if previous.get(k)==v)
+ preflight={'kind':'private_final43bc_incremental_adoption_preflight','sourceCandidateReviewSha256':REVIEW_SHA,'candidateSourceEntries':2199,'previousSourceEntries':len(previous),'changedOrAddedSourcePaths':changed,'deletedDeclaredOldPaths':deleted,'unchangedSourcePaths':unchanged,'elevenVendors':vendors,'canonicalOldSourceVerified':True,'sourceOnly':True,'runtimeQualified':False}
+ if not args.execute:
+  dump(ROUTE/'preflight.json',preflight);print(json.dumps({'status':'private source adoption preflight passed, not executed','changed':len(changed),'deleted':len(deleted),'untouchedMtimePaths':len(unchanged),'requiredExecutableTargets':plan['totalRequiredExecutableTargets']},indent=2));return
+ actual=OUT/'actual-incremental-run';actual.mkdir(exist_ok=False);dump(actual/'preflight.json',preflight)
+ # Fetch only the held exact commit through a read-only local repository; do not reset/copy unchanged files.
+ subprocess.run(['git','-C',str(SOURCE),'fetch','--no-tags','--no-recurse-submodules',str(OUT/'source'),BASE],check=True)
+ for rel in changed:
+  assert '..' not in Path(rel).parts and not rel.startswith('.git/');dest=SOURCE/rel;dest.parent.mkdir(parents=True,exist_ok=True);temporary=dest.with_name(dest.name+'.ca4-source-new');shutil.copy2(OUT/'source'/rel,temporary);os.replace(temporary,dest)
+ for rel in deleted:
+  assert sha(SOURCE/rel)==previous[rel]['sha256'];(SOURCE/rel).unlink()
+ subprocess.run(['git','-C',str(SOURCE),'update-ref','--no-deref','HEAD',BASE],check=True)
+ subprocess.run(['git','-C',str(SOURCE),'read-tree',BASE],check=True)
+ # Include local added files in the exact source diff/provenance while keeping HEAD the merged base.
+ untracked=[n.decode() for n in git(SOURCE,'ls-files','--others','--exclude-standard','-z').split(b'\0') if n]
+ if untracked:subprocess.run(['git','-C',str(SOURCE),'add','--intent-to-add','--',*untracked],check=True)
+ assert source_map(SOURCE)==expected and verify_vendors(SOURCE,expected)==vendors
+ assert all((SOURCE/k).stat().st_mtime_ns==old_times[k] for k in unchanged)
+ assert source_map(PARENT_CANON,False)==canonical
+ dump(actual/'source-adoption-receipt.json',{'status':'actual_private_final43bc_plus20_source_adopted_no_canonical_or_device_mutation','sourceReviewSha256':REVIEW_SHA,'upstreamCommit':BASE,'sourceEntryCount':2199,'patchCount':20,'changedOrAddedFiles':len(changed),'deletedDeclaredFiles':deleted,'unchangedFilesRetainedExactMtimeAndMode':len(unchanged),'sourceMapMatched':True,'elevenVendorsCleanExact':True,'canonicalOldSourceUnchanged':True,'oldSourceAndBuildRetainedReceiptSha256':sha(PRESERVED/'receipt.json'),'compilerExecuted':False,'runtimeQualified':False})
+ helper=ROUTE/'build-hle-final43bc.py';prefix=Path(plan['newWinePrefix']);output=Path(plan['output']);output.parent.mkdir(parents=True,exist_ok=True)
+ argv=[str(PYTHON),'-I','-B',str(helper),'--source',str(SOURCE),'--from-hle',str(ROOT/'build/apple-gpu-20261011/hle-runtime.zip'),'--build',str(BUILD),'--wine',str(WINE),'--wine-prefix',str(prefix),'--jobs','1','--output',str(output)]
+ for target in plan['totalAdditionalTargets']:argv+=['--additional-test',target]
+ # Keep old preparation immutable; author a fresh exact-source preparation.
+ oldprep=json.loads((BASE_DIR/'qualification-source-latest17-actual-preparation.json').read_text());prep={'schema':1,'kind':'actual_private_final43bc_plus20_incremental_hle_source_preparation','upstreamCommit':BASE,'source':str(SOURCE),'rootBuildSourceAfterPromotion':str(SOURCE),'sourceEntryCount':2199,'sourceTree':newfiles,'sourceFiles':{k:v['sha256'] for k,v in newfiles.items()},'sourceFullMapSha256':sha(OUT/'candidate-source-map.json'),'patchCount':20,'patches':review['patches'],'latestSourceCandidateReviewSha256':REVIEW_SHA,'actualPrivateSourceAdoptionReceiptSha256':sha(actual/'source-adoption-receipt.json'),'previousActualPreparationSha256':sha(BASE_DIR/'qualification-source-latest17-actual-preparation.json'),'previousFailedSourceBuildPreservationSha256':sha(PRESERVED/'receipt.json'),'selectedPrxTargets':oldprep['selectedPrxTargets'],'selectedPrxTargetCount':47,'requiredDefaultHostTestTargets':oldprep['requiredDefaultHostTestTargets'],'defaultHostTestTargetCount':42,'additionalTestTargets':plan['totalAdditionalTargets'],'additionalTestTargetCount':32,'requiredCompleteHostTestTargetCount':74,'original49ExecutableTargetsRetained':True,'requiredHostTestArena':ARENA,'requestVersion':17,'cacheFormatVersion':28,'generatedSourceVersionFromFreshConfigureRequired':True,'helperSha256':HELPER_SHA,'rootScriptSha256':sha(Path(__file__)),'rootCommandArgv':argv,'allThirdPartyTreesCleanAtExactGitlinks':True,'actualInitializedDependencies':vendors,'canonicalUpdated':False,'sourceOnly':False,'actualRuntimeTestsExecutedForThisSource':False,'fullHleQualified':False,'runtimeQualified':False,'deviceExecuted':False,'gameplayVerified':False}
+ assert len(prep['selectedPrxTargets'])==47 and len(prep['requiredDefaultHostTestTargets'])==42
+ prepfile=BASE_DIR/'qualification-source-final43bc-patch20-actual-preparation.json';assert not prepfile.exists();dump(prepfile,prep)
+ code=None;joined=None;started=time.monotonic();error=None
+ try:
+  with (actual/'full-hle.log').open('wb') as log:code=subprocess.run(argv,env=dict(os.environ,**ARENA,PYTHONUNBUFFERED='1'),stdout=log,stderr=subprocess.STDOUT,timeout=7200).returncode
+ except BaseException as exc:error=repr(exc)
+ finally:
+  try:joined=subprocess.run([str(WINE.parent/'wineserver'),'-w'],env=dict(os.environ,WINEPREFIX=str(prefix),WINEDEBUG='-all',**ARENA),timeout=45).returncode
+  except Exception as exc:error=(error or '')+' Wine join '+repr(exc)
+  matched=source_map(SOURCE)==expected and verify_vendors(SOURCE,expected)==vendors
+  result={'kind':'actual_final43bc_plus20_incremental_full_hle_run','sourceReviewSha256':REVIEW_SHA,'actualPreparationSha256':sha(prepfile),'upstreamCommit':BASE,'patchCount':20,'helperSha256':HELPER_SHA,'rootScriptSha256':sha(Path(__file__)),'rootCommandArgv':argv,'exit':code,'error':error,'seconds':time.monotonic()-started,'wineJoined':joined==0,'sourceAndDependenciesUnchangedAfterRun':matched,'requiredDefaultTargetCount':42,'requiredAdditionalTargetCount':32,'requiredExecutableTargetCount':74,'selectedPrxTargetCount':47,'hostTestArena':ARENA,'fullHleProducerPassed':code==0 and joined==0 and matched,'nativeWindowsGpuQualified':False,'deviceExecuted':False,'gameplayVerified':False}
+  for name in ['test-additional.xml','inventory-additional.json','test-additional-inventory.json']:
+   p=BUILD/name
+   if p.exists():result[name+'Sha256']=sha(p)
+  dump(actual/'receipt.json',result)
+ print(json.dumps({'fullHleExit':code,'wineJoined':joined==0,'sourceMatched':matched,'receipt':str(actual/'receipt.json')},indent=2),flush=True)
+ raise SystemExit(0 if code==0 and joined==0 and matched else 1)
+if __name__=='__main__':main()

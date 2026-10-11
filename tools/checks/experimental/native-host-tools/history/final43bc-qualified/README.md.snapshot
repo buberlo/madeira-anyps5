@@ -1,0 +1,29 @@
+# Held latest native conversion-tool qualification route
+
+This source-only successor copies the retained public native-host-tools harness.
+It registers the portable upstream alias fixture on macOS using the production
+reader, Windows writer and their actual helper closure. The complete relinker,
+NID patcher and existing CTests remain registered through the supplied source.
+
+Use the actual adopted private source and its frozen latest-plus20 source review.
+Run receipt.py before and after; it compares every source hash and mode and all
+11 initialized vendor commits/clean states directly against that review. The
+optional adoption receipt is recorded by hash without inventing its outcome.
+
+A fresh output directory must receive configure.log, build.log, ctest.log,
+test-inventory.json, tests.xml, source-before.json and source-after.json. Use
+Python3.12 and PYTHONDONTWRITEBYTECODE=1. Capture CTest --show-only=json-v1 and
+run the complete inventory without a name filter. finalize.py takes the actual
+--jobs value and the prior 110 test-inventory.json. Qualification requires the
+actual configured names with all prior 110 and the required ca4 and 43b regressions, complete executed-name equality, no failed/skipped cases and
+unchanged reviewed source/dependencies.
+
+Compiler jobs are coordinated across native and Windows work: --parallel1 only
+when Windows uses1 job, or --parallel2 only when Windows is joined. Configuration
+can invoke compiler checks and follows the same coordination. Source preparation
+alone is not a build, tool qualification, runtime/device or gameplay result.
+
+The preserved targeted ARM64 baseline19 alias failure and patched20 success
+are separate from the pending complete latest-case tool qualification.
+
+The final upstream target for this cycle is 43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b. Source counts and extra current test names come from the frozen source review and actual configured inventory; earlier 114 is only the retained ca4 checkpoint.

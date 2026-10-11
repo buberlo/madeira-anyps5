@@ -1,0 +1,49 @@
+--- a/core/relinker/relinker/tests/WindowsExportAliasTests.cpp
++++ b/core/relinker/relinker/tests/WindowsExportAliasTests.cpp
+@@ -2,11 +2,14 @@
+ #include <elfpatcher/general/GuestModuleWriter.hpp>
+ #include <elfpatcher/windows/WindowsLoadImage.hpp>
+ #include <elfpatcher/windows/WindowsPeFormat.hpp>
++#include <elfpatcher/windows/WindowsGuestLifecycleBuilder.hpp>
+ #include <io/BufferUtils.hpp>
+ #include <domain/ImportModule.hpp>
+ #include <array>
+ #include <cstring>
+ #include <iostream>
++#include <map>
++#include <set>
+ #include <stdexcept>
+ 
+ using Bytes = std::vector<std::uint8_t>;
+@@ -53,10 +56,27 @@
+     Check(g.Symbols[3].QualifiedName=="imported#A#B"&&g.Symbols[3].Library=="fixtureHost.prx","qualified import changed");
+     Domain::GuestRuntime runtime;const auto pe=Elfpatcher::GuestModuleWriter().WriteWindows(g,runtime);
+     const auto directory=Offset(pe,Io::ReadU32(pe,Io::ReadU32(pe,0x3c)+24+112));
+-    Check(Io::ReadU32(pe,directory+20)==1&&Io::ReadU32(pe,directory+24)==1,"multiple PE exports");
+-    const auto function=Io::ReadU32(pe,Offset(pe,Io::ReadU32(pe,directory+28)));
+-    const auto nameRva=Io::ReadU32(pe,Offset(pe,Io::ReadU32(pe,directory+32)));
+-    Check(std::strcmp(reinterpret_cast<const char*>(pe.data()+Offset(pe,nameRva)),"alias")==0,"wrong export name");
++    const auto functionCount=Io::ReadU32(pe,directory+20),nameCount=Io::ReadU32(pe,directory+24);
++    Check(functionCount==3&&nameCount==3,"expected one alias and two owned lifecycle exports");
++    const auto functions=Offset(pe,Io::ReadU32(pe,directory+28));
++    const auto names=Offset(pe,Io::ReadU32(pe,directory+32));
++    const auto ordinals=Offset(pe,Io::ReadU32(pe,directory+36));
++    const std::array<const char*,3> expectedNames={Elfpatcher::Windows::GuestStartExport,Elfpatcher::Windows::GuestStopExport,"alias"};
++    std::map<std::string,std::uint32_t> exports;
++    std::set<std::uint16_t> usedOrdinals;
++    for(unsigned i=0;i<nameCount;++i){
++        const auto nameRva=Io::ReadU32(pe,names+i*4);
++        const auto* name=reinterpret_cast<const char*>(pe.data()+Offset(pe,nameRva));
++        Check(std::strcmp(name,expectedNames[i])==0,"unexpected or unsorted owned export name");
++        const auto ordinal=Io::ReadU16(pe,ordinals+i*2);
++        Check(ordinal<functionCount&&usedOrdinals.insert(ordinal).second,"invalid or duplicate export ordinal");
++        const auto rva=Io::ReadU32(pe,functions+ordinal*4);
++        Check(rva!=0&&exports.emplace(name,rva).second,"missing or duplicate named export");
++    }
++    const auto start=exports.at(Elfpatcher::Windows::GuestStartExport),stop=exports.at(Elfpatcher::Windows::GuestStopExport);
++    Check(start==runtime.StartRva&&stop==runtime.StopRva&&start!=stop,"owned lifecycle export points to the wrong wrapper");
++    Check(pe.at(Offset(pe,start))==0x53&&pe.at(Offset(pe,stop))==0x53,"owned lifecycle export is not a wrapper entry");
++    const auto function=exports.at("alias");
+     Elfpatcher::Windows::WindowsLoadImage image(g.Bytes,g.Headers,false);
+     Check(function==image.GetRva(0x20,1),"wrong export RVA");
+     for(auto target:{0x2800,0x2808})Check(Io::ReadU64(pe,Offset(pe,image.GetRva(target,8)))==Elfpatcher::Windows::ImageBase+function,"wrong alias relocation value");

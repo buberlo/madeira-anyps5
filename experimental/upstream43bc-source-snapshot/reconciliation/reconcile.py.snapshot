@@ -1,0 +1,65 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import subprocess,shutil,json,re,hashlib
+OUT=Path(__file__).resolve().parent;SRC=OUT/'source';REF=OUT/'reference-ca4-skeleton';STATE=OUT/'rebase-state.json';OLD='ca4ab0d5d66f3855991fa95eec6e7e15e34e24c6'
+def run(repo,*args):return subprocess.run(['git','-C',str(repo),*args],capture_output=True,text=True)
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def copy_existing(src,dst,paths):
+ for rel in paths:
+  p=src/rel
+  if p.exists():q=dst/rel;q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+def regenerate(case,patch,paths):
+ after=case/'after';after.mkdir(exist_ok=True);copy_existing(SRC,after,paths)
+ r=subprocess.run(['git','diff','--no-index','--binary','--',str((case/'before').relative_to(OUT)),str(after.relative_to(OUT))],cwd=OUT,capture_output=True,text=True);assert r.returncode in [0,1]
+ assert r.returncode==1,'Entire patch already present needs explicit proof/dedup review'
+ oldPrefix='a/'+str((case/'before').relative_to(OUT))+'/';newPrefix='b/'+str(after.relative_to(OUT))+'/'
+ s=r.stdout.replace(oldPrefix,'a/').replace(newPrefix,'b/');patch.write_text(s)
+ return sha(patch)
+if not STATE.exists():
+ assert not REF.exists();REF.mkdir();subprocess.run(['git','init','--quiet',str(REF)],check=True)
+ names=set()
+ for p in sorted((OUT/'held-ca4-patches').glob('*.patch')):
+  names.update(re.findall(r'^diff --git a/(.+) b/\1$',p.read_text(),flags=re.M));names.update(re.findall(r'^\+\+\+ b/(.+)$',p.read_text(),flags=re.M))
+ for rel in sorted(names):
+  blob=subprocess.run(['git','-C',str(SRC),'show',OLD+':'+rel],capture_output=True)
+  if blob.returncode:continue
+  q=REF/rel;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(blob.stdout)
+  mode=subprocess.check_output(['git','-C',str(SRC),'ls-tree',OLD,'--',rel]).decode().split()[0]
+  q.chmod(0o755 if mode=='100755' else 0o644)
+ state={'completed':[],'pending':None};STATE.write_text(json.dumps(state,indent=2)+'\n')
+else:state=json.loads(STATE.read_text())
+patches=sorted((OUT/'patches').glob('*.patch'));assert len(patches)==20
+if state['pending']:
+ pend=state['pending'];case=OUT/pend['case'];resolved=case/'resolved'
+ for rel in pend['conflictPaths']:
+  p=resolved/rel;assert p.is_file(),'Provide reviewed resolved file '+str(p)
+  s=p.read_text();assert '<<<<<<<' not in s and '>>>>>>>' not in s
+  shutil.copy2(p,SRC/rel)
+ p=OUT/'patches'/pend['patch'];regenerate(case,p,pend['paths']);state['completed'].append({'patch':p.name,'rebased':True,'conflictPaths':pend['conflictPaths'],'patchSha256':sha(p)});state['pending']=None;STATE.write_text(json.dumps(state,indent=2)+'\n')
+for p in patches[len(state['completed']):]:
+ orig=OUT/'held-ca4-patches'/p.name;paths=sorted(set(re.findall(r'^diff --git a/(.+) b/\1$',orig.read_text(),flags=re.M)+re.findall(r'^\+\+\+ b/(.+)$',orig.read_text(),flags=re.M)));assert paths
+ case=OUT/'rebase'/p.stem;case.mkdir(parents=True);before=case/'before';before.mkdir();refBefore=case/'reference-before';refBefore.mkdir();copy_existing(SRC,before,paths);copy_existing(REF,refBefore,paths)
+ r=run(REF,'apply','--check',str(orig));assert r.returncode==0,(p.name,r.stderr)
+ r=run(REF,'apply',str(orig));assert r.returncode==0,(p.name,r.stderr)
+ r=run(SRC,'apply','--check',str(orig));(case/'original-check.json').write_text(json.dumps({'returncode':r.returncode,'stderr':r.stderr},indent=2)+'\n')
+ if r.returncode==0:
+  r=run(SRC,'apply',str(orig));assert r.returncode==0;state['completed'].append({'patch':p.name,'rebased':False,'patchSha256':sha(p)});STATE.write_text(json.dumps(state,indent=2)+'\n');print(p.name,'unchanged',flush=True);continue
+ conflicts=sorted(set(re.findall(r'error: patch failed: (.+):\d+',r.stderr)+re.findall(r'error: (.+): already exists in working directory',r.stderr)))
+ assert conflicts,(p.name,r.stderr)
+ assert set(conflicts)<=set(paths)
+ r=run(SRC,'apply',*[f'--exclude={rel}' for rel in conflicts],str(orig));assert r.returncode==0,(p.name,r.stderr)
+ unresolved=[];merged=case/'merged';resolved=case/'resolved';merged.mkdir();resolved.mkdir()
+ for rel in conflicts:
+  current=before/rel;base=refBefore/rel;local=REF/rel
+  for q in [current,base,local]:assert q.is_file(),(rel,q)
+  r=subprocess.run(['git','merge-file','-p',str(current),str(base),str(local)],capture_output=True,text=True)
+  assert 0<=r.returncode<128,(rel,r.stderr);q=merged/rel;q.parent.mkdir(parents=True,exist_ok=True);q.write_text(r.stdout);shutil.copymode(current,q)
+  if r.returncode==0:target=resolved/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(q,target)
+  else:unresolved.append(rel)
+ pend={'patch':p.name,'case':str(case.relative_to(OUT)),'paths':paths,'conflictPaths':conflicts,'unresolvedPaths':unresolved};state['pending']=pend;STATE.write_text(json.dumps(state,indent=2)+'\n');print(json.dumps(pend,indent=2),flush=True)
+ if unresolved:break
+ for rel in conflicts:shutil.copy2(resolved/rel,SRC/rel)
+ regenerate(case,p,paths);state['completed'].append({'patch':p.name,'rebased':True,'conflictPaths':conflicts,'patchSha256':sha(p)});state['pending']=None;STATE.write_text(json.dumps(state,indent=2)+'\n')
+else:print('Complete20source reconciliation applied',flush=True)

@@ -1,4 +1,4 @@
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp
 new file mode 100644
 index 0000000..5fed42a
 --- /dev/null
@@ -39,7 +39,7 @@ index 0000000..5fed42a
 +
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSnapshotCopy.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSnapshotCopy.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSnapshotCopy.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSnapshotCopy.hpp
 new file mode 100644
 index 0000000..c6f4ca8
 --- /dev/null
@@ -75,7 +75,7 @@ index 0000000..c6f4ca8
 +};
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSwizzleEquations.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSwizzleEquations.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSwizzleEquations.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleSwizzleEquations.hpp
 new file mode 100644
 index 0000000..c17278b
 --- /dev/null
@@ -151,7 +151,7 @@ index 0000000..c17278b
 +
 +}
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp
 new file mode 100644
 index 0000000..70ba169
 --- /dev/null
@@ -294,7 +294,7 @@ index e59172f..79dbfe4 100644
  std::optional<std::string> KnownValidationFailure(const Context& context, std::span<const CompiledShader> shaders, const State& state);
  std::uint64_t DrawRenderPassKey(const Context& context, const State& state, std::span<const VkImageView> targetViews);
  
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/FramePixelDiagnostics.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/FramePixelDiagnostics.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/FramePixelDiagnostics.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/FramePixelDiagnostics.hpp
 new file mode 100644
 index 0000000..671296c
 --- /dev/null
@@ -455,7 +455,7 @@ index 0000000..671296c
 +}
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/GpuColorSampleTiler.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/GpuColorSampleTiler.hpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/include/GpuColorSampleTiler.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/GpuColorSampleTiler.hpp
 new file mode 100644
 index 0000000..72c641e
 --- /dev/null
@@ -527,27 +527,24 @@ index 0000000..72c641e
 +}
 +#endif
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/State.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/State.hpp
-index cd0d2c3..db8c2d7 100644
+index bb18791..7f87b96 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/include/State.hpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/include/State.hpp
-@@ -57,6 +57,10 @@ struct ColorTarget {
+@@ -61,7 +61,10 @@ struct ColorTarget {
      std::uint32_t exportIndex = 0;
      bool uintExport = false;
      std::uint32_t pipeBankXor = 0;
 +    // Coverage samples and stored color fragments, decoded from CB_COLOR_ATTRIB.
 +    // EQAA (different counts) is rejected until its FMASK mapping is implemented.
-+    std::uint32_t samples = 1;
+     std::uint32_t samples = 1;
 +    std::uint32_t fragments = 1;
  };
  
  struct DepthTarget {
-@@ -68,9 +72,21 @@ struct DepthTarget {
-     std::uint8_t clearStencil;
-     std::uint64_t htileAddress = 0;
-     bool htileStencil = false;
-+    std::uint32_t samples = 1;
-+};
-+
+@@ -76,7 +79,18 @@ struct DepthTarget {
+     std::uint32_t samples = 1;
+ };
+ 
 +// Logical coverage/storage samples. Eight guest samples are retained in two
 +// native four-sample attachment layers, not reduced to four or averaged.
 +struct SampleConfiguration {
@@ -556,14 +553,18 @@ index cd0d2c3..db8c2d7 100644
 +    std::uint32_t groups = 1;
 +    std::uint32_t mask = 1;
 +    std::array<VkSampleLocationEXT, 8> positions{};
- };
- 
++};
++
  struct State {
 +    SampleConfiguration samples;
      ShaderStages stages;
      std::optional<DepthTarget> depth;
      bool depthTest = false;
-@@ -112,13 +128,23 @@ struct State {
+@@ -115,17 +129,26 @@ struct State {
+     VkProvokingVertexModeEXT provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT;
+     VkPipelineColorBlendAttachmentState blend;
+     std::array<float, 4> blendConstants;
+-    std::uint32_t samples = 1;
  };
  
  ShaderStages DecodeShaderStages(const QueueState& queue, bool vertexWorkgroup = false);
@@ -586,9 +587,9 @@ index cd0d2c3..db8c2d7 100644
 +QueueState ColorResolveRasterQueue(const QueueState& queue, const ColorResolvePass& pass);
 +
  struct ColorMetadataPass {
-     enum class Mode { EliminateFastClear, DccDecompress };
+     enum class Mode { EliminateFastClear, DccDecompress, Resolve };
      Mode mode;
-@@ -129,7 +155,7 @@ std::string DepthMaintenanceRejection(const QueueState& queue);
+@@ -137,7 +160,7 @@ std::string DepthMaintenanceRejection(const QueueState& queue);
  // The message DecodeState (or the pixel stage decode after it) would throw for the register rules
  // this precheck covers, evaluated without exceptions before the draw is decoded; empty when they
  // pass (DecodeState still checks everything). A register a rule needs that is absent is no verdict.
@@ -597,25 +598,7 @@ index cd0d2c3..db8c2d7 100644
  bool PixelProgramSkipped(const QueueState& queue);
  std::string NullPixelProgramRejection(const QueueState& queue);
  
-@@ -163,7 +189,7 @@ struct DrawKeyRange {
-     std::uint32_t first;
-     std::uint32_t count;
- };
--inline constexpr std::array<DrawKeyRange, 48> DrawKeyRegisters{{
-+inline constexpr std::array<DrawKeyRange, 49> DrawKeyRegisters{{
-     {RegisterBank::Context, 0x000, 1}, {RegisterBank::Context, 0x002, 1}, {RegisterBank::Context, 0x005, 1}, {RegisterBank::Context, 0x007, 7}, {RegisterBank::Context, 0x010, 6}, {RegisterBank::Context, 0x01a, 5},
-     {RegisterBank::Context, 0x080, 4}, {RegisterBank::Context, 0x08c, 4}, {RegisterBank::Context, 0x090, 2}, {RegisterBank::Context, 0x094, 2}, {RegisterBank::Context, 0x0b4, 2}, {RegisterBank::Context, 0x105, 4}, {RegisterBank::Context, 0x10b, 3}, {RegisterBank::Context, 0x10f, 6},
-     // SPI_PS_INPUT_CNTL_0..31, SPI_PS_INPUT_ENA/ADDR, SPI_PS_IN_CONTROL, SPI_SHADER_POS/Z/COL_FORMAT,
-@@ -171,7 +197,7 @@ inline constexpr std::array<DrawKeyRange, 48> DrawKeyRegisters{{
-     {RegisterBank::Context, 0x191, 32}, {RegisterBank::Context, 0x1b3, 2}, {RegisterBank::Context, 0x1b6, 1}, {RegisterBank::Context, 0x1c3, 3}, {RegisterBank::Context, 0x1e0, 8}, {RegisterBank::Context, 0x1ff, 1},
-     // DB_DEPTH_CONTROL .. PA_CL_VS_OUT_CNTL, PA_SC_MODE_CNTL_0/1, VGT_GS_MODE, VGT_GS_VERT_ITEMSIZE,
-     // PA_SU_VTX_CNTL, the sample masks, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL.
--    {RegisterBank::Context, 0x200, 8}, {RegisterBank::Context, 0x286, 2}, {RegisterBank::Context, 0x292, 2}, {RegisterBank::Context, 0x29b, 1}, {RegisterBank::Context, 0x2ab, 1}, {RegisterBank::Context, 0x2ce, 1}, {RegisterBank::Context, 0x2d5, 2}, {RegisterBank::Context, 0x2db, 2}, {RegisterBank::Context, 0x2de, 6}, {RegisterBank::Context, 0x2f8, 2}, {RegisterBank::Context, 0x30e, 2}, {RegisterBank::Context, 0x313, 1},
-+    {RegisterBank::Context, 0x200, 8}, {RegisterBank::Context, 0x286, 2}, {RegisterBank::Context, 0x292, 2}, {RegisterBank::Context, 0x29b, 1}, {RegisterBank::Context, 0x2ab, 1}, {RegisterBank::Context, 0x2ce, 1}, {RegisterBank::Context, 0x2d5, 2}, {RegisterBank::Context, 0x2db, 2}, {RegisterBank::Context, 0x2de, 6}, {RegisterBank::Context, 0x2f8, 2}, {RegisterBank::Context, 0x2fe, 16}, {RegisterBank::Context, 0x30e, 2}, {RegisterBank::Context, 0x313, 1},
-     // CB_COLOR0..7_BASE .. DCC_BASE (15 words a slot), CB_COLOR0..7_BASE_EXT, DCC_BASE_EXT, ATTRIB2, ATTRIB3.
-     {RegisterBank::Context, 0x318, 0x78}, {RegisterBank::Context, 0x390, 8}, {RegisterBank::Context, 0x398, 8}, {RegisterBank::Context, 0x3a8, 0x18},
-     // The pixel program address, RSRC2 and user words; the geometry-back user pointer and program
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve.frag
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve.frag
 new file mode 100644
 index 0000000..afceb30
 --- /dev/null
@@ -640,7 +623,7 @@ index 0000000..afceb30
 +    }
 +    color = sum / float(logicalSamples);
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve_spv.h
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorResolve_spv.h
 new file mode 100644
 index 0000000..5f75bf2
 --- /dev/null
@@ -807,7 +790,7 @@ index 0000000..5f75bf2
 +};
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling.comp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling.comp
 new file mode 100644
 index 0000000..6389d3e
 --- /dev/null
@@ -893,7 +876,7 @@ index 0000000..6389d3e
 +        else destination.words[tiledWord] = source.words[linearWord];
 +    }
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling_spv.h
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSamplePixelOwnedTiling_spv.h
 new file mode 100644
 index 0000000..c82028f
 --- /dev/null
@@ -1110,7 +1093,7 @@ index 0000000..c82028f
 +    0x0000006e, 0x00010038,
 +};
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleReadback.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleReadback.comp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleReadback.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleReadback.comp
 new file mode 100644
 index 0000000..ed23588
 --- /dev/null
@@ -1131,7 +1114,7 @@ index 0000000..ed23588
 +        destination.values[base + sampleIndex] = packUnorm4x8(color);
 +    }
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling.comp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling.comp b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling.comp
 new file mode 100644
 index 0000000..c76b797
 --- /dev/null
@@ -1203,7 +1186,7 @@ index 0000000..c76b797
 +    if (RETILE == 0u) destination.words[linearWord] = source.words[tiledWord];
 +    else destination.words[tiledWord] = source.words[linearWord];
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling_spv.h
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTiling_spv.h
 new file mode 100644
 index 0000000..5d00e45
 --- /dev/null
@@ -1390,7 +1373,7 @@ index 0000000..5d00e45
 +    0x00050080, 0x00000006, 0x0000006e, 0x0000006c, 0x0000006d, 0x000200fe, 0x0000006e, 0x00010038,
 +};
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTransfer_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTransfer_spv.h
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTransfer_spv.h b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleTransfer_spv.h
 new file mode 100644
 index 0000000..44c354e
 --- /dev/null
@@ -1583,7 +1566,7 @@ index 0000000..44c354e
 +};
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.frag
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.frag b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.frag
 new file mode 100644
 index 0000000..690df51
 --- /dev/null
@@ -1598,7 +1581,7 @@ index 0000000..690df51
 +    uint index = (pixel.y * parameters.width + pixel.x) * parameters.samples + parameters.logicalSample;
 +    color = unpackUnorm4x8(source.values[index]);
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.vert b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.vert
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.vert b/core/libs/prx/libSceAgcDriver/Graphics/shaders/ColorSampleUpload.vert
 new file mode 100644
 index 0000000..281dcb6
 --- /dev/null
@@ -1609,7 +1592,7 @@ index 0000000..281dcb6
 +    vec2 position = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
 +    gl_Position = vec4(position * 2.0 - 1.0, 0.0, 1.0);
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ColorRenderTarget.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorRenderTarget.cpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/ColorRenderTarget.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorRenderTarget.cpp
 new file mode 100644
 index 0000000..066bf88
 --- /dev/null
@@ -1703,7 +1686,7 @@ index 0000000..066bf88
 +}
 +
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolve.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolve.cpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolve.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolve.cpp
 new file mode 100644
 index 0000000..35a232e
 --- /dev/null
@@ -1874,7 +1857,7 @@ index 0000000..35a232e
 +}
 +
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolveFragment.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolveFragment.cpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolveFragment.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorResolveFragment.cpp
 new file mode 100644
 index 0000000..5b0c40e
 --- /dev/null
@@ -1952,7 +1935,7 @@ index 0000000..5b0c40e
 +
 +
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleSnapshotCopy.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleSnapshotCopy.cpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleSnapshotCopy.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleSnapshotCopy.cpp
 new file mode 100644
 index 0000000..f84e5d4
 --- /dev/null
@@ -2026,7 +2009,7 @@ index 0000000..f84e5d4
 +        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT};
 +}
 +}
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleTransfer.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleTransfer.cpp
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleTransfer.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ColorSampleTransfer.cpp
 new file mode 100644
 index 0000000..d0b53c5
 --- /dev/null
@@ -2618,11 +2601,11 @@ index 7639649..d0b6058 100644
      if (target.tileMode == ColorTileMode::Linear && layout.Bytes() == layout.LinearBytes()) {
          GuestMemory::Write(target.address, source, layout.Alignment());
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp
-index adb76dd..5ea4d61 100644
+index b1fe81c..9a0a7ee 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/src/Draw.cpp
-@@ -1,6 +1,15 @@
- #include "prx/libSceAgcDriver/Graphics/include/Draw.hpp"
+@@ -2,6 +2,15 @@
+ #include "prx/libSceAgcDriver/Graphics/include/MultisampleTarget.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/ColorTargetTransfer.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/GpuColorTransfer.hpp"
 +#include "prx/libSceAgcDriver/Graphics/include/ColorSampleTransfer.hpp"
@@ -2637,7 +2620,7 @@ index adb76dd..5ea4d61 100644
  #include "prx/libSceAgcDriver/Graphics/include/VertexInput.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/TextureDetiler.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/DccMetadata.hpp"
-@@ -669,6 +678,7 @@ bool ValidationKey(const Context& context, std::span<const CompiledShader> shade
+@@ -681,6 +690,7 @@ bool ValidationKey(const Context& context, std::span<const CompiledShader> shade
          add(context.subgroup.supportedStages);
          add(context.subgroup.supportedOperations);
          add(context.fragmentShaderBarycentric);
@@ -2645,7 +2628,7 @@ index adb76dd..5ea4d61 100644
          add(state.stages.mesh.has_value());
          if (state.stages.mesh) {
              const auto& mesh = *state.stages.mesh;
-@@ -720,7 +730,7 @@ std::set<std::uint32_t> CachedFragmentOutputs(const Context& context, std::span<
+@@ -732,7 +742,7 @@ std::set<std::uint32_t> CachedFragmentOutputs(const Context& context, std::span<
      }
      std::set<std::uint32_t> outputs;
      try {
@@ -2654,7 +2637,7 @@ index adb76dd..5ea4d61 100644
      } catch (const std::exception& error) {
          if (keyed) {
              std::lock_guard lock(validationMutex());
-@@ -762,6 +772,7 @@ ResourceCache::Key DrawResourceKey(const Context& context, std::span<const Compi
+@@ -774,6 +784,7 @@ ResourceCache::Key DrawResourceKey(const Context& context, std::span<const Compi
          key.push_back(static_cast<std::uint32_t>(value >> 32u));
      };
      append64(reinterpret_cast<std::uint64_t>(context.device));
@@ -2662,7 +2645,7 @@ index adb76dd..5ea4d61 100644
      key.push_back(static_cast<std::uint32_t>(shaders.size()));
      for (const auto& shader : shaders) {
          const auto part = ShaderResources::ContentKey(shader, true, MovableBuffers());
-@@ -1758,6 +1769,19 @@ void recordDraw(const Context& context, const State& state, const Pm4::DrawParam
+@@ -1771,6 +1782,19 @@ void recordDraw(const Context& context, const State& state, const Pm4::DrawParam
      recorder->LeaveRenderPassOpen(passKey, drawTiming, fenced, passAccess, std::move(storeProxies));
      timer.phase(PhaseRecord);
      keepRecordedDraw(*recorder, record.resources, std::move(record.pipeline), std::move(record.framebuffer), inputs, std::move(record.targets), std::move(scratch), std::move(checkRecords), record.listed, record.completion, outcome);
@@ -2682,7 +2665,7 @@ index adb76dd..5ea4d61 100644
      timer.phase(PhaseKeep);
      if (record.waited) {
          // The wait the dispatch path makes for such work (source 3, "address-based"): the
-@@ -1812,7 +1836,55 @@ std::optional<std::string> KnownValidationFailure(const Context& context, std::s
+@@ -1825,7 +1849,55 @@ std::optional<std::string> KnownValidationFailure(const Context& context, std::s
      return std::nullopt;
  }
  
@@ -2739,7 +2722,7 @@ index adb76dd..5ea4d61 100644
      if (context.recorder != nullptr) context.recorder->BoundKeptBytes();
      PerformanceTimer timing("Graphics.Draw");
      // APS5_PROFILE_DRAW prints the time of each phase of the draw (microseconds) and the [draws] totals.
-@@ -1842,6 +1914,7 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -1855,6 +1927,7 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
      struct TargetBinding {
          ColorTarget color;
          bool gpuTiling = false;
@@ -2747,13 +2730,14 @@ index adb76dd..5ea4d61 100644
          // Resident target: the surface's cached storage image is attached directly and marked dirty
          // afterwards, so nothing is copied in or out per draw.
          std::shared_ptr<StorageTexture> resident;
-@@ -1853,10 +1926,19 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -1866,11 +1939,20 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
          std::unique_ptr<DeviceBuffer> tiledDevice;
          std::unique_ptr<DeviceBuffer> linearDevice;
          std::vector<std::byte> original;
 +        std::unique_ptr<ColorSampleSnapshotCopy> sampleSnapshot;
          TileMipLayout mip{};
          std::unique_ptr<RenderTarget> target;
+         bool multisampled = false;
 +        std::unique_ptr<ColorSampleTransfer> sampleTransfer;
 +        std::unique_ptr<GpuColorSampleTiler::Transfer> sampleTiling;
          // APS5_DUMP_TARGETS: the rendered linear pixels, read back for target_<address>_<n>.raw.
@@ -2767,11 +2751,18 @@ index adb76dd..5ea4d61 100644
      };
      const int dumpLimit = DumpTargetLimit();
      static std::mutex dumpMutex;
-@@ -1867,14 +1949,16 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -1881,21 +1963,16 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
          auto& binding = targets[index];
          binding.color = state.colors[index];
          const auto& color = binding.color;
 -        binding.gpuTiling = color.tileMode == ColorTileMode::RenderTarget && context.detiler != nullptr;
+-        if (color.samples > 1) {
+-            binding.multisampled = true;
+-            timer.phase(PhaseSetup);
+-            targetViews.push_back(MultisampleTargetView(context, color));
+-            timer.phase(PhaseReadTarget);
+-            continue;
+-        }
 +        binding.gpuTiling = !groupedSamples && color.tileMode == ColorTileMode::RenderTarget && context.detiler != nullptr;
 +        binding.sampleGpuTiling = groupedSamples && context.colorSampleTiler != nullptr &&
 +            GpuColorSampleTiler::Supports(context, color);
@@ -2787,7 +2778,7 @@ index adb76dd..5ea4d61 100644
              // The lookup refreshes the image on every draw (StorageTexture::Refresh: FlushPending,
              // CollectWrites over the target's pages, the DCC key scan of TextureClearKeys, then
              // UnchangedSince). The page walk is skipped while the worker's collect epoch lasts
-@@ -1906,8 +1990,22 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -1936,8 +2013,22 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
              GuestMemory::Read(color.address, binding.original, colorLayout.Alignment());
              std::memcpy(binding.tiled->Bytes().data(), binding.original.data(), binding.original.size());
          } else {
@@ -2812,7 +2803,7 @@ index adb76dd..5ea4d61 100644
          }
          // A fast-cleared DCC target holds its clear value wherever the draw does not write.
          if (color.dccAddress != 0) {
-@@ -1925,20 +2023,97 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -1955,20 +2046,97 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
                  }
              }
          }
@@ -2877,7 +2868,7 @@ index adb76dd..5ea4d61 100644
      timer.phase(PhasePrepare);
      const bool recordDraws = RecordDraws();
      auto* recorder = Recorder::Active();
--    const bool recordable = recordDraws && recorder != nullptr && dumpLimit == 0 && std::all_of(targets.begin(), targets.end(), [](const TargetBinding& binding) { return binding.resident != nullptr; });
+-    const bool recordable = recordDraws && recorder != nullptr && dumpLimit == 0 && std::all_of(targets.begin(), targets.end(), [](const TargetBinding& binding) { return binding.resident != nullptr || binding.multisampled; });
 +    const bool recordable = !groupedSamples && recordDraws && recorder != nullptr && dumpLimit == 0 && std::all_of(targets.begin(), targets.end(), [](const TargetBinding& binding) { return binding.resident != nullptr; });
      auto resolved = resolveDrawResources(context, state, draw, shaders, snapshots, indexBytes, recordable, outcome, timer);
      auto& resources = resolved.resources;
@@ -2912,10 +2903,10 @@ index adb76dd..5ea4d61 100644
      // The memory-state decision of an indirect draw, made here after the resource build (which may
      // retire imports and wait for recorded work) and before anything is recorded, exactly as
      // VulkanDevice::dispatch decides for DISPATCH_INDIRECT: the GPU reads the records in place from
-@@ -2066,6 +2241,21 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
-     owners.reserve(targets.size());
-     for (const auto& binding : targets) owners.push_back(binding.resident);
-     auto framebuffer = pipeline->AcquireFramebuffer(targetViews, owners, state.renderExtent);
+@@ -2103,6 +2271,21 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+         persistent.push_back(binding.multisampled ? 1u : 0u);
+     }
+     auto framebuffer = pipeline->AcquireFramebuffer(targetViews, owners, state.renderExtent, persistent);
 +    std::vector<std::shared_ptr<Pipeline>> groupPipelines;
 +    std::vector<std::shared_ptr<Framebuffer>> groupFramebuffers;
 +    if (groupedSamples) {
@@ -2927,14 +2918,14 @@ index adb76dd..5ea4d61 100644
 +            if (state.depth) views.push_back(DepthSurfaceView(context, *state.depth, group,
 +                std::span<const VkSampleLocationEXT>(state.samples.positions).first(state.samples.count)));
 +            auto item=CachedPipeline(context, pipelineState, inputs.vertexInput, *resources, shaders, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, group);
-+            groupFramebuffers.push_back(item->AcquireFramebuffer(views, owners, state.renderExtent));
++            groupFramebuffers.push_back(item->AcquireFramebuffer(views, owners, state.renderExtent, persistent));
 +            groupPipelines.push_back(std::move(item));
 +        }
 +    }
      timer.phase(PhasePipeline);
      APS5_LOG_CHARS_OUT_DEBUG("Pipeline created");
      if (lean) {
-@@ -2188,6 +2378,23 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2225,6 +2408,23 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
              countBarrier();
              continue;
          }
@@ -2958,7 +2949,7 @@ index adb76dd..5ea4d61 100644
          VkBufferImageCopy copy{};
          copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
          copy.imageExtent = {binding.color.extent.width, binding.color.extent.height, 1};
-@@ -2203,29 +2410,48 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2240,29 +2440,48 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
          context.Resolved(&DeviceFunctions::cmdCopyBufferToImage, "vkCmdCopyBufferToImage")(commands, linear, binding.target->Image(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
          imageBarrier(context, commands, binding.target->Image(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
      }
@@ -3023,7 +3014,7 @@ index adb76dd..5ea4d61 100644
      for (auto& binding : targets) {
          if (binding.proxied) {
              binding.resident->RecordAttachmentProxyStore(commands, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-@@ -2237,6 +2463,21 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2274,6 +2493,21 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
              countBarrier();
              continue;
          }
@@ -3045,7 +3036,7 @@ index adb76dd..5ea4d61 100644
          VkBufferImageCopy copy{};
          copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
          copy.imageExtent = {binding.color.extent.width, binding.color.extent.height, 1};
-@@ -2266,6 +2507,20 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2303,6 +2537,20 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
              CopyBuffer(context, commands, binding.tiledDevice->Handle(), 0, binding.tiled->Handle(), 0, binding.original.size());
          }
      }
@@ -3066,7 +3057,7 @@ index adb76dd..5ea4d61 100644
      VkMemoryBarrier download{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
      download.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
      download.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
-@@ -2324,12 +2579,57 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2361,12 +2609,57 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
              binding.resident->MarkDirty();
              continue;
          }
@@ -3126,7 +3117,7 @@ index adb76dd..5ea4d61 100644
      timer.phase(PhaseWriteBack);
      if (profile && traceDraws) {
          // A synchronous draw's inputs and target sample are described as a rendering debug aid;
-@@ -2362,7 +2662,14 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
+@@ -2399,7 +2692,14 @@ void Draw(const Context& context, const State& state, const Pm4::DrawParameters&
      APS5_LOG_CHARS_OUT_DEBUG("Draw finished");
  }
  
@@ -3142,7 +3133,15 @@ index adb76dd..5ea4d61 100644
      if (context.recorder != nullptr) context.recorder->BoundKeptBytes();
      static_cast<void>(snapshots);
      PerformanceTimer timing("Graphics.DrawWithRecipe");
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/GpuColorSampleTiler.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/GpuColorSampleTiler.cpp
+@@ -2516,6 +2816,7 @@ std::shared_ptr<StorageTexture> metadataPassResident(const Context& context, con
+ 
+ void RunColorMetadataPass(const Context& context, const ColorMetadataPass& pass) {
+     if (pass.mode == ColorMetadataPass::Mode::Resolve) {
++        Require(false, "CB metadata resolve requires original guest geometry and validated guest sample import/writeback; use the checked draw resolve path");
+         Require(pass.source.has_value() && pass.targets.size() == 1, "CB resolve without its source and destination");
+         const auto& destination = pass.targets.front();
+         Require(destination.tileMode == ColorTileMode::RenderTarget && context.detiler != nullptr, "CB resolve into a target without a resident image is not implemented");
+diff --git a/rebase/0006-grouped-color-samples-and-transfers/after/core/libs/prx/libSceAgcDriver/Graphics/src/GpuColorSampleTiler.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/GpuColorSampleTiler.cpp
 new file mode 100644
 index 0000000..034f271
 --- /dev/null
@@ -3362,7 +3361,7 @@ index 0000000..034f271
 +}
 +}
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
-index cf0d6b1..e3c1e4a 100644
+index 3316fd7..d0fa6f3 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
 @@ -1,6 +1,7 @@
@@ -3373,7 +3372,7 @@ index cf0d6b1..e3c1e4a 100644
  #include "prx/libSceAgcDriver/Graphics/include/TextureTiling.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/DccMetadata.hpp"
  #include "prx/libSceAgcDriver/Execution/include/GuestMemory.hpp"
-@@ -106,6 +107,10 @@ constexpr std::uint32_t PixelStageRunsMask = 0x00020747u;
+@@ -108,6 +109,10 @@ constexpr std::uint32_t PixelStageRunsMask = 0x00020747u;
  constexpr std::uint32_t AlphaToCoverageMask = ~0x0001ff00u;
  constexpr std::uint32_t AlphaToCoverageUndithered = 0x0000aa01u;
  constexpr std::uint32_t ScanModeMask = ~0x22u;
@@ -3384,7 +3383,7 @@ index cf0d6b1..e3c1e4a 100644
  constexpr std::uint32_t ScanControlMask = ~0x76023fffu;
  constexpr std::uint32_t ScreenOffsetMask = ~0x01ff01ffu;
  // Bits 26/27 (ZCLIP_NEAR/FAR_DISABLE) become depth clamping; bit 19 selects the [0, 1] clip space.
-@@ -193,13 +198,37 @@ VkStencilOpState stencilFace(std::uint32_t compare, std::uint32_t ops, std::uint
+@@ -203,13 +208,37 @@ VkStencilOpState stencilFace(std::uint32_t compare, std::uint32_t ops, std::uint
      return face;
  }
  
@@ -3419,15 +3418,16 @@ index cf0d6b1..e3c1e4a 100644
      const bool stencilClear = (read(cx, 0x000) & 2u) != 0;
      const auto view = read(cx, 0x002);
      zero(cx, 0x002, 0x3c000000u, "depth mips (DB_DEPTH_VIEW MIP_LEVEL)");
--    zero(cx, 0x010, 0x000f100cu, "multisampled, partially resident or mipmapped depth (DB_Z_INFO)");
+-    zero(cx, 0x010, 0x000f1000u, "partially resident or mipmapped depth (DB_Z_INFO)");
 +    zero(cx, 0x010, enableSampleGroups ? 0x000f1000u : 0x000f100cu, "multisampled, partially resident or mipmapped depth (DB_Z_INFO)");
      zero(cx, 0x011, 0x00001000u, "partially resident stencil (DB_STENCIL_INFO)");
      const auto zFormat = read(cx, 0x010) & 3u;
      const bool stencil = (read(cx, 0x011) & 1u) != 0;
-@@ -215,6 +244,27 @@ void decodeDepth(const Registers& cx, std::uint32_t depthControl, State& result)
+@@ -225,7 +254,27 @@ void decodeDepth(const Registers& cx, std::uint32_t depthControl, State& result)
      Require(!stencilClear || (stencil && !stencilReadOnly), "stencil clear requires a writable stencil plane");
      Require(!depthClear || (zFormat != 0 && !depthReadOnly), "depth clear requires a writable depth plane");
      DepthTarget depth{};
+-    depth.samples = 1u << ((read(cx, 0x010) >> 2u) & 3u);
 +    depth.samples = enableSampleGroups ? 1u << ((read(cx, 0x010) >> 2u) & 3u) : 1u;
 +    if (depth.samples > 1u) {
 +        Require(!depthClear, "multisample depth clear requires guest depth/HTILE transfer (DB_RENDER_CONTROL)");
@@ -3452,7 +3452,7 @@ index cf0d6b1..e3c1e4a 100644
      depth.address = zFormat != 0 ? base(0x012, 0x01a) : 0;
      depth.stencilAddress = stencil ? base(0x013, 0x01b) : 0;
      Require(zFormat == 0 || depthReadOnly || base(0x014, 0x01c) == depth.address, "depth read and written at different addresses is unsupported");
-@@ -546,7 +596,59 @@ std::string DepthMaintenanceRejection(const QueueState& queue) {
+@@ -585,7 +634,59 @@ std::string DepthMaintenanceRejection(const QueueState& queue) {
      return zeroMessage(0x000, control->second, "DB_RENDER_CONTROL depth copy, resummarize or decompress");
  }
  
@@ -3513,22 +3513,30 @@ index cf0d6b1..e3c1e4a 100644
      if (auto reason = DepthMaintenanceRejection(queue); !reason.empty()) throw std::runtime_error(reason);
      const auto& cx = queue.context;
      State result{};
-@@ -584,7 +686,7 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+@@ -618,14 +719,14 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+         }
+     }
+     zero(cx, 0x207, ~LayerExports, "clip distances, layer, viewport or auxiliary vertex exports");
+-    result.samples = decodeSamples(cx);
++    result.samples = DecodeSampleConfiguration(cx, enableSampleGroups);
+     {
+         const auto depthControl = read(cx, 0x200);
          const auto renderControl = find(cx, 0x000);
          const bool clear = renderControl != cx.end() && (renderControl->second & 3u) != 0;
-         if (clear || ((depthControl & 0xbu) != 0 && depthSurfaceBound(cx))) {
+         const auto tests = planeTests(cx, depthControl);
+         if (clear || (tests != 0 && depthSurfaceBound(cx))) {
 -            decodeDepth(cx, depthControl, result);
 +            decodeDepth(cx, depthControl, result, enableSampleGroups);
-         } else if (depthPassThrough(depthControl) || ((depthControl & 0xbu) != 0 && depthPlanesAbsent(cx))) {
+         } else if (depthPassThrough(depthControl) || ((depthControl & 0xbu) != 0 && (tests == 0 || depthPlanesAbsent(cx)))) {
              static bool reported = false;
              if (!reported) {
-@@ -606,8 +708,11 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+@@ -647,9 +748,10 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
      zero(cx, 0x203, shaderControlMask(read(cx, 0x1c4)), "depth export, shader coverage or ordered fragment execution");
      result.alphaToCoverage = read(cx, 0x2dc) == AlphaToCoverageUndithered;
      if (!result.alphaToCoverage) zero(cx, 0x2dc, AlphaToCoverageMask, "dithered or rounded alpha-to-coverage");
--    zero(cx, 0x2f8, ~0u, "multisampling or coverage conversion");
--    zero(cx, 0x292, ScanModeMask, "scan conversion mode");
-+    result.samples = DecodeSampleConfiguration(cx, enableSampleGroups);
+-    Require(!result.depth || result.depth->samples == result.samples, "the depth target's sample count differs from the rasterizer's");
+-    zero(cx, 0x292, result.samples > 1 ? ScanModeMask & ~1u : ScanModeMask, "scan conversion mode");
+-    Require(result.samples == 1 || (read(cx, 0x292) & 1u) != 0, "multisampled targets rasterized without MSAA_ENABLE are unsupported");
 +    Require(result.samples.count == 1u || !result.alphaToCoverage, "multisample alpha-to-coverage is unsupported");
 +    Require(result.samples.count == 1u || read(cx, 0x1c4) != 9u, "multisample shader sample-mask export is unsupported");
 +    zero(cx, 0x292, result.samples.count > 1u ? (ScanModeMask & ~1u) : ScanModeMask, "scan conversion mode");
@@ -3536,7 +3544,7 @@ index cf0d6b1..e3c1e4a 100644
      zero(cx, 0x293, ScanControlMask, "sample iteration, primitive discard or out-of-order rasterization");
      zero(cx, 0x80, ~0u, "window offset");
      zero(cx, 0x8d, ScreenOffsetMask, "reserved PA_SU_HARDWARE_SCREEN_OFFSET bits");
-@@ -667,6 +772,8 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+@@ -709,9 +811,11 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
          if (slotExport == 0 || slotExport == 8 || slotExport > 9) throw std::runtime_error("AGC graphics: color export format " + std::to_string(slotExport) + " is unsupported");
          auto color = DecodeColorBuffer(cx, slot);
          if (slotExport == 7 && ((read(cx, 0x31c + slot * 0xfu) >> 8u) & 7u) != 4u) throw std::runtime_error("AGC graphics: color export format 7 (UINT16_ABGR) into a target that is not unsigned integer is unsupported");
@@ -3544,8 +3552,12 @@ index cf0d6b1..e3c1e4a 100644
 +        Require(color.samples == result.samples.count, "color target sample count differs from raster coverage");
          color.exportIndex = index;
          color.uintExport = slotExport == 7;
+-        Require(color.samples == result.samples, "a color target's sample count differs from the rasterizer's");
++        Require(color.samples == result.samples.count, "a color target's sample count differs from the rasterizer's");
          APS5_LOG_OUT_DEBUG("Color %u address=0x%llx extent=%ux%u bytes=%llu VkFormat=%u", slot, static_cast<unsigned long long>(color.address), color.extent.width, color.extent.height, static_cast<unsigned long long>(color.bytes), static_cast<unsigned>(color.format));
-@@ -677,6 +784,7 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+         if (result.colors.empty()) {
+             result.renderExtent = color.extent;
+@@ -720,6 +824,7 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
          }
          result.colors.push_back(color);
      }
@@ -3553,7 +3565,7 @@ index cf0d6b1..e3c1e4a 100644
      if (result.hasColorTarget) {
          result.color = result.colors.front();
          if (result.depth) result.renderExtent = {std::min(result.renderExtent.width, result.depth->extent.width), std::min(result.renderExtent.height, result.depth->extent.height)};
-@@ -840,6 +948,7 @@ std::uint32_t ColorWriteMask(const Registers& context) {
+@@ -885,6 +990,7 @@ std::uint32_t ColorWriteMask(const Registers& context) {
  }
  
  ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
@@ -3561,19 +3573,26 @@ index cf0d6b1..e3c1e4a 100644
      const auto stride = slot * 0xfu;
      ColorTarget color{};
      color.slot = slot;
-@@ -849,6 +958,7 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
+@@ -894,13 +1000,8 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
      APS5_LOG_OUT_DEBUG("Color %u info=0x%x number=%u swap=%u", slot, info, number, swap);
      const auto format = (info >> 2u) & 0x1fu;
      const auto decoded = DecodeColorFormat(format, number, swap);
+-    const auto attrib = read(cx, 0x31d + stride);
+-    zero(cx, 0x31d + stride, ~0x3f000u, "color destination alpha override or other CB_COLOR_ATTRIB modes");
+-    color.samples = 1u << ((attrib >> 12u) & 7u);
+-    Require(color.samples <= 8u, "color targets with more than eight samples are unsupported");
+-    Require((1u << ((attrib >> 15u) & 3u)) == color.samples, "color targets with fewer fragments than samples (EQAA) are unsupported");
+-    const auto multisampleInfo = color.samples > 1 ? 0x0c006000u : 0u;
+-    Require(color.samples == 1 || (info & 0x10000000u) == 0, "DCC over a multisampled color target is unsupported");
 +    Require((info & 0x0c004000u) == 0, "FMASK color compression or configuration is unsupported (CB_COLOR_INFO)");
++    const std::uint32_t multisampleInfo = 0u;
      // ROUND_MODE (bit 18) only affects unorm rounding. With DCC_ENABLE (bit 28) the target is written
-     if ((info & ~(0x00039f7cu | 0x00040000u | 0x10000000u | 0x00002000u)) != 0) throw std::runtime_error("AGC graphics: color compression, DCC, endian conversion, nonstandard rounding or color optimization is unsupported (CB_COLOR_INFO 0x" + [&] { char text[16]; std::snprintf(text, sizeof(text), "%08x", info); return std::string(text); }() + ")");
+     if ((info & ~(0x00039f7cu | 0x00040000u | 0x10000000u | 0x00002000u | multisampleInfo)) != 0) throw std::runtime_error("AGC graphics: color compression, DCC, endian conversion, nonstandard rounding or color optimization is unsupported (CB_COLOR_INFO 0x" + [&] { char text[16]; std::snprintf(text, sizeof(text), "%08x", info); return std::string(text); }() + ")");
      Require((info & 0x8000u) != 0 || number == 7 || number == 4 || number == 5, "unclamped normalized color is unsupported");
-@@ -857,7 +967,14 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
+@@ -909,6 +1010,14 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
      const auto slice = view & 0x1fffu;
      Require(slice == ((view >> 13u) & 0x1fffu), "color views of several array slices are unsupported");
      const auto viewMip = (view >> 26u) & 0xfu;
--    zero(cx, 0x31d + stride, ~0x20000u, "color samples, fragments or destination alpha override");
 +    // GC 10.1 CB_COLOR_ATTRIB: NUM_SAMPLES[14:12], NUM_FRAGMENTS[16:15], both log2.
 +    // Destination-alpha override is decoded by blending; FMASK and reserved bits remain rejected.
 +    const auto attrib = read(cx, 0x31d + stride);
@@ -3584,8 +3603,8 @@ index cf0d6b1..e3c1e4a 100644
 +    Require(color.samples == color.fragments, "EQAA color targets require FMASK sample mapping");
      const auto attrib2 = read(cx, 0x3b0 + slot);
      const auto maxMip = attrib2 >> 28u;
-     Require(viewMip <= maxMip, "color view mip exceeds the surface");
-@@ -865,6 +982,12 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
+     Require(color.samples == 1 || maxMip == 0, "multisampled color mips are unsupported");
+@@ -917,6 +1026,12 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
      color.tileMode = DecodeColorTileMode(attrib3);
      const bool volume = ((attrib3 >> 24u) & 3u) == 2u;
      Require(((attrib3 >> 24u) & 3u) != 0u || (attrib2 & 0x3fffu) == 0u, "1D color targets taller than one row are unsupported");
@@ -3598,7 +3617,7 @@ index cf0d6b1..e3c1e4a 100644
      if (volume) {
          color.depth = (attrib3 & 0x1fffu) + 1u;
          Require(maxMip == 0 && (info & 0x10000000u) == 0, "mipmapped or DCC 3D color targets are unsupported");
-@@ -887,7 +1010,7 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
+@@ -941,7 +1056,7 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
          color.mipTail = mip.tail;
          color.extent = {mip.width, mip.height};
      }
@@ -3607,7 +3626,7 @@ index cf0d6b1..e3c1e4a 100644
      const auto high = read(cx, 0x390 + slot);
      Require((high & ~0xffu) == 0, "invalid color address extension");
      color.surfaceAddress = (static_cast<std::uint64_t>(high) << 40u) | (static_cast<std::uint64_t>(read(cx, 0x318 + stride)) << 8u);
-@@ -935,6 +1058,58 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
+@@ -994,6 +1109,58 @@ ColorTarget DecodeColorBuffer(const Registers& cx, std::uint32_t slot) {
      return color;
  }
  
@@ -3666,15 +3685,7 @@ index cf0d6b1..e3c1e4a 100644
  std::optional<ColorMetadataPass> DecodeColorMetadataPass(const QueueState& queue) {
      const auto& cx = queue.context;
      const auto control = find(cx, 0x202);
-@@ -961,6 +1136,7 @@ std::optional<ColorMetadataPass> DecodeColorMetadataPass(const QueueState& queue
-     for (std::uint32_t slot = 0; slot < 8; ++slot) {
-         if (((targetMask >> (4u * slot)) & 0xfu) == 0 || ((read(cx, 0x31c + slot * 0xfu) >> 2u) & 0x1fu) == 0) continue;
-         const auto target = DecodeColorBuffer(cx, slot);
-+        Require(target.samples == 1, "CB metadata passes over multisampled color targets are unsupported");
-         Require((read(cx, 0x31c + slot * 0xfu) & 0x10000000u) == 0 || target.dccAddress != 0, "CB metadata pass over a mipmapped DCC color target, whose keys are not modeled");
-         const auto width = static_cast<float>(target.extent.width);
-         const auto height = static_cast<float>(target.extent.height);
-@@ -972,7 +1148,7 @@ std::optional<ColorMetadataPass> DecodeColorMetadataPass(const QueueState& queue
+@@ -1050,7 +1217,7 @@ std::optional<ColorMetadataPass> DecodeColorMetadataPass(const QueueState& queue
      return pass;
  }
  
@@ -3683,12 +3694,13 @@ index cf0d6b1..e3c1e4a 100644
      if (auto reason = DepthMaintenanceRejection(queue); !reason.empty()) return reason;
      const auto& cx = queue.context;
      // A register a rule needs that is absent gives no verdict here: DecodeState reports it.
-@@ -1019,8 +1195,21 @@ std::string DrawRejection(const QueueState& queue, bool indexed) {
+@@ -1098,9 +1265,21 @@ std::string DrawRejection(const QueueState& queue, bool indexed) {
      if (value(cx, 0x2dc, word) && word != AlphaToCoverageUndithered) {
          if (auto reason = nonzero(cx, 0x2dc, AlphaToCoverageMask, "dithered or rounded alpha-to-coverage"); !reason.empty()) return reason;
      }
--    if (auto reason = nonzero(cx, 0x2f8, ~0u, "multisampling or coverage conversion"); !reason.empty()) return reason;
--    if (auto reason = nonzero(cx, 0x292, ScanModeMask, "scan conversion mode"); !reason.empty()) return reason;
+-    if (auto reason = nonzero(cx, 0x2f8, ~(0x7u | 0x1e000u | 0x700000u), "coverage conversion or nonstandard multisampling"); !reason.empty()) return reason;
+-    const bool multisampled = value(cx, 0x2f8, word) && (word & 7u) != 0;
+-    if (auto reason = nonzero(cx, 0x292, multisampled ? ScanModeMask & ~1u : ScanModeMask, "scan conversion mode"); !reason.empty()) return reason;
 +    if (!enableSampleGroups) {
 +        if (auto reason = nonzero(cx, 0x2f8, ~0u, "multisampling or coverage conversion"); !reason.empty()) return reason;
 +    } else if (cx.contains(0x2f8)) {
@@ -3707,7 +3719,7 @@ index cf0d6b1..e3c1e4a 100644
      if (auto reason = nonzero(cx, 0x293, ScanControlMask, "sample iteration, primitive discard or out-of-order rasterization"); !reason.empty()) return reason;
      if (auto reason = nonzero(cx, 0x80, ~0u, "window offset"); !reason.empty()) return reason;
      if (auto reason = nonzero(cx, 0x8d, ScreenOffsetMask, "reserved PA_SU_HARDWARE_SCREEN_OFFSET bits"); !reason.empty()) return reason;
-@@ -1034,6 +1223,30 @@ std::string DrawRejection(const QueueState& queue, bool indexed) {
+@@ -1114,6 +1293,30 @@ std::string DrawRejection(const QueueState& queue, bool indexed) {
      if (auto reason = nonzero(cx, 0x204, ClipControlMask, "unsupported PA_CL_CLIP_CNTL flags"); !reason.empty()) return reason;
      std::uint32_t targetMask = 0, shaderMask = 0;
      if (value(cx, 0x8e, targetMask) && value(cx, 0x8f, shaderMask) && value(cx, 0x202, word) && !colorControlSupported(word, ColorWriteMask(cx) != 0)) return colorControlMessage(word);
@@ -3727,11 +3739,11 @@ index cf0d6b1..e3c1e4a 100644
 +        const auto config = find(cx, 0x2f8);
 +        const auto z = find(cx, 0x010);
 +        const auto depth = find(cx, 0x200);
-+        if (config != cx.end() && z != cx.end() && depth != cx.end() && (depth->second & 0xbu) != 0 && depthSurfaceBound(cx) &&
++        if (config != cx.end() && z != cx.end() && depth != cx.end() && planeTests(cx, depth->second) != 0 && depthSurfaceBound(cx) &&
 +            (1u << ((z->second >> 2u) & 3u)) != (1u << (config->second & 7u))) return "AGC graphics: depth target sample count differs from raster coverage";
 +        if (config != cx.end() && (config->second & 7u) != 0u && zFormat == 9u) return "AGC graphics: multisample shader sample-mask export is unsupported";
 +        const auto renderControl = find(cx, 0x000);
-+        if (config != cx.end() && (config->second & 7u) != 0u && depth != cx.end() && (depth->second & 0xbu) != 0u &&
++        if (config != cx.end() && (config->second & 7u) != 0u && depth != cx.end() && planeTests(cx, depth->second) != 0u &&
 +            depthSurfaceBound(cx) && renderControl != cx.end() && (renderControl->second & 2u) == 0u)
 +            return "AGC graphics: multisample depth/stencil loads require guest-plane import and invalidation tracking";
 +    }

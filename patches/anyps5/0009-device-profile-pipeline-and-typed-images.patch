@@ -129,7 +129,7 @@ index a390c28..a23fa52 100644
  
  private:
      ShaderRecompiler::SpirvTarget target;
-diff --git a/core/libs/prx/libSceAgcDriver/Execution/include/SwapchainImages.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/SwapchainImages.hpp
+diff --git a/rebase/0009-device-profile-pipeline-and-typed-images/after/core/libs/prx/libSceAgcDriver/Execution/include/SwapchainImages.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/SwapchainImages.hpp
 new file mode 100644
 index 0000000..9803292
 --- /dev/null
@@ -156,10 +156,10 @@ index 0000000..9803292
 +}
 +}
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
-index 37a54bc..95d147b 100644
+index 4335827..f14a649 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
-@@ -281,6 +281,9 @@ public:
+@@ -286,6 +286,9 @@ public:
      void Draw(const Graphics::State& graphics, const Pm4::DrawParameters& draw, std::span<const Graphics::CompiledShader> shaders, std::span<const Graphics::GuestMemorySnapshot> snapshots = {}, std::shared_ptr<const DrawRecipe>* recipe = nullptr);
      std::optional<std::string> KnownDrawRejection(const Graphics::State& graphics, std::span<const Graphics::CompiledShader> shaders) const;
      void ColorMetadataPass(const Graphics::ColorMetadataPass& pass);
@@ -185,7 +185,7 @@ index d6d0264..f5ce6d9 100644
      const auto invocation = InvocationFor(*program.snapshot, program.codeOffset, request);
      timing.Mark("prepared_invocation");
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Draw/DrawDecode.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Draw/DrawDecode.cpp
-index ba55102..927f10e 100644
+index 2af5a11..afa0e55 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Draw/DrawDecode.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Draw/DrawDecode.cpp
 @@ -2,6 +2,7 @@
@@ -196,12 +196,12 @@ index ba55102..927f10e 100644
  
  namespace AgcDriver::DriverDetail {
  
-@@ -118,7 +119,7 @@ std::shared_ptr<DrawDecode> Driver::decodeDraw(const QueueState& queue, const Su
-         const auto front = ProgramSnapshot(*submission.shaders, address, {2});
-         vertexWorkgroup = front->header.empty() && ProgramUsesWorkgroup(*front, static_cast<std::size_t>((address - front->codeAddress) / sizeof(std::uint32_t)));
-     }
--    product->state = Graphics::DecodeState(queue, vertexWorkgroup);
-+    product->state = Graphics::DecodeState(queue, vertexWorkgroup, std::getenv("APS5_ENABLE_SAMPLE_GROUPS") != nullptr);
+@@ -109,7 +110,7 @@ void DecodeGraphicsPrograms(DrawDecode& decoded, const QueueState& queue, const
+ 
+ std::shared_ptr<DrawDecode> Driver::decodeDraw(const QueueState& queue, const Submission& submission) {
+     auto product = std::make_shared<DrawDecode>();
+-    product->state = Graphics::DecodeState(queue, VertexWorkgroupRequired(queue, *submission.shaders));
++    product->state = Graphics::DecodeState(queue, VertexWorkgroupRequired(queue, *submission.shaders), std::getenv("APS5_ENABLE_SAMPLE_GROUPS") != nullptr);
      DecodeGraphicsPrograms(*product, queue, *submission.shaders, false, true);
      product->pixel = Graphics::DecodePixelStageInfo(queue.context, Graphics::ExportMappings(product->state), Graphics::PixelProgramSkipped(queue));
      product->pixel.targetExportPacking = Graphics::ExportPackings(product->state);
@@ -366,10 +366,10 @@ index f462b90..f1ebe90 100644
              CaptureTrace::Log("flip frame=%llu submission=%llu offset=%zu batch=%llu unsignaled=%llu", static_cast<unsigned long long>(frameSerial), static_cast<unsigned long long>(submission.serial), cursor, static_cast<unsigned long long>(batchesAtFlip), static_cast<unsigned long long>(unsignaledAtFlip));
              flipHold.Release();
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/QueueWorker.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/QueueWorker.cpp
-index 9fa87ef..89386e1 100644
+index d568f7b..9cdd5ca 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/QueueWorker.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/QueueWorker.cpp
-@@ -11,13 +11,13 @@
+@@ -12,13 +12,13 @@
  namespace AgcDriver::DriverDetail {
  
  FrameTiming* Driver::frameTiming() {
@@ -385,7 +385,7 @@ index 9fa87ef..89386e1 100644
      auto* frame = submission.queue == 0 ? frameTiming() : FrameTiming::Async();
      require(submission.receivedAt != FrameTiming::Clock::time_point{} && submission.receivedAt <= submission.enqueuedAt && submission.enqueuedAt <= submission.dequeuedAt && submission.dequeuedAt <= submission.orderedAt, "invalid submission timing order");
      if (submission.queue == 0) frame->IncludeSubmission(submission.serial, submission.receivedAt, submission.enqueuedAt, submission.orderedAt, firstSegment);
-@@ -121,7 +121,7 @@ void Driver::run(std::uint32_t id) noexcept {
+@@ -156,7 +156,7 @@ void Driver::run(std::uint32_t id) noexcept {
                  }
                  submission = std::move(pending.front());
                  pending.pop_front();
@@ -394,7 +394,7 @@ index 9fa87ef..89386e1 100644
                  if (id == 0) queue0Executing = submission.suspend ? 0 : submission.received;
                  if (submission.waitFree) {
                      orderHolders.fetch_add(1, std::memory_order_acq_rel);
-@@ -130,7 +130,7 @@ void Driver::run(std::uint32_t id) noexcept {
+@@ -165,7 +165,7 @@ void Driver::run(std::uint32_t id) noexcept {
                      orderHolders.fetch_sub(1, std::memory_order_acq_rel);
                      rethrowFailure();
                  }
@@ -402,9 +402,9 @@ index 9fa87ef..89386e1 100644
 +                if (FrameTiming::Enabled()) submission.orderedAt = std::chrono::steady_clock::now();
                  timing.Mark("dequeue_order");
                  worker.queued.fetch_sub(1, std::memory_order_acq_rel);
-                 if (profile && submission.enqueuedAt != std::chrono::steady_clock::time_point{}) costs.dequeueNs += static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - submission.enqueuedAt).count());
+                 running.Start();
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/Submission.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/Submission.cpp
-index a4fbb6e..07f729c 100644
+index a0db6f8..e7abf13 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/Submission.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Queues/Submission.cpp
 @@ -203,14 +203,14 @@ void Driver::executeRewindTail(const Submission& stalled) {
@@ -478,10 +478,10 @@ index a4fbb6e..07f729c 100644
      std::unique_lock lock(mutex);
      rethrowFailure();
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Shaders/ShaderRegistry.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Shaders/ShaderRegistry.cpp
-index 9b46369..6982aba 100644
+index 580d119..95fba3f 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Shaders/ShaderRegistry.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Shaders/ShaderRegistry.cpp
-@@ -320,21 +320,23 @@ void PublishRegisteredShader(std::shared_ptr<ShaderRegistry>& registry, const st
+@@ -354,21 +354,23 @@ void PublishRegisteredShader(std::shared_ptr<ShaderRegistry>& registry, const st
  
  namespace {
  
@@ -510,7 +510,7 @@ index 9b46369..6982aba 100644
  }
  
  }
-@@ -350,10 +352,18 @@ std::shared_ptr<const ShaderRecompiler::SourceHandle> SourceHandleFor(const Shad
+@@ -384,10 +386,18 @@ std::shared_ptr<const ShaderRecompiler::SourceHandle> SourceHandleFor(const Shad
      for (const auto& entry : snapshot.prepared->entries) {
          if (entry.codeOffset == codeOffset && ShaderRecompiler::MatchesPreparedShader(request, *entry.handle, key)) return entry.handle;
      }
@@ -533,7 +533,7 @@ index 9b46369..6982aba 100644
  }
  
  ShaderRecompiler::RectListShaders PreparedRectangle(const ShaderSnapshot& snapshot, std::uint64_t vertexId, std::uint64_t fragmentId) {
-@@ -449,14 +459,22 @@ ShaderRecompiler::PreparedShaderInvocation InvocationFor(const ShaderSnapshot& s
+@@ -483,14 +493,22 @@ ShaderRecompiler::PreparedShaderInvocation InvocationFor(const ShaderSnapshot& s
          if (!linked.empty() && !std::ranges::equal(invocationRequest.shader.code, linked)) continue;
          if (auto invocation = ShaderRecompiler::PreparedShaderInvocation::TryCreate(invocationRequest, entry.handle, key)) return std::move(*invocation);
      }
@@ -565,7 +565,7 @@ index 9b46369..6982aba 100644
  std::optional<ShaderRecompiler::ShaderFloatMode> RegisteredFloatMode(const ShaderSnapshot& snapshot) {
      if (snapshot.registeredState == nullptr) return std::nullopt;
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/GuestMemory.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/GuestMemory.cpp
-index 36d7b28..dc684d3 100644
+index b764c49..9672cdd 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/GuestMemory.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/GuestMemory.cpp
 @@ -659,7 +659,13 @@ std::string verify(std::uintptr_t address, std::size_t bytes, bool writable) {
@@ -583,7 +583,7 @@ index 36d7b28..dc684d3 100644
      require(bytes <= std::numeric_limits<std::uintptr_t>::max() - address, "address range overflow");
      const auto reason = verify(address, bytes, writable);
      if (!reason.empty()) {
-@@ -1215,8 +1221,36 @@ bool UnchangedSinceAll(std::span<const UnchangedQuery> queries) {
+@@ -1230,8 +1236,36 @@ bool UnchangedSinceAll(std::span<const UnchangedQuery> queries) {
      return true;
  }
  
@@ -621,7 +621,7 @@ index 36d7b28..dc684d3 100644
      const auto stampStored = [](WriteTracker& tracker, std::pair<std::uint64_t, std::uint64_t> stored) -> std::uint64_t {
          if (stored.second <= stored.first) return 0;
          ++tracker.generation;
-@@ -1238,7 +1272,21 @@ std::uint64_t storeOwn(std::uint64_t address, std::size_t bytes, const std::func
+@@ -1253,7 +1287,21 @@ std::uint64_t storeOwn(std::uint64_t address, std::size_t bytes, const std::func
      if (GuestArena::GuestArenaHostRegionOverlaps_nid_postfix(first, static_cast<std::size_t>(stop - first))) return stampStored(tracker, store());
  #endif
      if (!walkWrites(tracker, first, stop, StampKind::Cpu)) return stampStored(tracker, store());
@@ -644,7 +644,7 @@ index 36d7b28..dc684d3 100644
      walkWrites(tracker, first, stop, StampKind::Driver);
      return stampStored(tracker, stored);
  }
-@@ -1247,7 +1295,7 @@ std::uint64_t StoreOwnBytes(std::uint64_t address, std::size_t bytes, const std:
+@@ -1262,7 +1310,7 @@ std::uint64_t StoreOwnBytes(std::uint64_t address, std::size_t bytes, const std:
      return storeOwn(address, bytes, [&] {
          store();
          return std::pair<std::uint64_t, std::uint64_t>{address, address + bytes};
@@ -675,7 +675,7 @@ index 3d37942..6f7218c 100644
      Require(limits.maxPushConstantsSize >= ShaderRecompiler::RuntimeAbi::PushConstantDwords * sizeof(std::uint32_t) && limits.maxBoundDescriptorSets > ShaderRecompiler::RuntimeAbi::DescriptorSet, "shader runtime ABI exceeds device limits");
      Require(limits.maxStorageBufferRange >= sizeof(ShaderRecompiler::RuntimeAbi::ShaderData), "shader runtime ShaderData exceeds device limits");
 diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
-index 87d211a..27cdbef 100644
+index 8a1600b..2c97f68 100644
 --- a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
 @@ -1,3 +1,7 @@
@@ -686,7 +686,7 @@ index 87d211a..27cdbef 100644
  #include "prx/libSceAgcDriver/Execution/include/ProfileOutput.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/PipelineSpecialization.hpp"
  #include "prx/libSceAgcDriver/Execution/include/CaptureTrace.hpp"
-@@ -5,6 +9,7 @@
+@@ -8,6 +12,7 @@
  #include "prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp"
  #include "prx/libSceAgcDriver/Execution/include/Driver.hpp"
  #include "prx/libSceAgcDriver/Execution/include/PerformanceTimer.hpp"
@@ -694,13 +694,14 @@ index 87d211a..27cdbef 100644
  #include "prx/libSceAgcDriver/Execution/include/BdaFeatures.hpp"
  #include "prx/libSceAgcDriver/Execution/include/FragmentBarycentric.hpp"
  #include "prx/libSceAgcDriver/Execution/include/PipelineLinkOptimization.hpp"
-@@ -13,10 +18,14 @@
+@@ -16,11 +21,15 @@
  #include "prx/libSceAgcDriver/Execution/include/PresentationScaler.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/DepthSurface.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
 +#include "prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/DccMetadata.hpp"
  #include "prx/libSceAgcDriver/Execution/include/DisplayFormat.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/MultisampleTarget.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/TextureDetiler.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/GpuColorTransfer.hpp"
 +#include "prx/libSceAgcDriver/Graphics/include/GpuColorSampleTiler.hpp"
@@ -709,7 +710,7 @@ index 87d211a..27cdbef 100644
  #include "prx/libSceAgcDriver/Graphics/include/BufferPool.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/TextureCache.hpp"
  #include "prx/libSceAgcDriver/Graphics/include/PipelineCache.hpp"
-@@ -31,6 +40,14 @@
+@@ -35,6 +44,14 @@
  #ifdef _WIN32
  #include <windows.h>
  #endif
@@ -724,7 +725,7 @@ index 87d211a..27cdbef 100644
  #include <atomic>
  #include <chrono>
  #include <charconv>
-@@ -39,8 +56,6 @@
+@@ -43,8 +60,6 @@
  #include <cctype>
  #include <cstdlib>
  #include <mutex>
@@ -733,7 +734,7 @@ index 87d211a..27cdbef 100644
  #include <spirv/unified1/spirv.hpp>
  #include <array>
  #include <optional>
-@@ -213,6 +228,13 @@ struct VulkanDevice::State {
+@@ -262,6 +277,13 @@ struct VulkanDevice::State {
      bool fragmentShaderBarycentric = false;
      bool geometryShader = false;
      bool sampleRateShading = false;
@@ -747,15 +748,15 @@ index 87d211a..27cdbef 100644
      bool shaderClock = false;
      bool narrowSubgroupClock = false;
      bool float64DenormPreserve = false;
-@@ -222,6 +244,7 @@ struct VulkanDevice::State {
-     bool storageBufferUpdateAfterBind = false;
+@@ -274,6 +296,7 @@ struct VulkanDevice::State {
+     bool runtimeDescriptorArray = false;
      VkPhysicalDeviceDescriptorIndexingPropertiesEXT descriptorIndexingProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT};
      bool imageInt64Atomics = false;
 +    bool storageImageMultisample = false;
      bool bufferInt64Atomics = false;
      bool primitiveListRestart = false;
      bool depthClipControl = false;
-@@ -278,6 +301,9 @@ struct VulkanDevice::State {
+@@ -330,6 +353,9 @@ struct VulkanDevice::State {
      std::mutex computePipelinesMutex;
      std::map<std::uint64_t, std::shared_ptr<ComputePipelineObjects>> computePipelines;
      std::unique_ptr<Graphics::GpuColorTransfer> colorTransfer;
@@ -765,7 +766,7 @@ index 87d211a..27cdbef 100644
      std::shared_ptr<Graphics::BufferPool> bufferPool;
      std::unique_ptr<Graphics::Buffer> emptyBuffer;
      std::unique_ptr<Graphics::PlaceholderImages> placeholderImages;
-@@ -619,6 +645,10 @@ struct VulkanDevice::State {
+@@ -676,6 +702,10 @@ struct VulkanDevice::State {
              textureCache.reset();
              detiler.reset();
              colorTransfer.reset();
@@ -776,7 +777,7 @@ index 87d211a..27cdbef 100644
              scaler.reset();
              pipelineCache.reset();
              context.bufferPool.reset();
-@@ -651,13 +681,36 @@ struct VulkanDevice::State {
+@@ -708,7 +738,15 @@ struct VulkanDevice::State {
              reinterpret_cast<PFN_vkDestroyInstance>(instanceProc(instance, "vkDestroyInstance"))(instance, nullptr);
          }
          if (library != nullptr) {
@@ -792,8 +793,9 @@ index 87d211a..27cdbef 100644
          }
      }
  };
- 
- VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_unique<State>()), serial([] { static std::atomic<std::uint64_t> serials{0}; return serials.fetch_add(1, std::memory_order_relaxed) + 1; }()) {
+@@ -873,6 +911,21 @@ VulkanDevice::VulkanDevice(CompileOnly) : VulkanDevice(nullptr, true) {}
+ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) : state(std::make_unique<State>()), serial([] { static std::atomic<std::uint64_t> serials{0}; return serials.fetch_add(1, std::memory_order_relaxed) + 1; }()) {
+     state->compileOnly = compileOnly;
      APS5_LOG_OUT("VulkanDevice constructor window=%p", static_cast<const void*>(window));
 +#ifdef APS5_SLIM
 +#ifdef _WIN32
@@ -813,7 +815,7 @@ index 87d211a..27cdbef 100644
  #ifdef _WIN32
      state->library = SDL_LoadObject("vulkan-1.dll");
  #else
-@@ -666,8 +719,9 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -881,8 +934,9 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      if (state->library == nullptr) {
          throw std::runtime_error(std::string("Vulkan loader: ") + SDL_GetError());
      }
@@ -824,7 +826,7 @@ index 87d211a..27cdbef 100644
      if (state->instanceProc == nullptr) {
          throw std::runtime_error("Vulkan loader: vkGetInstanceProcAddr missing");
      }
-@@ -699,6 +753,23 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -914,6 +968,23 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
          create.enabledExtensionCount = static_cast<std::uint32_t>(instanceExtensions.size());
          create.ppEnabledExtensionNames = instanceExtensions.data();
      }
@@ -848,7 +850,7 @@ index 87d211a..27cdbef 100644
      check(state->InstanceFunction<PFN_vkCreateInstance>("vkCreateInstance")(&create, nullptr, &state->instance), "vkCreateInstance");
      APS5_LOG_OUT("Vulkan instance created instance=%p", reinterpret_cast<void*>(state->instance));
      if (window != nullptr) {
-@@ -845,6 +916,10 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1060,6 +1131,10 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
              state->fragmentShaderBarycentric = FragmentShaderBarycentricUsable(driver.driverID, state->fragmentShaderBarycentric);
          }
      }
@@ -859,7 +861,7 @@ index 87d211a..27cdbef 100644
      VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlockFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT};
      if (hasExtension(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME)) {
          VkPhysicalDeviceFeatures2 features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &interlockFeatures};
-@@ -892,7 +967,10 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1107,7 +1182,10 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      if (bufferInt64Atomics) state->capabilities.push_back(spv::CapabilityInt64Atomics);
      atomicInt64Features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR};
      atomicInt64Features.shaderBufferInt64Atomics = VK_TRUE;
@@ -871,7 +873,7 @@ index 87d211a..27cdbef 100644
      state->bufferInt64Atomics = bufferInt64Atomics;
      VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT imageAtomicInt64Features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT};
      if (hasExtension(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME)) {
-@@ -1045,7 +1123,9 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1260,7 +1338,9 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT};
      VkPhysicalDeviceDynamicRenderingFeaturesKHR renderingFeatures{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR};
      constexpr std::array<const char*, 6> libraryExtensions{VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME, VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME};
@@ -882,7 +884,7 @@ index 87d211a..27cdbef 100644
          dynamicStateFeatures.pNext = &renderingFeatures;
          libraryFeatures.pNext = &dynamicStateFeatures;
          VkPhysicalDeviceFeatures2 features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &libraryFeatures};
-@@ -1093,7 +1173,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1308,7 +1388,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      enabled.tessellationShader = available.tessellationShader;
      state->tessellationShader = enabled.tessellationShader == VK_TRUE;
      if (state->tessellationShader) state->capabilities.push_back(3);
@@ -891,7 +893,7 @@ index 87d211a..27cdbef 100644
      require(available.samplerAnisotropy && available.textureCompressionBC, "device lacks sampler anisotropy or BC texture compression support required for texture sampling");
      enabled.samplerAnisotropy = VK_TRUE;
      enabled.textureCompressionBC = VK_TRUE;
-@@ -1118,6 +1198,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1333,6 +1413,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      state->occlusionQueryPrecise = enabled.occlusionQueryPrecise == VK_TRUE;
      // Recompiled storage-image access declares no format (the guest descriptor decides it).
      enabled.shaderStorageImageMultisample = available.shaderStorageImageMultisample;
@@ -899,7 +901,7 @@ index 87d211a..27cdbef 100644
      if (enabled.shaderStorageImageMultisample) state->capabilities.push_back(spv::CapabilityStorageImageMultisample);
      state->capabilities.push_back(spv::CapabilityImageMSArray);
      enabled.shaderStorageImageWriteWithoutFormat = available.shaderStorageImageWriteWithoutFormat;
-@@ -1150,6 +1231,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1368,6 +1449,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
          if (state->storageBufferUpdateAfterBind) {
              VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &state->descriptorIndexingProperties};
              state->InstanceFunction<PFN_vkGetPhysicalDeviceProperties2>("vkGetPhysicalDeviceProperties2")(selected, &properties);
@@ -907,7 +909,7 @@ index 87d211a..27cdbef 100644
          }
      }
      descriptorIndexingFeatures = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT};
-@@ -1293,21 +1375,51 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1518,21 +1600,51 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      }
      bdaFeatures.pNext = &byteFeatures;
      VkPhysicalDeviceRobustness2FeaturesEXT robustness2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT};
@@ -962,8 +964,8 @@ index 87d211a..27cdbef 100644
 +    auto shaderProfile = std::make_unique<const ShaderDeviceProfile>(buildTarget(), deviceInfo, state->properties.limits, true);
      check(state->InstanceFunction<PFN_vkCreateDevice>("vkCreateDevice")(selected, &deviceInfo, nullptr, &state->device), "vkCreateDevice");
      state->shaderProfile = std::move(shaderProfile);
-     state->DeviceFunction<PFN_vkGetDeviceQueue>("vkGetDeviceQueue")(state->device, family, 0, &state->queue);
-@@ -1331,13 +1443,23 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+     if (compileOnly) return;
+@@ -1557,13 +1669,23 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
      state->descriptorCache = std::make_unique<Graphics::DescriptorCache>(graphicsContext());
      state->samplerCache = std::make_unique<Graphics::SamplerCache>();
      state->CreateWorkgroupMemoryLayout();
@@ -988,7 +990,7 @@ index 87d211a..27cdbef 100644
      state->context = buildContext();
      state->contextReady = true;
      if (window != nullptr) {
-@@ -1369,7 +1491,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1595,7 +1717,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
          require(std::any_of(formats.begin(), formats.end(), [](const auto& format) { return format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; }), "BGRA8 sRGB-nonlinear surface format is unavailable");
          VkSwapchainCreateInfoKHR swapchain{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
          swapchain.surface = state->surface;
@@ -997,7 +999,7 @@ index 87d211a..27cdbef 100644
          swapchain.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
          swapchain.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
          swapchain.imageExtent = state->extent;
-@@ -1386,7 +1508,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window) : state(std::make_u
+@@ -1612,7 +1734,7 @@ VulkanDevice::VulkanDevice(const PresentationWindow* window, bool compileOnly) :
          check(getImages(state->device, state->swapchain, &imageCount, nullptr), "vkGetSwapchainImagesKHR");
          state->images.resize(imageCount);
          check(getImages(state->device, state->swapchain, &imageCount, state->images.data()), "vkGetSwapchainImagesKHR");
@@ -1006,7 +1008,7 @@ index 87d211a..27cdbef 100644
          VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
          const auto createFence = state->DeviceFunction<PFN_vkCreateFence>("vkCreateFence");
          check(createFence(state->device, &fence, nullptr, &state->acquireFence), "vkCreateFence");
-@@ -2040,7 +2162,7 @@ void VulkanDevice::Resize(std::uint32_t width, std::uint32_t height) {
+@@ -2274,7 +2396,7 @@ void VulkanDevice::Resize(std::uint32_t width, std::uint32_t height) {
      require((surface.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0 && (surface.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) != 0 && (surface.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0, "resized surface capabilities are unsupported");
      VkSwapchainCreateInfoKHR create{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
      create.surface = state->surface;
@@ -1015,7 +1017,7 @@ index 87d211a..27cdbef 100644
      create.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
      create.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
      create.imageExtent = {width, height};
-@@ -2064,7 +2186,7 @@ void VulkanDevice::Resize(std::uint32_t width, std::uint32_t height) {
+@@ -2298,7 +2420,7 @@ void VulkanDevice::Resize(std::uint32_t width, std::uint32_t height) {
      check(getImages(state->device, replacement, &count, state->images.data()), "vkGetSwapchainImagesKHR resize");
      state->images.resize(count);
      state->rendered.assign(count, VK_NULL_HANDLE);
@@ -1024,7 +1026,7 @@ index 87d211a..27cdbef 100644
  }
  
  bool VulkanDevice::Presentable() const {
-@@ -2563,6 +2685,8 @@ std::size_t VulkanDevice::FlipInFlight() {
+@@ -2797,6 +2919,8 @@ std::size_t VulkanDevice::FlipInFlight() {
          std::fprintf(stderr, "[present] APS5_FLIP_INFLIGHT=%s refused (0, 1 or 2 presentations may trail on the GPU); using 1\n", value);
          return std::size_t{1};
      }();
@@ -1033,7 +1035,7 @@ index 87d211a..27cdbef 100644
      return count;
  }
  
-@@ -2674,6 +2798,8 @@ ShaderRecompiler::SpirvTarget VulkanDevice::buildTarget() const {
+@@ -2908,6 +3032,8 @@ ShaderRecompiler::SpirvTarget VulkanDevice::buildTarget() const {
      target.float64DenormPreserve = state->float64DenormPreserve;
      target.fixedPushSlots = state->graphicsPipelineLibrary;
      target.srgbDecodeFormats = state->srgbDecodeFormats;
@@ -1042,7 +1044,7 @@ index 87d211a..27cdbef 100644
      if (state->meshShader) {
          const auto& mesh = state->meshLimits;
          target.mesh = ShaderRecompiler::MeshTargetLimits{{mesh.maxMeshWorkGroupSize[0], mesh.maxMeshWorkGroupSize[1], mesh.maxMeshWorkGroupSize[2]}, mesh.maxMeshWorkGroupInvocations, std::min(mesh.maxMeshSharedMemorySize, mesh.maxMeshPayloadAndSharedMemorySize), mesh.maxMeshOutputVertices, mesh.maxMeshOutputPrimitives, mesh.maxMeshOutputComponents, std::min(mesh.maxMeshOutputMemorySize, mesh.maxMeshPayloadAndOutputMemorySize), mesh.meshOutputPerVertexGranularity, mesh.meshOutputPerPrimitiveGranularity};
-@@ -2751,6 +2877,9 @@ Graphics::Context VulkanDevice::buildContext() const {
+@@ -2985,6 +3111,9 @@ Graphics::Context VulkanDevice::buildContext() const {
          state->depthClamp,
          state->hostImportAlignment
      };
@@ -1052,7 +1054,7 @@ index 87d211a..27cdbef 100644
      context.dmaBufImport = state->dmaBufImport;
      context.recorder = state->recorder.get();
      context.descriptorCache = state->descriptorCache.get();
-@@ -2774,13 +2903,25 @@ Graphics::Context VulkanDevice::buildContext() const {
+@@ -3008,13 +3137,25 @@ Graphics::Context VulkanDevice::buildContext() const {
      context.copiedWriters = state->copiedWriters.get();
      context.functions = state->functionsReady ? &state->deviceFunctions : nullptr;
      context.descriptorIndexing = state->descriptorIndexing;
@@ -1078,7 +1080,7 @@ index 87d211a..27cdbef 100644
      context.primitiveListRestart = state->primitiveListRestart;
      context.imageViewMinLod = state->imageViewMinLod;
      context.pipelineExecutableInfo = state->pipelineExecutableInfo;
-@@ -2798,6 +2939,12 @@ std::optional<std::string> VulkanDevice::KnownDrawRejection(const Graphics::Stat
+@@ -3032,6 +3173,12 @@ std::optional<std::string> VulkanDevice::KnownDrawRejection(const Graphics::Stat
      return Graphics::KnownValidationFailure(graphicsContext(), shaders, graphics);
  }
  
@@ -1091,7 +1093,7 @@ index 87d211a..27cdbef 100644
  void VulkanDevice::ColorMetadataPass(const Graphics::ColorMetadataPass& pass) {
      Graphics::RunColorMetadataPass(graphicsContext(), pass);
  }
-@@ -2812,7 +2959,9 @@ void VulkanDevice::Draw(const Graphics::State& graphics, const Pm4::DrawParamete
+@@ -3046,7 +3193,9 @@ void VulkanDevice::Draw(const Graphics::State& graphics, const Pm4::DrawParamete
      static const bool trace = std::getenv("APS5_TRACE_DRAWS") != nullptr;
      if (trace) APS5_LOG_OUT("VulkanDevice::Draw indices=%u instances=%u indexSize=%u address=0x%llx shaders=%zu colorTarget=%u", draw.indexCount, draw.instanceCount, draw.indexSize, static_cast<unsigned long long>(draw.indexAddress), shaders.size(), static_cast<unsigned>(graphics.hasColorTarget));
      const auto context = graphicsContext();
@@ -1166,7 +1168,7 @@ index 38049d9..fe9a24f 100644
  
      template<typename TFunction>
      TFunction Function(const char* name) const {
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/DescriptorFeaturePolicy.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DescriptorFeaturePolicy.hpp
+diff --git a/rebase/0009-device-profile-pipeline-and-typed-images/after/core/libs/prx/libSceAgcDriver/Graphics/include/DescriptorFeaturePolicy.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/DescriptorFeaturePolicy.hpp
 new file mode 100644
 index 0000000..33e25ae
 --- /dev/null
@@ -1194,7 +1196,7 @@ index 0000000..33e25ae
 +}
 +
 +#endif
-diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp
+diff --git a/rebase/0009-device-profile-pipeline-and-typed-images/after/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp
 new file mode 100644
 index 0000000..3364711
 --- /dev/null
@@ -1243,7 +1245,7 @@ index 0000000..3364711
 +}
 +#endif
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/Pipeline.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/Pipeline.hpp
-index c4fa933..c05e02a 100644
+index bb817d4..fb7769f 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/include/Pipeline.hpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/include/Pipeline.hpp
 @@ -39,8 +39,10 @@ public:
@@ -1260,7 +1262,7 @@ index c4fa933..c05e02a 100644
      Pipeline(const Pipeline&) = delete;
      Pipeline& operator=(const Pipeline&) = delete;
 @@ -48,8 +50,8 @@ public:
-     std::shared_ptr<Framebuffer> AcquireFramebuffer(std::span<const VkImageView> targets, std::span<const std::shared_ptr<StorageTexture>> owners, VkExtent2D extent);
+     std::shared_ptr<Framebuffer> AcquireFramebuffer(std::span<const VkImageView> targets, std::span<const std::shared_ptr<StorageTexture>> owners, VkExtent2D extent, std::span<const std::uint8_t> persistent = {});
      // Begins the render pass on the framebuffer, binds the pipeline and sets its dynamic state.
      void Begin(VkCommandBuffer commands, const Framebuffer& framebuffer, VkExtent2D extent, const State& state) const;
 -    // The same inside a render pass another pipeline of the same attachments began (compatible by
@@ -1270,7 +1272,7 @@ index c4fa933..c05e02a 100644
      void Continue(VkCommandBuffer commands, const State& state) const;
      bool SplitsFaces() const { return backFaces != VK_NULL_HANDLE; }
      bool Optimized() const { return optimized != nullptr && optimized->handle.load() != VK_NULL_HANDLE; }
-@@ -69,6 +71,7 @@ private:
+@@ -70,6 +72,7 @@ private:
      };
      void release() noexcept;
      void setLibraryState(VkCommandBuffer commands, const State& state) const;
@@ -1278,7 +1280,7 @@ index c4fa933..c05e02a 100644
      Context context;
      std::vector<VkShaderModule> _modules;
      VkPipelineLayout layout = VK_NULL_HANDLE;
-@@ -86,16 +89,20 @@ private:
+@@ -87,16 +90,20 @@ private:
      VkFormat depthFormat = VK_FORMAT_UNDEFINED;
      VkImageLayout attachmentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
      std::vector<std::uint32_t> colorSlots;
@@ -1301,7 +1303,7 @@ index c4fa933..c05e02a 100644
  // Destroys the cached pipelines of a device; to be called before the device goes away. Without it,
  // entries of a gone device are recognised by their buffer pool (made and reset with the device, so
  // it tells device instances apart when the loader reuses a VkDevice handle) and forgotten unused.
-@@ -103,12 +110,16 @@ void ClearCachedPipelines(VkDevice device);
+@@ -104,13 +111,17 @@ void ClearCachedPipelines(VkDevice device);
  bool HasStencil(VkFormat format);
  // Device limit checks of the viewport, which is dynamic state and so no longer checked by Pipeline.
  void ValidateViewport(const Context& context, const VkViewport& viewport);
@@ -1313,6 +1315,7 @@ index c4fa933..c05e02a 100644
  void ValidateProvokingVertex(const Context& context, const State& state, std::span<const CompiledShader> shaders = {});
  
  void ValidateShaderPair(const ShaderRecompiler::RecompileResult& vertex, const ShaderRecompiler::RecompileResult& fragment);
+ bool ShadersWriteMemory(std::span<const CompiledShader> shaders);
  // Returns the color attachment locations the pixel shader writes.
 -std::set<std::uint32_t> ValidateShaders(std::span<const CompiledShader> shaders, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing = false, bool imageInt64Atomics = false, bool geometryShader = false, bool sampleRateShading = false, bool bufferInt64Atomics = false);
 +std::set<std::uint32_t> ValidateShaders(std::span<const CompiledShader> shaders, const State& state, const VkPhysicalDeviceSubgroupProperties& subgroup, bool fragmentShaderBarycentric, bool descriptorIndexing = false, bool imageInt64Atomics = false, bool geometryShader = false, bool sampleRateShading = false, bool bufferInt64Atomics = false, bool multisampleArrayImage = false);
@@ -1355,7 +1358,7 @@ index 7e9a4dc..79fee9e 100644
  public:
      explicit PlaceholderImages(const Context& context);
 diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/Pipeline.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/Pipeline.cpp
-index d47dcb3..a51c1c3 100644
+index 27bfd7e..760415b 100644
 --- a/core/libs/prx/libSceAgcDriver/Graphics/src/Pipeline.cpp
 +++ b/core/libs/prx/libSceAgcDriver/Graphics/src/Pipeline.cpp
 @@ -1,3 +1,4 @@
@@ -1425,7 +1428,26 @@ index d47dcb3..a51c1c3 100644
  void ValidateViewport(const Context& context, const VkViewport& viewport) {
      Require(std::isfinite(viewport.minDepth) && std::isfinite(viewport.maxDepth), "non-finite viewport depth range");
      Require(context.depthRangeUnrestricted || (viewport.minDepth >= 0 && viewport.minDepth <= 1 && viewport.maxDepth >= 0 && viewport.maxDepth <= 1), "viewport depth outside [0, 1] requires VK_EXT_depth_range_unrestricted");
-@@ -202,14 +247,49 @@ bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State&
+@@ -154,7 +199,7 @@ void appendKey(std::vector<std::byte>& key, const TValue& value) {
+     key.insert(key.end(), bytes.begin(), bytes.end());
+ }
+ 
+-bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State& state, const VertexInputLayout& input, const ShaderResources& resources, std::span<const CompiledShader> shaders) {
++bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State& state, const VertexInputLayout& input, const ShaderResources& resources, std::span<const CompiledShader> shaders, std::uint32_t sampleGroup) {
+     using Stage = ShaderRecompiler::ShaderStage;
+     if (!context.graphicsPipelineLibrary || context.pipelineExecutableInfo || state.depthBiasPerFace || state.rectList || SplitsAlternateAlpha(state)) return false;
+     keys = {};
+@@ -188,6 +233,9 @@ bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State&
+     if (state.stages.tessellation) appendKey(keys.preRasterization, state.stages.tessellation->inputControlPoints);
+     appendKey(keys.fragmentShader, state.samples);
+     appendKey(keys.fragmentOutput, state.samples);
++    // The two groups of an eight-sample draw select different native positions and masks.
++    appendKey(keys.fragmentShader, sampleGroup);
++    appendKey(keys.fragmentOutput, sampleGroup);
+     for (const auto& blend : state.blends) appendKey(keys.fragmentOutput, blend);
+     for (const auto value : state.blendConstants) appendKey(keys.fragmentOutput, value);
+     appendKey(keys.renderPass, state.blends.size());
+@@ -204,15 +252,49 @@ bool libraryKeys(PipelineLibraryKeys& keys, const Context& context, const State&
  
  }
  
@@ -1437,7 +1459,8 @@ index d47dcb3..a51c1c3 100644
      this->context.bufferPool.reset();
      Require(state.blends.size() == (state.colors.empty() ? 0u : state.colors.back().exportIndex + 1u) && state.colors.size() <= state.blends.size(), "blend states do not match decoded color state");
      Require(state.blends.size() <= context.limits.maxColorAttachments, "color targets exceed device attachment limits");
--    Require(state.hasColorTarget || (context.limits.framebufferNoAttachmentsSampleCounts & VK_SAMPLE_COUNT_1_BIT) != 0, "device does not support single-sample rendering without attachments");
+-    Require(state.hasColorTarget || (context.limits.framebufferNoAttachmentsSampleCounts & static_cast<VkSampleCountFlagBits>(state.samples)) != 0, "device does not support rendering without attachments at the draw's sample count");
+-    Require(state.samples == 1 || !state.depth.has_value() || (context.limits.framebufferDepthSampleCounts & static_cast<VkSampleCountFlagBits>(state.samples)) != 0, "device does not support depth targets with the draw's sample count");
 +    const auto nativeSamples = static_cast<VkSampleCountFlagBits>(state.samples.nativeCount);
 +    Require(std::has_single_bit(state.samples.count) && state.samples.count <= 8u &&
 +            state.samples.nativeCount == std::min(state.samples.count, 4u) &&
@@ -1477,29 +1500,38 @@ index d47dcb3..a51c1c3 100644
      Require(!depthBounds || context.depthBounds, "device does not support the depth bounds test");
      Require(!depthBias || state.depthBiasClamp == 0.0f || context.depthBiasClamp, "device does not support depth bias clamping");
      Require(!state.dualSourceBlend || (context.dualSrcBlend && state.blends.size() <= context.limits.maxFragmentDualSrcAttachments), "device does not support dual-source blending into this many attachments");
-@@ -270,7 +350,7 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
+@@ -273,7 +355,7 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
          for (std::uint32_t index = 0; index < state.colors.size(); ++index) {
              VkAttachmentDescription color{};
              color.format = state.colors[index].format;
--            color.samples = VK_SAMPLE_COUNT_1_BIT;
+-            color.samples = static_cast<VkSampleCountFlagBits>(state.samples);
 +            color.samples = nativeSamples;
              color.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
              color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
              color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-@@ -288,7 +368,7 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
+@@ -291,7 +373,7 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
          if (state.depth) {
              VkAttachmentDescription depth{};
              depth.format = state.depth->format;
--            depth.samples = VK_SAMPLE_COUNT_1_BIT;
+-            depth.samples = static_cast<VkSampleCountFlagBits>(state.samples);
 +            depth.samples = nativeSamples;
              depth.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
              depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
              depth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-@@ -363,7 +443,14 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
+@@ -340,7 +422,7 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
+         viewports.viewportCount = 1;
+         viewports.scissorCount = 1;
+         PipelineLibraryKeys keys;
+-        libraries = libraryKeys(keys, context, state, vertexInput, resources, shaders);
++        libraries = libraryKeys(keys, context, state, vertexInput, resources, shaders, sampleGroup);
+         std::vector<VkDynamicState> dynamicStates{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+         if (depthBounds) dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BOUNDS);
+         if (depthBias) dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
+@@ -366,7 +448,14 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
              raster.pNext = &provoking;
          }
          VkPipelineMultisampleStateCreateInfo samples{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
--        samples.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+-        samples.rasterizationSamples = static_cast<VkSampleCountFlagBits>(state.samples);
 +        samples.rasterizationSamples = nativeSamples;
 +        const VkSampleMask sampleMask = (state.samples.mask >> (sampleGroup * state.samples.nativeCount)) & ((1u << state.samples.nativeCount) - 1u);
 +        if (state.samples.count > 1u) samples.pSampleMask = &sampleMask;
@@ -1511,7 +1543,7 @@ index d47dcb3..a51c1c3 100644
          VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
          depthStencil.depthTestEnable = state.depthTest;
          depthStencil.depthWriteEnable = state.depthWrite;
-@@ -521,6 +608,7 @@ std::shared_ptr<Framebuffer> Pipeline::AcquireFramebuffer(std::span<const VkImag
+@@ -530,6 +619,7 @@ std::shared_ptr<Framebuffer> Pipeline::AcquireFramebuffer(std::span<const VkImag
  }
  
  void Pipeline::Begin(VkCommandBuffer commands, const Framebuffer& framebuffer, VkExtent2D extent, const State& state) const {
@@ -1519,7 +1551,7 @@ index d47dcb3..a51c1c3 100644
      if (dynamicRendering) {
          const auto views = framebuffer.Views();
          Require(views.size() == attachments, "render targets do not match the pipeline's attachments");
-@@ -554,11 +642,36 @@ void Pipeline::Begin(VkCommandBuffer commands, const Framebuffer& framebuffer, V
+@@ -563,11 +653,36 @@ void Pipeline::Begin(VkCommandBuffer commands, const Framebuffer& framebuffer, V
      begin.renderPass = renderPass;
      begin.framebuffer = framebuffer.Handle();
      begin.renderArea = {{0, 0}, extent};
@@ -1556,7 +1588,7 @@ index d47dcb3..a51c1c3 100644
      const auto best = optimized != nullptr ? optimized->handle.load() : VK_NULL_HANDLE;
      context.Resolved(&DeviceFunctions::cmdBindPipeline, "vkCmdBindPipeline")(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, best != VK_NULL_HANDLE ? best : pipeline);
      context.Resolved(&DeviceFunctions::cmdSetViewport, "vkCmdSetViewport")(commands, 0, 1, &state.viewport);
-@@ -627,24 +740,64 @@ void append(std::vector<std::byte>& key, const TValue& value) {
+@@ -636,24 +751,64 @@ void append(std::vector<std::byte>& key, const TValue& value) {
  }
  
  // Everything the Pipeline objects are built from, or empty when a stage's result has no variant id
@@ -1628,9 +1660,9 @@ index d47dcb3..a51c1c3 100644
          // Where the stage's push constants sit in the block (AssemblePushConstants).
          append(key, shader.pushConstantOffset);
      }
-@@ -678,13 +831,14 @@ void pipelineKey(std::vector<std::byte>& key, const Context& context, const Stat
-     for (const auto& blend : state.blends) append(key, blend);
+@@ -688,13 +843,14 @@ void pipelineKey(std::vector<std::byte>& key, const Context& context, const Stat
      for (const auto value : state.blendConstants) append(key, value);
+     append(key, state.samples);
      append(key, state.colors.size());
 -    for (const auto& color : state.colors) append(key, color.format);
 +    for (const auto& color : state.colors) { append(key, color.format); append(key, color.samples); append(key, color.fragments); }
@@ -1644,7 +1676,7 @@ index d47dcb3..a51c1c3 100644
          append(key, state.depthTest);
          append(key, state.depthWrite);
          append(key, state.depthCompare);
-@@ -779,17 +933,17 @@ void reportPipelines(PipelineStore& store) {
+@@ -789,17 +945,17 @@ void reportPipelines(PipelineStore& store) {
  
  }
  
@@ -1666,7 +1698,7 @@ index d47dcb3..a51c1c3 100644
      }
      const auto hash = hashKey(key);
      if (const auto found = store.index.find(hash); found != store.index.end()) {
-@@ -806,7 +960,7 @@ std::shared_ptr<Pipeline> CachedPipeline(const Context& context, const State& st
+@@ -816,7 +972,7 @@ std::shared_ptr<Pipeline> CachedPipeline(const Context& context, const State& st
          } else {
              // A different configuration with the same hash keeps the resident entry; this one stays private.
              ++store.uncached;
@@ -1675,7 +1707,7 @@ index d47dcb3..a51c1c3 100644
          }
      }
      ++store.misses;
-@@ -815,7 +969,7 @@ std::shared_ptr<Pipeline> CachedPipeline(const Context& context, const State& st
+@@ -825,7 +981,7 @@ std::shared_ptr<Pipeline> CachedPipeline(const Context& context, const State& st
      for (auto it = store.entries.begin(); it != store.entries.end();) {
          it = alive(*it, context) ? std::next(it) : abandon(store, it);
      }

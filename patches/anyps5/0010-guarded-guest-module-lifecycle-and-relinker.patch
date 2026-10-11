@@ -1,4 +1,4 @@
-diff --git a/core/libs/prx/libkernel/Module/ModuleLifecycle.hpp b/core/libs/prx/libkernel/Module/ModuleLifecycle.hpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/libs/prx/libkernel/Module/ModuleLifecycle.hpp b/core/libs/prx/libkernel/Module/ModuleLifecycle.hpp
 new file mode 100644
 index 0000000..65c5fc1
 --- /dev/null
@@ -262,7 +262,7 @@ index f1d39a1..af3317a 100644
  }
  
  }
-diff --git a/core/libs/tests/GuestKernelModuleLifecycle.cpp b/core/libs/tests/GuestKernelModuleLifecycle.cpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/libs/tests/GuestKernelModuleLifecycle.cpp b/core/libs/tests/GuestKernelModuleLifecycle.cpp
 new file mode 100644
 index 0000000..5a679a7
 --- /dev/null
@@ -489,7 +489,7 @@ index 0000000..5a679a7
 +    Require(imageUnloads == 1);
 +#endif
 +}
-diff --git a/core/libs/tests/GuestKernelModuleLifecycleFixture.cpp b/core/libs/tests/GuestKernelModuleLifecycleFixture.cpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/libs/tests/GuestKernelModuleLifecycleFixture.cpp b/core/libs/tests/GuestKernelModuleLifecycleFixture.cpp
 new file mode 100644
 index 0000000..9c01580
 --- /dev/null
@@ -542,7 +542,7 @@ index 0000000..9c01580
 +}
 +#endif
 +#endif
-diff --git a/core/libs/tests/GuestKernelModuleLifecycleFixture.hpp b/core/libs/tests/GuestKernelModuleLifecycleFixture.hpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/libs/tests/GuestKernelModuleLifecycleFixture.hpp b/core/libs/tests/GuestKernelModuleLifecycleFixture.hpp
 new file mode 100644
 index 0000000..122a967
 --- /dev/null
@@ -562,10 +562,10 @@ index 0000000..122a967
 +};
 +#endif
 diff --git a/core/relinker/cli/include/Cli.hpp b/core/relinker/cli/include/Cli.hpp
-index 6f7985c..c58b375 100644
+index 7faa535..dfb0f23 100644
 --- a/core/relinker/cli/include/Cli.hpp
 +++ b/core/relinker/cli/include/Cli.hpp
-@@ -28,6 +28,7 @@ struct Args {
+@@ -29,6 +29,7 @@ struct Args {
      std::string runPath = "$ORIGIN/libs";
      std::set<std::string> excludedSceModules;
      std::vector<std::string> moduleDirectories;
@@ -574,19 +574,19 @@ index 6f7985c..c58b375 100644
  
  Args ParseArgs(int argc, char* argv[]);
 diff --git a/core/relinker/cli/src/CliArgs.cpp b/core/relinker/cli/src/CliArgs.cpp
-index 0528e84..4108e2a 100644
+index eef10da..95bf124 100644
 --- a/core/relinker/cli/src/CliArgs.cpp
 +++ b/core/relinker/cli/src/CliArgs.cpp
 @@ -8,7 +8,7 @@
  namespace Cli {
  
  const char* Usage() {
--    return "Usage: relinker [--help] [--windows | --macos] [--windows-diagnostics] [--windows-gui] [--skip-syscall-check] [--skip-sce-module | --sce-module-path <path>] [--exclude-sce-module <file>]... [--module-dir <dir>]... [--to-intel] [--to-rosetta] [unused-filter=0|1|2] [--registry] [--rpath <path>] [--lazy-binding] [--autorun] <input.elf> <output.elf>\n"
-+    return "Usage: relinker [--help] [--windows | --macos] [--windows-diagnostics] [--windows-gui] [--skip-syscall-check] [--skip-sce-module | --sce-module-path <path>] [--exclude-sce-module <file>]... [--module-dir <dir>]... [--defer-guest-lifecycle <file>]... [--to-intel] [--to-rosetta] [unused-filter=0|1|2] [--registry] [--rpath <path>] [--lazy-binding] [--autorun] <input.elf> <output.elf>\n"
+-    return "Usage: relinker [--help] [--windows | --macos] [--windows-diagnostics] [--windows-gui] [--skip-syscall-check | --trap-sdk-syscall-stubs] [--skip-sce-module | --sce-module-path <path>] [--exclude-sce-module <file>]... [--module-dir <dir>]... [--to-intel] [--to-rosetta] [unused-filter=0|1|2] [--registry] [--rpath <path>] [--lazy-binding] [--autorun] <input.elf> <output.elf>\n"
++    return "Usage: relinker [--help] [--windows | --macos] [--windows-diagnostics] [--windows-gui] [--skip-syscall-check | --trap-sdk-syscall-stubs] [--skip-sce-module | --sce-module-path <path>] [--exclude-sce-module <file>]... [--module-dir <dir>]... [--defer-guest-lifecycle <file>]... [--to-intel] [--to-rosetta] [unused-filter=0|1|2] [--registry] [--rpath <path>] [--lazy-binding] [--autorun] <input.elf> <output.elf>\n"
             "Example: relinker input.elf output.elf";
  }
  
-@@ -38,6 +38,14 @@ Args ParseArgs(int argc, char* argv[]) {
+@@ -40,6 +40,14 @@ Args ParseArgs(int argc, char* argv[]) {
              if (i + 1 >= argc)
                  throw std::runtime_error("--module-dir requires a directory");
              args.moduleDirectories.push_back(argv[++i]);
@@ -601,7 +601,7 @@ index 0528e84..4108e2a 100644
          } else if (arg == "--to-intel") {
              args.toIntel = true;
          } else if (arg == "--to-rosetta") {
-@@ -82,6 +90,10 @@ Args ParseArgs(int argc, char* argv[]) {
+@@ -86,6 +94,10 @@ Args ParseArgs(int argc, char* argv[]) {
  
      if (args.skipSceModule && !args.excludedSceModules.empty())
          throw std::runtime_error("--exclude-sce-module conflicts with --skip-sce-module");
@@ -613,7 +613,7 @@ index 0528e84..4108e2a 100644
      if (args.skipSceModule && !args.moduleDirectories.empty())
          throw std::runtime_error("--module-dir conflicts with --skip-sce-module");
 diff --git a/core/relinker/cli/tests/CliArgsTests.cpp b/core/relinker/cli/tests/CliArgsTests.cpp
-index 98f3b29..d46a1b6 100644
+index ec27e77..14a8c75 100644
 --- a/core/relinker/cli/tests/CliArgsTests.cpp
 +++ b/core/relinker/cli/tests/CliArgsTests.cpp
 @@ -58,6 +58,7 @@ void defaults() {
@@ -624,7 +624,7 @@ index 98f3b29..d46a1b6 100644
  }
  
  void booleanFlags() {
-@@ -126,6 +127,24 @@ void excludeConflictsWithSkip() {
+@@ -133,6 +134,24 @@ void excludeConflictsWithSkip() {
      expectThrows({"--exclude-sce-module", "m", "--skip-sce-module", "input.elf", "output.elf"}, message);
  }
  
@@ -649,7 +649,7 @@ index 98f3b29..d46a1b6 100644
  void unusedFilter() {
      for (const auto& value : {std::string("0"), std::string("1"), std::string("2")}) {
          const auto args = parse({"unused-filter=" + value, "input.elf", "output.elf"});
-@@ -198,6 +217,7 @@ int main() {
+@@ -206,6 +225,7 @@ int main() {
          excludeSceModuleConsumesNextTokenVerbatim();
          excludeSceModuleWithoutValue();
          excludeConflictsWithSkip();
@@ -671,7 +671,7 @@ index b7e81a3..60dadd0 100644
      bool UsePlatformTlsResolver = true;
      std::vector<std::string> Names;
      std::vector<std::string> UnmatchedImportModules;
-diff --git a/core/relinker/elfpatcher/include/elfpatcher/windows/WindowsGuestLifecycleBuilder.hpp b/core/relinker/elfpatcher/include/elfpatcher/windows/WindowsGuestLifecycleBuilder.hpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/elfpatcher/include/elfpatcher/windows/WindowsGuestLifecycleBuilder.hpp b/core/relinker/elfpatcher/include/elfpatcher/windows/WindowsGuestLifecycleBuilder.hpp
 new file mode 100644
 index 0000000..92cc564
 --- /dev/null
@@ -743,7 +743,7 @@ index 8328104..48c1e2f 100644
      const auto functionEnd = code.GetRva();
      code.PatchBranch(exitCallback, functionEnd);
      code.Emit({0x48, 0x83, 0xec, 0x28});
-diff --git a/core/relinker/elfpatcher/src/windows/WindowsGuestLifecycleBuilder.cpp b/core/relinker/elfpatcher/src/windows/WindowsGuestLifecycleBuilder.cpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/elfpatcher/src/windows/WindowsGuestLifecycleBuilder.cpp b/core/relinker/elfpatcher/src/windows/WindowsGuestLifecycleBuilder.cpp
 new file mode 100644
 index 0000000..79eeccd
 --- /dev/null
@@ -869,7 +869,7 @@ index 0000000..79eeccd
 +
 +}
 diff --git a/core/relinker/elfpatcher/src/windows/WindowsGuestModuleWriter.cpp b/core/relinker/elfpatcher/src/windows/WindowsGuestModuleWriter.cpp
-index f7ca50f..c95bf8c 100644
+index bcc3469..01817e5 100644
 --- a/core/relinker/elfpatcher/src/windows/WindowsGuestModuleWriter.cpp
 +++ b/core/relinker/elfpatcher/src/windows/WindowsGuestModuleWriter.cpp
 @@ -5,6 +5,7 @@
@@ -880,7 +880,7 @@ index f7ca50f..c95bf8c 100644
  #include <io/BufferUtils.hpp>
  #include <algorithm>
  #include <map>
-@@ -148,6 +149,15 @@ std::vector<std::uint8_t> GuestModuleWriter::WriteWindows(const Relinker::GuestI
+@@ -155,6 +156,15 @@ std::vector<std::uint8_t> GuestModuleWriter::WriteWindows(const Relinker::GuestI
          nextRva = AlignRva(nextRva + lifecycle.Data.size());
          sections.push_back(std::move(lifecycle));
      }
@@ -896,7 +896,7 @@ index f7ca50f..c95bf8c 100644
      if (exports.size() > 65535) throw Domain::RelinkerException("Too many guest PE exports");
      PeSection exportSection{".edata", nextRva, SectionRead | 0x40u, std::vector<std::uint8_t>(40)};
      auto& data = exportSection.Data;
-@@ -192,11 +202,7 @@ std::vector<std::uint8_t> GuestModuleWriter::WriteWindows(const Relinker::GuestI
+@@ -199,11 +209,7 @@ std::vector<std::uint8_t> GuestModuleWriter::WriteWindows(const Relinker::GuestI
      }
      const auto entry = nextRva;
      sections.push_back({".dllmain", entry, SectionRead | SectionExecute | 0x20u, {0xb8, 1, 0, 0, 0, 0xc3}});
@@ -946,7 +946,7 @@ index 8d24179..9672862 100644
      }
      code.PatchBranch(skip, code.GetRva());
  }
-diff --git a/core/relinker/elfpatcher/tests/GuestLifecycleHost.cpp b/core/relinker/elfpatcher/tests/GuestLifecycleHost.cpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/elfpatcher/tests/GuestLifecycleHost.cpp b/core/relinker/elfpatcher/tests/GuestLifecycleHost.cpp
 new file mode 100644
 index 0000000..4dfeb31
 --- /dev/null
@@ -999,7 +999,7 @@ index 0000000..4dfeb31
 +} runtime;
 +
 +}
-diff --git a/core/relinker/elfpatcher/tests/WindowsGuestLifecycleTests.cpp b/core/relinker/elfpatcher/tests/WindowsGuestLifecycleTests.cpp
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/elfpatcher/tests/WindowsGuestLifecycleTests.cpp b/core/relinker/elfpatcher/tests/WindowsGuestLifecycleTests.cpp
 new file mode 100644
 index 0000000..57c159d
 --- /dev/null
@@ -1090,7 +1090,7 @@ index 0000000..57c159d
 +    std::puts("Guest lifecycle wrapper contract passed");
 +}
 diff --git a/core/relinker/main.cpp b/core/relinker/main.cpp
-index f1b4a5b..68882a6 100644
+index 0e74785..fe42478 100644
 --- a/core/relinker/main.cpp
 +++ b/core/relinker/main.cpp
 @@ -100,6 +100,7 @@ int Run(const int argc, char* argv[]) {
@@ -1111,10 +1111,10 @@ index f1b4a5b..68882a6 100644
  
          const Elfpatcher::Linux::LinuxDesktopEntryWriter desktopEntryWriter;
 diff --git a/core/relinker/relinker/include/relinker/guest/GuestImage.hpp b/core/relinker/relinker/include/relinker/guest/GuestImage.hpp
-index fcc35ac..bc1b3f9 100644
+index d566a15..3c56440 100644
 --- a/core/relinker/relinker/include/relinker/guest/GuestImage.hpp
 +++ b/core/relinker/relinker/include/relinker/guest/GuestImage.hpp
-@@ -44,6 +44,7 @@ struct GuestImage {
+@@ -52,6 +52,7 @@ struct GuestImage {
      std::uint64_t Fini = 0;
      std::uint64_t Got = 0;
      bool UsePlatformTlsResolver = true;
@@ -1122,7 +1122,7 @@ index fcc35ac..bc1b3f9 100644
  };
  
  class GuestImageReader {
-@@ -61,7 +62,7 @@ struct GuestArtifact {
+@@ -69,7 +70,7 @@ struct GuestArtifact {
  
  class GuestModuleBuilder {
  public:
@@ -1132,7 +1132,7 @@ index fcc35ac..bc1b3f9 100644
  
  }
 diff --git a/core/relinker/relinker/src/guest/GuestImageReader.cpp b/core/relinker/relinker/src/guest/GuestImageReader.cpp
-index ac7caaf..e94c246 100644
+index e6c3545..c69561a 100644
 --- a/core/relinker/relinker/src/guest/GuestImageReader.cpp
 +++ b/core/relinker/relinker/src/guest/GuestImageReader.cpp
 @@ -114,6 +114,9 @@ GuestImage GuestImageReader::Read(const std::filesystem::path& path, std::vector
@@ -1146,7 +1146,7 @@ index ac7caaf..e94c246 100644
          if (header.Type == 1) {
              if (header.FileSize > header.MemorySize || header.MemorySize > std::numeric_limits<std::uint64_t>::max() - header.MappedAddress || (header.Flags & ~7u) != 0) fail("Invalid load segment");
 diff --git a/core/relinker/relinker/src/guest/GuestModuleBuilder.cpp b/core/relinker/relinker/src/guest/GuestModuleBuilder.cpp
-index 689f4da..62d613f 100644
+index d51c4c1..cad6e2c 100644
 --- a/core/relinker/relinker/src/guest/GuestModuleBuilder.cpp
 +++ b/core/relinker/relinker/src/guest/GuestModuleBuilder.cpp
 @@ -52,7 +52,7 @@ std::string ModuleStem(std::string name, const bool windows) {
@@ -1178,10 +1178,10 @@ index 689f4da..62d613f 100644
 +    }
      std::vector<std::filesystem::path> runtimeDirectories;
      for (const auto& name : moduleDirectories) {
-         const auto relative = Io::NativePath(name);
-@@ -75,10 +84,14 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
-             throw Domain::RelinkerException("--module-dir must be a directory inside the guest module parent directory: " + name);
-         const auto directory = (root / relative).lexically_normal();
+         const auto relative = Io::NativePath(name).lexically_normal();
+@@ -76,10 +85,14 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
+         auto directory = (root / relative).lexically_normal();
+         if (!directory.has_filename()) directory = directory.parent_path();
          if (!std::filesystem::is_directory(directory)) throw Domain::RelinkerException("Guest module path is not a directory: " + Io::Utf8Path(directory));
 -        if (std::find(directories.begin(), directories.end(), directory) != directories.end()) throw Domain::RelinkerException("Duplicate guest module directory: " + Io::Utf8Path(directory));
 -        directories.push_back(directory);
@@ -1196,7 +1196,7 @@ index 689f4da..62d613f 100644
      std::vector<std::filesystem::path> paths;
      std::set<std::string> unmatchedExclusions = excludedModules;
      const auto isElf = [](const std::filesystem::path& path) {
-@@ -126,6 +139,16 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
+@@ -127,6 +140,16 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
      if (!unmatchedExclusions.empty()) throw Domain::RelinkerException("Excluded guest module file not found: " + *unmatchedExclusions.begin());
      std::sort(paths.begin(), paths.end());
      paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
@@ -1213,7 +1213,7 @@ index 689f4da..62d613f 100644
      if (paths.empty()) return {};
      if (lazyBinding) throw Domain::RelinkerException("Guest modules require eager binding; --lazy-binding is incompatible");
      std::vector<GuestImage> images;
-@@ -284,9 +307,19 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
+@@ -285,9 +308,19 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
          if (found != guestNames.end()) required[found->second] = true;
      }
      for (const auto& needed : dependencies) for (const auto dependency : needed) required[dependency] = true;
@@ -1234,7 +1234,7 @@ index 689f4da..62d613f 100644
      if (!windows) {
          for (auto& image : images) {
              for (std::size_t index = 1; index < image.Symbols.size(); ++index) {
-@@ -323,7 +356,7 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
+@@ -324,7 +357,7 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
          Io::AppendU64(dynamic.DynamicSegmentData, dynamic.DynStrData.size());
          Io::AppendString(dynamic.DynStrData, name);
      };
@@ -1243,7 +1243,7 @@ index 689f4da..62d613f 100644
      for (const auto& name : hostLibraries) addNeeded(name);
      if (!windows && runPath != "$ORIGIN" && !runPath.starts_with("$ORIGIN/") && !std::filesystem::path(runPath).is_absolute()) throw Domain::RelinkerException("Guest Linux run path must be absolute or begin with $ORIGIN");
      const auto outputDirectory = std::filesystem::absolute(outputPath).parent_path().lexically_normal();
-@@ -351,10 +384,11 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
+@@ -357,10 +390,11 @@ std::vector<GuestArtifact> GuestModuleBuilder::Build(const std::filesystem::path
          for (const auto& source : paths) if (std::filesystem::exists(target) && std::filesystem::equivalent(source, target)) throw Domain::RelinkerException("Guest output would overwrite an input module: " + Io::Utf8Path(target));
          if (std::filesystem::exists(target) && std::filesystem::equivalent(inputPath, target)) throw Domain::RelinkerException("Guest output would overwrite the input executable");
          Domain::GuestRuntime runtime;
@@ -1256,7 +1256,7 @@ index 689f4da..62d613f 100644
          std::vector<std::uint8_t> output;
          if (windows) output = Elfpatcher::GuestModuleWriter().WriteWindows(image, runtime);
          else {
-diff --git a/core/relinker/relinker/tests/test_guest_deferred_lifecycle.py b/core/relinker/relinker/tests/test_guest_deferred_lifecycle.py
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/relinker/tests/test_guest_deferred_lifecycle.py b/core/relinker/relinker/tests/test_guest_deferred_lifecycle.py
 new file mode 100644
 index 0000000..ecb53f4
 --- /dev/null
@@ -1397,7 +1397,7 @@ index 0000000..ecb53f4
 +
 +if __name__ == '__main__':
 +    main()
-diff --git a/core/relinker/relinker/tests/test_guest_init_fini.py b/core/relinker/relinker/tests/test_guest_init_fini.py
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/relinker/tests/test_guest_init_fini.py b/core/relinker/relinker/tests/test_guest_init_fini.py
 new file mode 100644
 index 0000000..26703e1
 --- /dev/null
@@ -1800,7 +1800,7 @@ index 0000000..26703e1
 +if __name__ == '__main__':
 +    main()
 diff --git a/core/relinker/relinker/tests/test_guest_module_dir.py b/core/relinker/relinker/tests/test_guest_module_dir.py
-index 97f3c85..c8bf7d1 100644
+index 4ab73d8..b2c0354 100644
 --- a/core/relinker/relinker/tests/test_guest_module_dir.py
 +++ b/core/relinker/relinker/tests/test_guest_module_dir.py
 @@ -56,7 +56,13 @@ def main():
@@ -1843,9 +1843,9 @@ index 97f3c85..c8bf7d1 100644
              assert result.returncode != 0 and "conflicts with --skip-sce-module" in result.stderr, result.stderr
 +            result, output = convert(case, windows, ["--module-dir", "Media/Plugins", "--module-dir", "Media/Plugins"])
 +            assert result.returncode == 2 and "Duplicate guest module directory" in result.stderr, result.stderr
-     print("Guest module directory option tests passed")
  
- 
+             for index, (name, relative) in enumerate((("..plugins", "..plugins"), ("Media/../..plugins", "..plugins"),
+                                                        ("./..plugins/.", "..plugins"), ("Media/../Media/Plugins", "Media/Plugins"),
 diff --git a/core/relinker/relinker/tests/test_guest_module_directories.py b/core/relinker/relinker/tests/test_guest_module_directories.py
 index 278a968..9507f70 100644
 --- a/core/relinker/relinker/tests/test_guest_module_directories.py
@@ -2000,7 +2000,7 @@ index 4b226cf..bdd1a81 100644
      print('Nested required guest module tests passed')
  
  
-diff --git a/core/relinker/relinker/tests/test_guest_optional_notes.py b/core/relinker/relinker/tests/test_guest_optional_notes.py
+diff --git a/rebase/0010-guarded-guest-module-lifecycle-and-relinker/after/core/relinker/relinker/tests/test_guest_optional_notes.py b/core/relinker/relinker/tests/test_guest_optional_notes.py
 new file mode 100644
 index 0000000..e79ab84
 --- /dev/null
