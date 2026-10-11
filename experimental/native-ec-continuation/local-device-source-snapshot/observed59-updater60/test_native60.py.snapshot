@@ -1,0 +1,71 @@
+import ast,copy,importlib.util,json,tempfile,unittest
+from pathlib import Path
+from unittest import mock
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('tested60',HERE/'install.py');i=importlib.util.module_from_spec(sp);sp.loader.exec_module(i);s=i.s;v=s.pv
+class SourceView(unittest.TestCase):
+ def setUp(self):
+  self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name).resolve();self.logical=self.root/'upstreams/AnyPS5/core/example.cpp';self.old=self.root/'build/anyps5-full-main-update-20261012/old-applied-stack/core/example.cpp';self.old.parent.mkdir(parents=True);self.old.write_bytes(b'old source');self.row={'path':str(self.old),'sha256':v.sha(self.old),'bytes':10,'stableLocalStat':v.seven(self.old.stat())};self.rows={str(self.logical):self.row}
+ def tearDown(self):self.temp.cleanup()
+ def test_retained_bytes_not_live(self):
+  self.logical.parent.mkdir(parents=True);self.logical.write_bytes(b'new source');q=v.View(self.rows,self.root);self.assertEqual(q.file(self.logical),self.old);self.assertEqual(q.physical_map({str(self.logical):self.row['sha256']}),{str(self.old):self.row['sha256']});self.assertEqual(self.logical.read_bytes(),b'new source')
+ def test_wrong_historical_digest(self):
+  q=v.View(self.rows,self.root)
+  with self.assertRaises(ValueError):q.physical_map({str(self.logical):'0'*64})
+ def test_changed_bytes(self):
+  q=v.View(self.rows,self.root);self.old.write_bytes(b'bad source')
+  with self.assertRaises(ValueError):q.file(self.logical)
+ def test_saved_inode(self):
+  self.row['stableLocalStat'][1]+=1
+  with self.assertRaises(ValueError):v.View(self.rows,self.root)
+ def test_symlink(self):
+  self.old.unlink();self.old.symlink_to(self.logical)
+  with self.assertRaises(ValueError):v.View(self.rows,self.root)
+ def test_duplicate_identity(self):
+  other=self.root/'upstreams/AnyPS5/core/other.cpp';rows={**self.rows,str(other):self.row}
+  with self.assertRaises(ValueError):v.View(rows,self.root)
+ def test_unknown_logical_prefix(self):
+  with self.assertRaises(ValueError):v.View({str(self.root/'saves/file'):self.row},self.root)
+class Native60(unittest.TestCase):
+ def setUp(self):self.r=s.load(s.SIGNED);self.p=s.load(s.BUILD_DIR/'inputs.json')
+ def test_actual_signed_shape(self):self.assertTrue(s.signed_shape(self.r,self.p))
+ def test_old_build_refused(self):
+  self.r['appBuild']='59'
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_fake_cpu_claim_refused(self):
+  self.r['cpuEightQualified']=True
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_wrong_frame_rebuild_refused(self):
+  self.r['freshNativeFexObjectCount']=43
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_wrong_fex_refused(self):
+  self.r['embeddedPEComponents']['xtajit64.dll']['sha256']='0'*64
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_wrong_rollback_refused(self):
+  self.r['native59RollbackSigningReceiptSha256']='0'*64
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_unsigned_provider_gate_refused(self):
+  self.r['deepStrictCodesignVerified']=False
+  with self.assertRaises(ValueError):s.signed_shape(self.r,self.p)
+ def test_actual_sampler_route(self):
+  p,records,dirs,session,values=i.ref.failed_origin();self.assertEqual(len(records),63);self.assertEqual(p['nativeBuild'],'59');self.assertIn('/raw/unix',str(sorted(dirs)));self.assertIn(str(i.ref.FAILED/'execution/receipt.json'),values)
+ def test_undeclared_appconfig_file_refused(self):
+  lib={'kind':'file','bytes':1,'sha256':'0'*64};ref={'inventory':{'Documents/madeira-library.json':lib},'originalLibrarySha256':'0'*64,'acceptedNative59BindingSha256':s.INSTALL59_SHA,'approvedCpuRecords':{},'approvedCpuDirectories':['Documents/CPU/raw/unix/AppConfig'],'exactSessionLog':'Documents/logs/one','exactConfig':'x','observedBundlePath':'/private/var/containers/Bundle/Application/<LOCAL_BUNDLE_UUID>/Madeira.app'}
+  current={**ref['inventory'],'Documents/CPU/raw/unix/AppConfig/unseen.json':lib};policy=mock.Mock();policy.system_artifact_records.return_value={}
+  with self.assertRaises(ValueError):i.ref.transition(ref,current,policy)
+ def test_install_budgets_unchanged(self):self.assertEqual((i.MIN_FREE,i.LIVE_RESERVE,i.MAX_OUTPUT,i.INSTALL_SECONDS,i.FALLBACK_SECONDS,i.WRAPPER_SECONDS),(6<<30,2<<30,1152<<20,1800,900,2850))
+ def test_preservation_function_bodies_only_literal_delta(self):
+  old=i.borrowed().pbody.extracted();actual=ast.fix_missing_locations(i.Adapter().visit(copy.deepcopy(old)))
+  import types
+  namespace=dict(vars(i));exec(compile(actual,'expected-private-literal-adapter','exec'),namespace)
+  def code(f):
+   c=f if isinstance(f,types.CodeType)else f.__code__;return(c.co_code,c.co_names,tuple(code(x)if isinstance(x,types.CodeType)else x for x in c.co_consts))
+  for n in actual.body:
+   expected=namespace[n.name];got=getattr(i,n.name)
+   if isinstance(n,ast.ClassDef):
+    for name,m in vars(expected).items():
+     if isinstance(m,types.FunctionType):self.assertEqual(code(m),code(getattr(got,name)))
+   else:self.assertEqual(code(expected),code(got))
+ def test_cli_pending_before_plan(self):
+  with mock.patch('sys.argv',['install.py']),mock.patch.object(i,'freeze_plan',side_effect=AssertionError):self.assertEqual(i.main(),0)
+if __name__=='__main__':unittest.main()

@@ -1,0 +1,33 @@
+"""Exclusive local source review/freeze. No package materialization or device call."""
+import argparse,importlib.util,json,subprocess
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('source60review',HERE/'composition.py');c=importlib.util.module_from_spec(sp);sp.loader.exec_module(c)
+def main():
+ parser=argparse.ArgumentParser(description=__doc__);g=parser.add_mutually_exclusive_group()
+ g.add_argument('--review-draft',action='store_true');g.add_argument('--freeze-source',action='store_true');a=parser.parse_args()
+ if not(a.review_draft or a.freeze_source):
+  print(json.dumps({'status':'inert_source_review_only','deviceActions':False}));return 0
+ if a.freeze_source:
+  c.require_runtime();b=c.load(c.INSTALL)
+  c.need(c.sha(c.INSTALL)==c.SEALED_INSTALL_SHA and len(b['inputs'])==c.SEALED_INPUT_COUNT and b['status']==c.INSTALL_STATUS and b['observedBuild']=='60','Genuine actual Native60 binding required')
+  result=c.ROOT/b['compositeInstallationResult'];c.need(c.sha(c.regular(result))==c.SEALED_RESULT_SHA==b['compositeInstallationResultSha256'],'Actual accepted60 result required')
+  c.install_reader().installation_claims(b,c.load(result),b['inputs'],b['collectorProtectedDataView'],Path(b['retainedProtectedPayload']))
+ held=c.load(c.INSTALL_REVIEW);c.need(c.sha(c.INSTALL_REVIEW)==c.INSTALL_REVIEW_SHA,'Exact independent updater review')
+ values=dict(held['inputHashes']);tool_values=dict(held['currentToolInputs']);tool_stamps={n:c.s.pv.seven(Path(n).stat())for n in tool_values};files={c.rel(p):c.sha(p)for p in c.reviewed_paths()}
+ for n,h in files.items():c.s.merge(values,{str(c.ROOT/n):h})
+ stamps={n:c.s.pv.seven(c.s.regular(n).stat())for n in values}
+ log=HERE/('offline-source-freeze-tests.log'if a.freeze_source else'offline-draft-tests.log')
+ with log.open('x')as stream:
+  child=subprocess.run([c.s.tool.PYTHON,'-I','-B','-m','unittest','discover','-s',str(HERE),'-p','test_route.py'],stdout=stream,stderr=subprocess.STDOUT,timeout=60)
+ c.need(child.returncode==0,'Source/temp controls failed')
+ c.s.replay(values);c.need({n:c.s.pv.seven(c.s.regular(n).stat())for n in values}==stamps,'Source review identity changed')
+ values[str(log)]=c.sha(log);stamps[str(log)]=c.s.pv.seven(log.stat())
+ c.s.replay(tool_values);c.need({n:c.s.pv.seven(Path(n).stat())for n in tool_values}==tool_stamps,'Current execution/query tool identities changed')
+ c.s.tool.verify_current_python()
+ record={'schema':1,'status':c.STATUS if a.freeze_source else'native60_original50_initial_quiescence_partial_observed59_source_draft_genuine_installation_tuple_pending','caseCount':27,'files':files,'inputHashes':values,'inputFingerprints':stamps,'currentToolInputs':tool_values,'currentToolFingerprints':tool_stamps,'cpuPackageSourceFreezeSha256':c.FREEZE,'installationReaderSha256':c.INSTALL_READER_SHA,'installationReaderReviewSha256':c.INSTALL_REVIEW_SHA,'actualSignedNative60ReceiptSha256':c.s.SIGNED_SHA,'rawOriginal50ProbeSha256':c.sha(HERE/'probe.py'),'continuingExecutableSha256':c.CONTINUING_EXE_SHA,'actualInstallationPins':{'bindingSha256':c.SEALED_INSTALL_SHA,'resultSha256':c.SEALED_RESULT_SHA,'inputCount':c.SEALED_INPUT_COUNT},'deviceActions':False,'executionPlanCreated':False,'runtimeExecuted':False,'cpuAccepted':False,'full803OrEightAccepted':False}
+ path=c.SOURCE_FREEZE if a.freeze_source else HERE/'draft-source-review.json'
+ with path.open('x')as stream:json.dump(record,stream,indent=2);stream.write('\n')
+ print(json.dumps({'review':str(path),'sha256':c.sha(path),'inputs':len(values),'caseCount':27,'runtimePinsPending':not a.freeze_source}))
+ return 0
+if __name__=='__main__':raise SystemExit(main())

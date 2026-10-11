@@ -77,9 +77,16 @@ new sRGB depth-comparison checks. GPU execution on the iPad is separate.
 Earlier failed attempts and their logs remain unchanged locally.
 [Authored qualification source snapshots](../experimental/upstream-qualification-source-snapshot/README.md).
 
-The complete **47-library Windows HLE rebuild** is being qualified with all
-42 default plus seven additional test executable targets, including all four
-registered ShaderMemory cases. No test target is skipped. The local test host
+The complete **47-library Windows HLE rebuild and all 49 selected test
+executables compile**. The runtime attempt passes the first 28 default targets
+and stops in Graphics: a 3D `SW_64KB_D_X` texture is incorrectly dispatched to
+the thin layout, producing 1,048,576 bytes where the independent Addrlib fixture
+requires 262,144. The fixture is retained unchanged; the production dispatch is
+being repaired. The remaining default targets and seven additional targets,
+including all four registered ShaderMemory cases, still require the full run.
+No qualified archive was exported from this failed attempt.
+[Actual build and failure](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
+The local test host
 uses the independently probed lazy arena at `0x7400000000`, 4 GiB reserved in
 256-MiB chunks. Earlier complete-refresh memory and exception tests passed with
 this arena; that result does not establish allocation on the iPad.

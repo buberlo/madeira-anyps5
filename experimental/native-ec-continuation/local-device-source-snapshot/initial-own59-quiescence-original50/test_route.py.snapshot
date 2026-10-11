@@ -1,0 +1,147 @@
+"""Small source/temp controls. No hardware, real plans or fabricated pass receipts."""
+import ast
+import copy
+import hashlib
+import importlib.util
+import json
+import types
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+def imported(name):
+ spec=importlib.util.spec_from_file_location('test60_'+name,HERE/(name+'.py'))
+ module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+c=imported('composition');a=imported('adapt');e=imported('execution_tool')
+
+class Route(unittest.TestCase):
+ def test_exact_raw_sources(self):
+  for name in ['probe.py','launch_query.py','log_contracts.py']:
+   self.assertEqual((HERE/name).read_bytes(),(c.LEGACY/name).read_bytes())
+  self.assertEqual(c.sha(HERE/'probe.py'),e.PROBE_SHA)
+ def test_pending_refuses_before_package_and_output(self):
+  before=set(HERE.iterdir())
+  with patch.object(c,'SEALED_INSTALL_SHA','PENDING'),patch.object(c,'SEALED_RESULT_SHA','PENDING'),patch.object(c,'SEALED_INPUT_COUNT',None),patch.object(a,'module',return_value=c),patch.object(a,'package_contract',side_effect=AssertionError('package reached')):
+   with self.assertRaisesRegex(ValueError,'pending'):a.prepare('continuing-only-diagnostic',None,None,None)
+  self.assertEqual(set(HERE.iterdir()),before)
+ def test_pending_lineage_refuses_before_file_read(self):
+  with patch.object(c,'SEALED_INSTALL_SHA','PENDING'),patch.object(c,'SEALED_RESULT_SHA','PENDING'),patch.object(c,'SEALED_INPUT_COUNT',None),patch.object(c,'load',side_effect=AssertionError('read reached')):
+   with self.assertRaisesRegex(ValueError,'pending'):c.plan_lineage({})
+ def test_pending_source_freeze_refuses(self):
+  with patch.object(c,'SEALED_INSTALL_SHA','PENDING'),patch.object(c,'SEALED_RESULT_SHA','PENDING'),patch.object(c,'SEALED_INPUT_COUNT',None):
+   with self.assertRaisesRegex(ValueError,'pending'):c.source_contract(c.SOURCE_FREEZE)
+ def test_exact_fresh_reader_pins(self):
+  self.assertEqual(c.sha(c.INSTALL_READER),c.INSTALL_READER_SHA)
+  self.assertEqual(c.sha(c.INSTALL_REVIEW),c.INSTALL_REVIEW_SHA)
+  self.assertEqual(c.install_reader().STATUS,c.INSTALL_STATUS)
+ def test_raw_probe_identity_kept(self):
+  self.assertEqual(Path(a.__file__),HERE/'probe.py')
+  self.assertEqual(a.BUILD,'60');self.assertEqual(a.FREEZE,c.FREEZE)
+ def test_original50_timing_and_profile_unchanged(self):
+  old=importlib.util.spec_from_file_location('old50raw',c.LEGACY/'probe.py');m=importlib.util.module_from_spec(old);old.loader.exec_module(m)
+  self.assertEqual(a.EXECUTABLES,m.EXECUTABLES);self.assertEqual(a.BASE_ENV,m.BASE_ENV)
+  self.assertEqual((a.TOTAL,a.SETUP,a.CLEANUP,a.MARGIN,a.MAX_LOG),(330,120,90,60,8<<20))
+  self.assertEqual(a.EXECUTABLES['continuing-only-diagnostic'][2],120)
+ def test_all_probe_body_changes_are_exact_literals(self):
+  original=ast.parse((HERE/'probe.py').read_bytes());converted=a.Literals().visit(copy.deepcopy(original))
+  class Erase(ast.NodeTransformer):
+   def visit_Constant(self,node):
+    if type(node.value)is str:node.value='<string>'
+    return node
+  self.assertEqual(ast.dump(Erase().visit(copy.deepcopy(original))),ast.dump(Erase().visit(copy.deepcopy(converted))))
+  code=compile(ast.fix_missing_locations(converted),str(HERE/'probe.py'),'exec')
+  expected={x.co_name:x for x in code.co_consts if isinstance(x,types.CodeType)}
+  for name in ['execute','verify_plan','read_final_cpu_log','restore_library','close_initial_owned_main','close_exact_main','bindings']:
+   self.assertEqual(getattr(a,name).__code__,expected[name])
+ def test_actual_reader_status_in_binding_guard(self):
+  self.assertIn(c.INSTALL_STATUS,a.bindings.__code__.co_consts)
+  self.assertNotIn('actual_closed_native60_composite_install_bound_not_jit_or_launch_ready',a.bindings.__code__.co_consts)
+ def test_execute_complete_replay_precedes_session(self):
+  raw=ast.parse((HERE/'probe.py').read_bytes());f=next(x for x in raw.body if isinstance(x,ast.AsyncFunctionDef)and x.name=='execute')
+  self.assertEqual(f.body[0].value.func.id,'verify_plan')
+  verify=next(x for x in raw.body if isinstance(x,ast.FunctionDef)and x.name=='verify_plan')
+  calls=[x for x in ast.walk(verify)if isinstance(x,ast.Call)and isinstance(x.func,ast.Attribute)]
+  replay=next(x for x in calls if x.func.attr=='verify_input_map');lineage=next(x for x in calls if x.func.attr=='plan_lineage')
+  self.assertLess(replay.lineno,lineage.lineno)
+ def test_execution_clone_keeps_real_body(self):
+  cloned=e.execute_function(a)
+  self.assertIs(cloned.__code__,a.execute.__code__)
+  self.assertIsNot(cloned.__globals__,a.execute.__globals__)
+  self.assertEqual(set(k for k in cloned.__globals__ if cloned.__globals__[k]is not a.execute.__globals__.get(k)),{'module'})
+ def test_wrong_raw_probe_identity_refuses(self):
+  wrong=types.SimpleNamespace(**vars(a));wrong.__file__=str(HERE/'adapt.py')
+  with self.assertRaisesRegex(ValueError,'unchanged'):e.execute_function(wrong)
+ def test_actual_historical_interpreter_plan_scope(self):
+  tool=e.held_tool();old=json.loads(e.OLD_PLAN.read_text());before=copy.deepcopy(old)
+  with patch.object(tool,'verify_current_python',return_value=[]):new=tool.current_original_plan(old)
+  self.assertEqual(old,before);self.assertEqual(new['afcPythonSha256'],tool.CURRENT)
+  self.assertEqual({k:v for k,v in new.items()if k!='afcPythonSha256'},{k:v for k,v in old.items()if k!='afcPythonSha256'})
+ def test_wrong_interpreter_scope_refuses(self):
+  tool=e.held_tool();old=json.loads(e.OLD_PLAN.read_text());old['afcPythonSha256']='0'*64
+  with self.assertRaisesRegex(ValueError,'historical'):tool.current_original_plan(old)
+ def test_real_native_verifier_code_unchanged(self):
+  spec=importlib.util.spec_from_file_location('tiny_old_native',e.ORIGINAL);n=importlib.util.module_from_spec(spec);spec.loader.exec_module(n)
+  tool=e.held_tool()
+  with patch.object(e,'held_tool',return_value=tool),patch.object(tool,'verify_current_python',return_value=[]):view=e.native_view(n)
+  self.assertIs(view.verify_plan.__code__,n.verify_plan.__code__)
+  self.assertEqual(view.verify_plan.__globals__['load'](e.OLD_PLAN)['afcPythonSha256'],tool.CURRENT)
+  self.assertEqual(n.load(e.OLD_PLAN)['afcPythonSha256'],tool.OLD)
+ def test_false_completion_not_qualification(self):
+  for seconds in [331,float('nan'),float('inf'),-1]:self.assertFalse(a.bounded_completion(seconds))
+ def test_non_original_phase_refuses(self):
+  with self.assertRaisesRegex(ValueError,'Original50'):c.selected_package('cpu-avx2')
+ def test_only_reviewed_reader_route_semantics_change(self):
+  def functions(p):return{n.name:ast.dump(n,include_attributes=False)for n in ast.parse(p.read_text()).body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))}
+  old=functions(c.ROUTE_PREDECESSOR/'composition.py');actual=functions(HERE/'composition.py')
+  for name,value in old.items():
+   if name=='reviewed_paths':continue
+   self.assertEqual(value.replace('exact_preserved_native59_sources_and_current_own_diagnostic_before_signed_native60_update','exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update'),actual[name],name)
+  for name in ['probe.py','launch_query.py','log_contracts.py','adapt.py','execution_tool.py','run.py']:
+   self.assertEqual((HERE/name).read_bytes(),(c.ROUTE_PREDECESSOR/name).read_bytes(),name)
+  self.assertIn(c.ROUTE_PREDECESSOR/'draft-source-review.json',c.reviewed_paths())
+  self.assertIn(c.PARTIAL_PREDECESSOR/'draft-source-review.json',c.reviewed_paths())
+ def test_literal_constants_wrong_count_refuse(self):
+  with patch.object(c,'SEALED_INSTALL_SHA','1'*64),patch.object(c,'SEALED_RESULT_SHA','2'*64),patch.object(c,'SEALED_INPUT_COUNT',True):
+   with self.assertRaisesRegex(ValueError,'pending'):c.require_runtime()
+
+class SealedLineage(unittest.TestCase):
+ """Fake only lineage rows, never emitted as a genuine production tuple."""
+ def setUp(self):
+  self.binding={'inputs':{'one':'a'*64},'status':c.INSTALL_STATUS,'observedBuild':'60','acceptedProducerType':'exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update','compositeInstallationResult':'fake/result.json','compositeInstallationResultSha256':'2'*64,'observedBundlePath':'exact-own60'}
+  self.plan={'phase':'continuing-only-diagnostic','continuingPrerequisite':None,'inputs':{str(c.INSTALL.relative_to(c.ROOT)):'1'*64,'fake/result.json':'2'*64,'one':'a'*64},'expectedBundlePath':'exact-own60','acceptedInstallationBindingSha256':'1'*64,'acceptedInstallationResultSha256':'2'*64,'signedNative60ReceiptSha256':c.s.SIGNED_SHA,'fexRuntimeSha256':c.s.FEX_SHA}
+  # This exact fake boundary avoids any installed closure replay or output.
+  self.calls=[];self.stack=[]
+  for name,value in [('SEALED_INSTALL_SHA','1'*64),('SEALED_RESULT_SHA','2'*64),('SEALED_INPUT_COUNT',1),('regular',lambda p:Path(p)),('sha',lambda p:'1'*64 if Path(p)==c.INSTALL else '2'*64),('load',lambda p:self.binding if Path(p)==c.INSTALL else {}),('collector_input_map',lambda m:m),('install_reader',lambda:types.SimpleNamespace(installation_claims=lambda *x:self.calls.append('claims'))),('signed58_contract',lambda *x:self.calls.append('signed'))]:
+   p=patch.object(c,name,value);p.start();self.stack.append(p)
+  self.binding.update(collectorProtectedDataView={},retainedProtectedPayload='fake')
+ def tearDown(self):
+  for p in reversed(self.stack):p.stop()
+ def test_complete_subset_accepts_after_prior_verifier(self):
+  c.plan_lineage(self.plan);self.assertEqual(self.calls,['claims','signed'])
+ def test_omitted_input_refuses_before_claims(self):
+  del self.plan['inputs']['one']
+  with self.assertRaisesRegex(ValueError,'subset'):c.plan_lineage(self.plan)
+  self.assertEqual(self.calls,[])
+ def test_tampered_input_refuses_before_claims(self):
+  self.plan['inputs']['one']='b'*64
+  with self.assertRaisesRegex(ValueError,'subset'):c.plan_lineage(self.plan)
+ def test_old_bddf_origin_refuses_before_claims(self):
+  self.binding['acceptedProducerType']='exact_preserved_native59_sources_and_current_own_diagnostic_before_signed_native60_update'
+  with self.assertRaisesRegex(ValueError,'provenance'):c.plan_lineage(self.plan)
+  self.assertEqual(self.calls,[])
+ def test_old_partial_origin_refuses_before_claims(self):
+  self.binding['acceptedProducerType']='exact_ten_observed_native59_rows_three_partial_retained_files_fresh_full_before_native60_update'
+  with self.assertRaisesRegex(ValueError,'provenance'):c.plan_lineage(self.plan)
+  self.assertEqual(self.calls,[])
+ def test_wrong_typed_status_refuses(self):
+  self.binding['status']='historical59'
+  with self.assertRaisesRegex(ValueError,'provenance'):c.plan_lineage(self.plan)
+ def test_wrong_aslr_identity_refuses(self):
+  self.plan['expectedBundlePath']='other60'
+  with self.assertRaisesRegex(ValueError,'UUID'):c.plan_lineage(self.plan)
+ def test_failed_receipt_cannot_be_bound(self):
+  self.plan['continuingPrerequisite']={'status':'diagnostic-only'}
+  with self.assertRaisesRegex(ValueError,'Original50'):c.plan_lineage(self.plan)
+
+if __name__=='__main__':unittest.main()

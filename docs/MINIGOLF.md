@@ -25,9 +25,13 @@ proof checks with full compilation of admitted profiles; they do not claim
 that every negative profile compiles. The complete ShaderMemory fixture also
 passes, including the new sRGB depth-comparison checks.
 
-The full 47-library build and all 49 selected test executable targets are
-being qualified separately. The preceding build already passed memory and
-exception tests with the explicitly probed `0x7400000000` test-host arena.
+The full 47-library build and all 49 selected test executable targets compile.
+The runtime attempt passes 28 default targets, including memory and exception
+tests, before Graphics detects an incorrect thin-layout dispatch for 3D
+`SW_64KB_D_X` textures. The independent Addrlib size and address fixtures remain
+unchanged; the production repair and remaining tests are pending.
+[Actual attempt](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
+The tests use the explicitly probed `0x7400000000` test-host arena.
 That result does not prove fixed-address allocation on the iPad. Stale graphics
 fixtures were corrected for real tiled MSAA backing, upstream stencil clears
 and cross-block XOR coordinates. Production memory/graphics validations stay

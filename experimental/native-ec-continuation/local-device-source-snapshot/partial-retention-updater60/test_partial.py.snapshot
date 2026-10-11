@@ -1,0 +1,32 @@
+"""Actual small partial evidence and negative claims; no device or full59 replay."""
+import copy,importlib.util,unittest
+from pathlib import Path
+from unittest import mock
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('partial_evidence_controls',HERE/'reference.py');r=importlib.util.module_from_spec(sp);sp.loader.exec_module(r)
+class Partial(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  cls.observed=r.s.load(r.OBSERVED);cls.rows=r.s.load(r.OBSERVED_ROWS)['rows'];cls.receipt=r.s.load(r.READ_RECEIPT);cls.note=r.s.load(r.PARTIAL_OBSERVATION)
+  cls.snapshots=[{}for _ in range(6)]+[{2142:'/private/var/containers/Bundle/Application/<LOCAL_BUNDLE_UUID>/Madeira.app/Madeira'}]
+ def record(self,receipt=None,outputs=None,snapshots=None,observed=None):
+  return r.partial_read_record(receipt or self.receipt,observed or self.observed,self.rows,outputs or self.receipt['outputs'],self.snapshots if snapshots is None else snapshots,self.note['providers'])
+ def test_actual_small_complete_output_and_byte_replay_no_deep_reader(self):
+  with mock.patch.object(r.s,'accepted59',side_effect=AssertionError):
+   observed,rows,note,values=r.observed_evidence()
+  self.assertEqual(note,self.note);self.assertEqual(note['fileBytesVerified'],312179);self.assertEqual(len(observed),6057)
+  self.assertIn(str(r.READ_RECEIPT),values);self.assertFalse(note['fullInventoryBeforeAfterEqual']);self.assertTrue(note['freshFullPreinstallInventoryRequired']);self.assertFalse(note['accepted60'])
+ def test_failed_receipt_cannot_be_relabelled_success(self):
+  q=copy.deepcopy(self.receipt);q['status']='exact_current59_three_file_bytes_and_complete_closed_inventory_retained_not_installation_acceptance';self.assertRaises(ValueError,self.record,receipt=q)
+ def test_false_two_inventory_proof_refused(self):
+  q=copy.deepcopy(self.receipt);q['fullInventoryBeforeAfterEqual']=True;self.assertRaises(ValueError,self.record,receipt=q)
+ def test_missing_output_refused(self):
+  q=dict(self.receipt['outputs']);q.pop('bytes/02.bin');self.assertRaises(ValueError,self.record,outputs=q)
+ def test_other_failure_phase_refused(self):
+  q=copy.deepcopy(self.snapshots);q[4]=q[-1];self.assertRaises(ValueError,self.record,snapshots=q)
+ def test_first_complete_inventory_content_drift_refused(self):
+  q=copy.deepcopy(self.observed);q['Documents/madeira-controls.json']=self.rows['Documents/madeira-controls.json']['before'];self.assertRaises(ValueError,self.record,observed=q)
+ def test_new_local_readback_identity_is_required(self):
+  row=self.note['providers']['Documents/madeira-controls.json'];bad=list(row['stableLocalStat']);bad[1]+=1
+  self.assertRaises(ValueError,r.adoption_validator().verified_file,row['path'],row['record'],bad)
+if __name__=='__main__':unittest.main()

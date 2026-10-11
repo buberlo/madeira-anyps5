@@ -1,0 +1,96 @@
+"""Root-only closed Native59 exact three-file retention and full-inventory readback.
+
+Default CLI is inert. No launch, termination, install, pairing or userdata write.
+"""
+import argparse,asyncio,hashlib,importlib.util,json,shutil,stat,sys,time,uuid
+from pathlib import Path
+from types import SimpleNamespace
+sys.dont_write_bytecode=True
+ROOT=Path('<LOCAL_HOME>/Documents/ChatGPT/anyps5-ipad');HERE=Path(__file__).resolve().parent
+PREP=ROOT/'build/minigolf-upstream-20261010'
+PRIOR=PREP/'native60-device-prep/native59-preserved-source-update-proposal'
+PLAN=PRIOR/'execution-plan-17b6c70c539d.json'
+PLAN_SHA='118141fe175bf594c7a089e7291ece5464b4e018cb792691da7b39240108fbc6'
+INVENTORY=PRIOR/'install-ee28e49b6bd1/before-full-inventory.json'
+INVENTORY_SHA='da1536d19a778a8f7136464364d3d499e92f17f8376fa3a40c1bd01d2f601e67'
+REFUSAL=INVENTORY.with_name('result.json')
+REFUSAL_SHA='def42971b082424cd5e83da91de65e43fe578319af4b02d515a6422a34c18896'
+BASE='/private/var/containers/Bundle/Application/<LOCAL_BUNDLE_UUID>/Madeira.app'
+ROWS_SHA='43d5b526448c57185b3094ad6c00cc3dc7864bd7335bec70efb478ced8188e80'
+TOTAL=312179;SECONDS=1200;MAX_OUTPUT=16<<20
+PYTHON='<LOCAL_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12'
+PYTHON_SHA='4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc'
+def need(value,message):
+ if not value:raise ValueError(message)
+def sha(path):
+ h=hashlib.sha256()
+ with Path(path).open('rb')as f:
+  for b in iter(lambda:f.read(1<<20),b''):h.update(b)
+ return h.hexdigest()
+def stamp(path):
+ p=Path(path);st=p.lstat();need(p==p.resolve()and not any(q.is_symlink()for q in [p,*p.parents])and stat.S_ISREG(st.st_mode)and st.st_nlink==1,'Exact regular read input')
+ return[st.st_dev,st.st_ino,st.st_mode,st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns]
+def review(digest):
+ p=HERE/'source-review-freeze.json';need(type(digest)is str and len(digest)==64 and sha(p)==digest,'Exact source review required')
+ q=json.loads(p.read_text());need(q['status']=='source_only_exact_current59_three_file_and_full_inventory_retention_not_executed'and q['caseCount']==9 and q['deviceActions']is False,'Source-only read review')
+ for path,h in q['inputHashes'].items():
+  before=stamp(path);need(before==q['inputFingerprints'][path]and sha(path)==h and stamp(path)==before,'Reviewed read source/primitive drift')
+ return q
+def module(path,expected,name):
+ need(path==path.resolve()and path.is_file()and not any(p.is_symlink()for p in [path,*path.parents])and path.stat().st_nlink==1 and sha(path)==expected,'Exact reviewed source required')
+ spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+def selection(inventory,rows):
+ need(rows['schema']==1 and rows['rowCount']==len(rows['rows'])==10 and rows['observedInventorySha256']==INVENTORY_SHA and rows['failedBeforeInstallResultSha256']==REFUSAL_SHA,'Exact ten observed records')
+ selected={k:r['after']for k,r in rows['rows'].items()if r['after']and r['after']['kind']=='file'}
+ need(len(selected)==3 and sum(r['bytes']for r in selected.values())==TOTAL and all(inventory.get(k)==r['after']for k,r in rows['rows'].items()),'Three present files, exact absence/directories')
+ need(sum(r['after']is None for r in rows['rows'].values())==1 and sum(r['after']=={'kind':'directory'}for r in rows['rows'].values())==6,'One absence, six directories')
+ return selected
+def dependencies():
+ m=module(PREP/'native57-device-prep/observed-composite-install-proposal/install.py','ba2c592bbfb715a1a83209193bc89f85d2bdc751e7b663bc42f493001c5038b7','held_exact_byte_retention')
+ x=module(PREP/'native56-device-prep/native55-readonly-diagnostic/bounded-composite-recapture-proposal/recapture.py','a4a59b8c2c64e23d1160642605e0cb036d0776b2bd56413bf19a38ecee7c80a3','held_record_validator')
+ n=module(PREP/'native56-device-prep/accessible-backup-proposal/native56.py','6bd6f243ddc83d66b6eb0e07f0cc306a485c9d93c8161421b74ba643bbac77dc','held_closed_read_session')
+ bounded=m.typed_output()
+ bounded.MAX_QUERIES=64;bounded.MAX_RECORDED_TOTAL=MAX_OUTPUT;bounded.MAX_METADATA_TOTAL=8<<20
+ return m,x,n,bounded
+async def read(session,m,x,n,bounded,inventory,selected):
+ await session.closed(['59'])
+ before=await session.userdata(['59'],destination=None)
+ bounded.need(before==inventory,'Current full inventory changed; no byte adoption')
+ session.output_budget.save(session.stage/'before-full-inventory.json',before)
+ records=await m.retain_system_files(x,n,SimpleNamespace(system_artifact_records=lambda _:selected),session,before,session.stage/'bytes')
+ need(set(records)==set(selected)and all(v['record']==selected[k]for k,v in records.items()),'Complete exact actual current providers')
+ session.output_budget.guard()
+ after=await session.userdata(['59'],destination=None)
+ session.output_budget.save(session.stage/'after-full-inventory.json',after)
+ need(after==before,'Current full inventory changed during bounded retention')
+ await session.closed(['59'])
+ return records
+async def execute(digest):
+ review(digest)
+ need(str(Path(sys.executable).resolve())==PYTHON and sha(PYTHON)==PYTHON_SHA,'Exact current execution interpreter')
+ for p,h in [(PLAN,PLAN_SHA),(INVENTORY,INVENTORY_SHA),(REFUSAL,REFUSAL_SHA),(HERE/'observed-rows.json',ROWS_SHA)]:need(sha(p)==h,'Held observation/plan changed')
+ plan=json.loads(PLAN.read_text());inventory=json.loads(INVENTORY.read_text());rows=json.loads((HERE/'observed-rows.json').read_text());selected=selection(inventory,rows)
+ rejected=json.loads(REFUSAL.read_text());need(rejected['installationAttempted']is rejected['success']is False and all(rejected[k]is True for k in ['nativeJoinConfirmed','monitorJoinConfirmed','observerJoinConfirmed']),'Actual closed before-install refusal')
+ need(rejected['error'].split('complete list): ',1)[1].split(',')==list(rows['rows']),'Exact complete rejection set')
+ m,x,n,bounded=dependencies();original=plan['originalPlan']
+ need(original['afcPythonResolved']==PYTHON and original['afcPythonSha256']==PYTHON_SHA and sha(n.DEVICETL)==original['devicectlSha256'],'Current exact declared primitives')
+ stage=HERE/('execution-'+uuid.uuid4().hex[:12]);session=bounded.session_type(n,'recapture')(original,stage,SECONDS);session.base=BASE;session.boundary=SimpleNamespace(build='59')
+ session.guard();need(shutil.disk_usage(HERE).free>=2<<30,'Two GiB live read reserve');stage.mkdir(exist_ok=False)
+ receipt={'schema':1,'status':'failed_or_unconfirmed_exact_current59_retention','sourceSha256':sha(Path(__file__)),'sourceReviewSha256':digest,'observedRowsSha256':ROWS_SHA,'inventorySha256':INVENTORY_SHA,'refusalSha256':REFUSAL_SHA,'planSha256':PLAN_SHA,'deviceDataWrites':False,'install':False,'launch':False,'processTermination':False,'fullBackupComplete':False,'accepted60':False,'ownProcessesAbsentAtFinalSnapshot':False,'fullInventoryBeforeAfterEqual':False,'bytesRetained':0}
+ code=1
+ try:
+  records=await read(session,m,x,n,bounded,inventory,selected)
+  review(digest)
+  receipt.update(status='exact_current59_three_file_bytes_and_complete_closed_inventory_retained_not_installation_acceptance',providers=records,bytesRetained=TOTAL,ownProcessesAbsentAtFinalSnapshot=True,fullInventoryBeforeAfterEqual=True,inventoryRecordCount=len(inventory));code=0
+ except Exception as error:receipt['error']=type(error).__name__+': '+str(error)
+ finally:
+  receipt['seconds']=time.monotonic()-session.started
+  receipt['outputs']={p.relative_to(stage).as_posix():sha(p)for p in stage.rglob('*')if p.is_file()}
+  session.output_budget.save(stage/'receipt.json',receipt)
+  print(json.dumps({'stage':str(stage),'status':receipt['status']}))
+ return code
+def main():
+ parser=argparse.ArgumentParser();parser.add_argument('--execute',action='store_true');parser.add_argument('--source-review-sha256');a=parser.parse_args()
+ if not a.execute:print(json.dumps({'status':'source_only_current59_byte_retention_pending_root_execution','deviceActions':False}));return 0
+ return asyncio.run(execute(a.source_review_sha256))
+if __name__=='__main__':raise SystemExit(main())

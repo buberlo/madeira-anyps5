@@ -3,8 +3,158 @@
   "actualNative60BuiltSigned": true,
   "actualNative60Installed": false,
   "actualOriginal50Accepted": false,
+  "actualRetentionAcceptedInThisSnapshot": false,
+  "actualRetentionReceiptPinsPending": true,
   "capturedLogIncluded": false,
+  "current59RetentionSourceControls": 9,
   "derivation": {
+    "current59-retention/read_current.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_HOME>/",
+        "<LOCAL_BUNDLE_UUID>"
+      ],
+      "sourceSha256": "c6000226d02fc2c39ed37460db059b8cde0d2eb727c09c1f26e5083da379210b"
+    },
+    "current59-retention/test_read_current.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "3234d02fef590c7b19718816fd69fefaf325d6e87f78313eb89e795f22fb061e"
+    },
+    "initial-own59-quiescence-original50/composition.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>"
+      ],
+      "sourceSha256": "78cbfbee505a44196f804d7f8f8f9b1285cd496276428f5a1b699c1697c6acd3"
+    },
+    "initial-own59-quiescence-original50/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "dd8fb035b75bc660041980c3f02fd3adc21e0d5ebf0d9bf91b74da248277360e"
+    },
+    "initial-own59-quiescence-original50/test_route.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "46c826bd54a0311ecc34d47232aca9bee28b54fb3f314d9df31eb09acb8cf5fc"
+    },
+    "initial-own59-quiescence-updater60/binding.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_DEVICE_UDID>"
+      ],
+      "sourceSha256": "aeb05ca811d372738cd2bf7eaef9e2f54fc27a158250da702e1de596c952bbee"
+    },
+    "initial-own59-quiescence-updater60/install.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "d34f7ea14b7407412256dc51e7ff15bdefb22382540d4b2f55fe5f45043060ab"
+    },
+    "initial-own59-quiescence-updater60/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "59153d801a150d0a8e14bb6468d244e1b604d33468578fc30f8cd61f9c7f32f9"
+    },
+    "initial-own59-quiescence-updater60/test_native60.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_BUNDLE_UUID>"
+      ],
+      "sourceSha256": "0ec926e67d18609ac7bd7bd19a539a81e8cd69fb9d13bbae3b9cda4f5dd00e1f"
+    },
+    "initial-own59-quiescence-updater60/test_observed.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "dda1ce0198b022d20e38b9b77b7a916e5e1eaa863b2d479f959469c8142cd894"
+    },
+    "initial-own59-quiescence-updater60/test_quiescence.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "2931d539305d897fa6ae3694eec8da9e7f1f0c8cc7ee5a3dfcd24f530ea4a108"
+    },
+    "observed59-updater60/binding.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_DEVICE_UDID>"
+      ],
+      "sourceSha256": "7b97ee70938cf18100b7df3534ca7d164719acedb3eb685dd987a3ca3a7acfdd"
+    },
+    "observed59-updater60/install.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "44955a2758fee026f2f120ae6319b5d9347164e2af0259ac2e02e89ca15cbb45"
+    },
+    "observed59-updater60/package.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "9c51403be50426f57ffd2c0132eaf377c9a779de6fba0d6c9c67de32987d78d2"
+    },
+    "observed59-updater60/providers.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "d8b58f7564eaab1a30b5eeb95e9ca810df92499e7e0f915be0c6935439fe0406"
+    },
+    "observed59-updater60/reference.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>"
+      ],
+      "sourceSha256": "49eb9d09d7f9a1b1a5510ba40fa0c01408ca79a58af09ccc9b21c7821121349c"
+    },
+    "observed59-updater60/support.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_HOME>/",
+        "<LOCAL_TEAM>"
+      ],
+      "sourceSha256": "38709eafbd315f16ebc0fc816b913d0aaf762841928ba4d36cdfd140307a0ff8"
+    },
+    "observed59-updater60/test_native60.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_BUNDLE_UUID>"
+      ],
+      "sourceSha256": "eccd8a12e4d4ac01ed68602cf5cbd0296ccccf7a212daef16afd7a6f84fcc1f5"
+    },
+    "observed59-updater60/test_observed.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "0e062c8bb89c375f7c4ea75fb8df49be64c540e9574b8f98e72089876fc2d3b4"
+    },
+    "ordered-own59-quiescence-original50/composition.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>"
+      ],
+      "sourceSha256": "3539ff4a3d9de6621f429539213c6d61bdf0cab57ab36ce173d45d8f096fe84f"
+    },
+    "ordered-own59-quiescence-original50/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "4b4e0331bdbd62fb333cff90632a8a4ff9b877ba386a4da0a41bf0f184f551b2"
+    },
+    "ordered-own59-quiescence-original50/test_route.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "24858eb43beab93a97c1aac72eb39e28e6afda19637f3b42b8a8b1e51d9d19b0"
+    },
+    "ordered-own59-quiescence-updater60/binding.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_DEVICE_UDID>"
+      ],
+      "sourceSha256": "39463e706a0b243e6824028c5cce17c73ba215421f201aa59490abd902edf012"
+    },
+    "ordered-own59-quiescence-updater60/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "a6c9ce37a76984556f69c0954b0fe6f8e6030cc0a332d1617e2346f4029ad42f"
+    },
+    "ordered-own59-quiescence-updater60/test_quiescence.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "ca0b42a336d8f830467fc6206b928d8d15df0354b71aae5c078a72e4a8368e35"
+    },
     "original50/adapt.py.snapshot": {
       "byteIdentical": true,
       "redactions": [],
@@ -56,6 +206,60 @@
       "byteIdentical": true,
       "redactions": [],
       "sourceSha256": "6e385976df34f4d2f3dbf9d3f860a702cff966901c950f5f07df40b9d7256dbe"
+    },
+    "partial-retention-original50/composition.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>"
+      ],
+      "sourceSha256": "af703b9a223bb89c0624119011c988f70c49cc8e9195553d509c0e9b78b25a0f"
+    },
+    "partial-retention-original50/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "9b2345a3eff95fc239c5c626732fb7b57de8c763e382203a9d1d1c3972cdd50f"
+    },
+    "partial-retention-original50/test_route.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "d0f9633392c67ef3c1029be5cc820df84150a8a7eca70086c6552db1ffb61e79"
+    },
+    "partial-retention-updater60/binding.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_DEVICE_UDID>"
+      ],
+      "sourceSha256": "6f7fc89682128a5a2d60c5ce6f52469e5afe8e3410d129534a35082e06668e81"
+    },
+    "partial-retention-updater60/install.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "4410855604f633555eb5b0150795d61fb679a8d9b7347c604c8d02da3420b60e"
+    },
+    "partial-retention-updater60/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "683da5c20e0fba1a9a82e96543b775d2d291d70bd6fbd04d30b8bb4cc8ad70c8"
+    },
+    "partial-retention-updater60/reference.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>",
+        "<LOCAL_BUNDLE_UUID>"
+      ],
+      "sourceSha256": "aea7609927b254940fef7a8025c36efb16ff4d49e79d555331c763ff8e667a27"
+    },
+    "partial-retention-updater60/test_observed.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "f8ff5e634394f045ce3293a781a7d9a24efbc3beb56db5b5a97a505af30d3158"
+    },
+    "partial-retention-updater60/test_partial.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "<LOCAL_BUNDLE_UUID>"
+      ],
+      "sourceSha256": "216faee1df59ee666be1646bd5780b6acbf55e870d51d301c756b867684f584f"
     },
     "runtime-ready-original50/composition.py.snapshot": {
       "byteIdentical": false,
@@ -120,7 +324,32 @@
   "deviceActions": false,
   "deviceIdentifierIncluded": false,
   "files": {
-    "README.md": "126a976a21ece57f79a386e4d24ecab0ad5e34ec7fb7a4f9af0ff5b9945bb543",
+    "README.md": "4599099b57b6b32767784c8f042692bc140f6fcdb869c64c340dd15aa0c05f88",
+    "current59-retention/read_current.py.snapshot": "44cf8ae8ee0fdde7e6415bab960b35d42dd1c4f68e85cecaa3b945ccd777b8d9",
+    "current59-retention/test_read_current.py.snapshot": "3234d02fef590c7b19718816fd69fefaf325d6e87f78313eb89e795f22fb061e",
+    "initial-own59-quiescence-original50/composition.py.snapshot": "eace1983d3cf6a5f3b0e8a069d50b42bc809daacf3453a603791e008d5ae0ecb",
+    "initial-own59-quiescence-original50/make_review.py.snapshot": "dd8fb035b75bc660041980c3f02fd3adc21e0d5ebf0d9bf91b74da248277360e",
+    "initial-own59-quiescence-original50/test_route.py.snapshot": "46c826bd54a0311ecc34d47232aca9bee28b54fb3f314d9df31eb09acb8cf5fc",
+    "initial-own59-quiescence-updater60/binding.py.snapshot": "cb4789063e413b67dbc9389543e006149fb9158cd5e8f148c3f405f62fc0a469",
+    "initial-own59-quiescence-updater60/install.py.snapshot": "d34f7ea14b7407412256dc51e7ff15bdefb22382540d4b2f55fe5f45043060ab",
+    "initial-own59-quiescence-updater60/make_review.py.snapshot": "59153d801a150d0a8e14bb6468d244e1b604d33468578fc30f8cd61f9c7f32f9",
+    "initial-own59-quiescence-updater60/test_native60.py.snapshot": "4e246490b054df27d79d99b33a445c688cc11f43a45b34e1f504cf944096f7f3",
+    "initial-own59-quiescence-updater60/test_observed.py.snapshot": "dda1ce0198b022d20e38b9b77b7a916e5e1eaa863b2d479f959469c8142cd894",
+    "initial-own59-quiescence-updater60/test_quiescence.py.snapshot": "2931d539305d897fa6ae3694eec8da9e7f1f0c8cc7ee5a3dfcd24f530ea4a108",
+    "observed59-updater60/binding.py.snapshot": "8731a7e7efdfbedb6e1c5335564f0178cdc45dd3bf79330a43ed01016015c61e",
+    "observed59-updater60/install.py.snapshot": "44955a2758fee026f2f120ae6319b5d9347164e2af0259ac2e02e89ca15cbb45",
+    "observed59-updater60/package.py.snapshot": "9c51403be50426f57ffd2c0132eaf377c9a779de6fba0d6c9c67de32987d78d2",
+    "observed59-updater60/providers.py.snapshot": "d8b58f7564eaab1a30b5eeb95e9ca810df92499e7e0f915be0c6935439fe0406",
+    "observed59-updater60/reference.py.snapshot": "ad882e3de4da8ec3df765b32caeaec90176600525135b5c41b8aaa5dfe274400",
+    "observed59-updater60/support.py.snapshot": "477a6ce8a45fcd317fd60db82849f3ecca0d31bfbe91f35ae22916039cfbda2f",
+    "observed59-updater60/test_native60.py.snapshot": "b337b9c22183c15ded0030378719e9802c2f5653fd777d3e0d1c6c85d5cd245a",
+    "observed59-updater60/test_observed.py.snapshot": "0e062c8bb89c375f7c4ea75fb8df49be64c540e9574b8f98e72089876fc2d3b4",
+    "ordered-own59-quiescence-original50/composition.py.snapshot": "d0b0f5a59182b15047dc982607e3a67b926367a37a1e329221353374ab407790",
+    "ordered-own59-quiescence-original50/make_review.py.snapshot": "4b4e0331bdbd62fb333cff90632a8a4ff9b877ba386a4da0a41bf0f184f551b2",
+    "ordered-own59-quiescence-original50/test_route.py.snapshot": "24858eb43beab93a97c1aac72eb39e28e6afda19637f3b42b8a8b1e51d9d19b0",
+    "ordered-own59-quiescence-updater60/binding.py.snapshot": "85f5322530a5d7a39cb4aa373294ac1eb15ab1291bf2df839f81e1199f525562",
+    "ordered-own59-quiescence-updater60/make_review.py.snapshot": "a6c9ce37a76984556f69c0954b0fe6f8e6030cc0a332d1617e2346f4029ad42f",
+    "ordered-own59-quiescence-updater60/test_quiescence.py.snapshot": "ca0b42a336d8f830467fc6206b928d8d15df0354b71aae5c078a72e4a8368e35",
     "original50/adapt.py.snapshot": "5ce32ba6aefb9b8509149079e6f90f7d17e92266626c8786b12bf9eb506d4e44",
     "original50/composition.py.snapshot": "e973c0e7721190c89d7d1d00f56577c4b929656aeea58e5d85d3b5dc3fef4075",
     "original50/execution_tool.py.snapshot": "5ce39a6fc2b5f4b105560b2e6772efe4452b7ab7edd54458ec7be9341d472f4d",
@@ -130,9 +359,18 @@
     "original50/probe.py.snapshot": "dd070dc50bc4fb2a4fedfd68905d639a00c5c20e8852e61a9e107ff0d4212138",
     "original50/run.py.snapshot": "0c511ae3a16c70700b9b1b5d3be736e1b2bf247fd117511ce8a52790dcf7a0a8",
     "original50/test_route.py.snapshot": "6e385976df34f4d2f3dbf9d3f860a702cff966901c950f5f07df40b9d7256dbe",
+    "partial-retention-original50/composition.py.snapshot": "8d9865fb6be756eaa047c248ba95f590c8cf884d33867a1eac7949ad44db1858",
+    "partial-retention-original50/make_review.py.snapshot": "9b2345a3eff95fc239c5c626732fb7b57de8c763e382203a9d1d1c3972cdd50f",
+    "partial-retention-original50/test_route.py.snapshot": "d0f9633392c67ef3c1029be5cc820df84150a8a7eca70086c6552db1ffb61e79",
+    "partial-retention-updater60/binding.py.snapshot": "6eef63aad65a040d499c62d5e869f232d8211604c970cd665c6048d23cdd5834",
+    "partial-retention-updater60/install.py.snapshot": "4410855604f633555eb5b0150795d61fb679a8d9b7347c604c8d02da3420b60e",
+    "partial-retention-updater60/make_review.py.snapshot": "683da5c20e0fba1a9a82e96543b775d2d291d70bd6fbd04d30b8bb4cc8ad70c8",
+    "partial-retention-updater60/reference.py.snapshot": "55f4d7851c6d048b8bde17379ffebd8ca55dcabd80532b52ee5c2744e77c84da",
+    "partial-retention-updater60/test_observed.py.snapshot": "f8ff5e634394f045ce3293a781a7d9a24efbc3beb56db5b5a97a505af30d3158",
+    "partial-retention-updater60/test_partial.py.snapshot": "bf7b0742a99eb68c4e0623bb63439a07650aeaba0fa3e9eb85743022d7ac38ce",
     "runtime-ready-original50/composition.py.snapshot": "dd5f4171cf7b884e833959f658902550dbfce23b25f75a408d1a15fa0a82c37c",
     "runtime-ready-original50/test_route.py.snapshot": "7e3268133aea2f7e0fe0a7a728d9bedee0366c087f02731b1381a2dcc0e5f148",
-    "test_snapshot.py": "1850027ab9b6379a886aead45d1929afa992124f052913094a33f86554a09793",
+    "test_snapshot.py": "50c48d13662b682de21dc3ac02397d609bfb423193e0a29e3fc1a24839934df7",
     "updater60/binding.py.snapshot": "e1ab62cb52229d99e7e366091c8c32147b18746a7f0420a59259824149ebd165",
     "updater60/install.py.snapshot": "5222e081f9fef974d869836b742bfd9423f394270e89fd27666ac9bc8d20995b",
     "updater60/make_review.py.snapshot": "5dbf4757b50e85226e53245f22034e6597fe9625b92d6699d93e2363b06f753b",
@@ -142,13 +380,42 @@
     "updater60/support.py.snapshot": "477a6ce8a45fcd317fd60db82849f3ecca0d31bfbe91f35ae22916039cfbda2f",
     "updater60/test_native60.py.snapshot": "eccd8a12e4d4ac01ed68602cf5cbd0296ccccf7a212daef16afd7a6f84fcc1f5"
   },
+  "initialOwn59QuiescenceDeviceExecuted": false,
+  "initialOwn59QuiescenceFutureInstallPolicyUnchanged": true,
+  "initialOwn59QuiescenceOriginal50InstallationPinsPending": true,
+  "initialOwn59QuiescenceOriginal50SourceControls": 27,
+  "initialOwn59QuiescenceOriginalReaderChronologyAccepted": false,
+  "initialOwn59QuiescenceRestartCauseProven": false,
+  "initialOwn59QuiescenceSourceControls": 48,
   "localSourceReviews": {
+    "current59Retention": "a3ba5388a9fa48073dfa847659b3134bddfe94e49ffeb2e5ea583837c14543cc",
+    "initialOwn59QuiescenceOriginal50PendingSource": "22bdf25004f65d666ca2acadb68fa876fb811c27d0a0d450a47940241cba5e0a",
+    "initialOwn59QuiescencePendingSource": "bf3ffef198039f8b49c14f43df70b400012bb7ef671c0c5a5b2665821e6f2834",
+    "observed59InitialAdoptionPendingDraft": "1746f112ecd34d82f4c2f63b6ad0c935dbae786f8fc9e45a6edfab5e81e39152",
+    "orderedOwn59QuiescenceOriginal50PendingSource": "1254448d96a029da2620c69fc00d08095fca504f192f50c29fbd476466239bca",
+    "orderedOwn59QuiescenceSource": "b0ee9922322e3ac57e9fe50a97bef5e0f2402450ffbd7b9bc3207e86d283d3e3",
     "original50PendingDraft": "87fac45ef8d0992734952ce64f80a3036e2ebefe058adfa35d0c54f22cc1065a",
     "runtimeReadyOriginal50PendingDraft": "190f0657411de5a8502b5f90f521c434875cb4c8865b248f17fa76320260e733",
     "updater": "bddf8f4e55d302f17b382679a683c16b5701c247e6542a54e6a5af2d5967a549"
   },
+  "observed59AbsentHistoricalLogCount": 1,
+  "observed59CurrentFileCount": 3,
+  "observed59EmptyDirectoryCount": 6,
+  "observed59ExactRejectedRecordCount": 10,
+  "observed59InitialAdoptionSourceControls": 33,
+  "orderedOwn59QuiescenceDeviceExecuted": false,
+  "orderedOwn59QuiescenceOriginal50InstallationPinsPending": true,
+  "orderedOwn59QuiescenceOriginal50SourceControls": 27,
+  "orderedOwn59QuiescenceSourceControls": 51,
   "original50InstallationPinsPending": true,
   "original50SourceControls": 24,
+  "partialRetainedFileBytesVerifiedLocally": 312179,
+  "partialRetentionFailedProducerReclassified": false,
+  "partialRetentionFinalClosedInventoryAccepted": false,
+  "partialRetentionFreshFullPreinstallInventoryRequired": true,
+  "partialRetentionOriginal50InstallationPinsPending": true,
+  "partialRetentionOriginal50SourceControls": 26,
+  "partialRetentionUpdaterSourceControls": 40,
   "privateProviderMapsIncluded": false,
   "schema": 1,
   "signingProfilesIncluded": false,

@@ -1,0 +1,123 @@
+"""Filesystem-only actual59 reader. No signature/service/child calls."""
+import argparse, copy, importlib.util, json, math, re, uuid
+from pathlib import Path
+from urllib.parse import urlparse, unquote
+HERE = Path(__file__).resolve().parent
+sp = importlib.util.spec_from_file_location('typed59_reader_support', HERE / 'support.py')
+s = importlib.util.module_from_spec(sp)
+sp.loader.exec_module(s)
+ROOT = s.ROOT
+INSTALLER = HERE / 'install.py'
+STATUS = s.STATUS
+DEVICE = '<LOCAL_DEVICE_UDID>'
+BUNDLE = s.BUNDLE
+need = s.need
+sha = s.sha
+regular = s.regular
+load = s.load
+
+def producer():
+    return s.module(INSTALLER, sha(INSTALLER), 'actual59_installer_definitions')
+
+def own_base(value):
+    need(type(value) is str and re.fullmatch('/private/var/containers/Bundle/Application/[0-9A-Fa-f-]{36}/Madeira\\.app', value), 'Exact installed59 app URL')
+    uuid.UUID(value.split('/')[-2])
+    return value
+
+def result_contract(r, p):
+    need(r.get('schema') == 1 and r.get('status') == 'native60_composite_update_protected_accessible_data_and_exact_system_policy_verified_not_launched' and (r.get('sourceSha256') == sha(INSTALLER)) and (r.get('scope') == p.SCOPE) and (r.get('device') == DEVICE) and (r.get('bundle') == BUNDLE) and (r.get('observedBuild') == '60'), 'Actual typed59 producer;58/fallback refused')
+    own_base(r.get('observedBundlePath'))
+    for k in ['success', 'jointObservationAccepted', 'deviceActions', 'installationAttempted', 'initialOwnClosed59Verified', 'nativeJoinConfirmed', 'monitorJoinConfirmed', 'observerJoinConfirmed', 'protectedAccessibleUserdataReadbackMatched', 'exactSystemArtifactPolicySatisfied', 'opaqueMetadataReadbackMatched', 'fullBeforeAfterInventoriesRetained', 'postSystemFileBytesRetained', 'freshCompleteUsbBeforeInstall', 'sourceClosureReplayedUnderLiveObserver', 'postJoinSourceFingerprintClosureUnchanged']:
+        need(r.get(k) is True, 'Actual59 gate: ' + k)
+    for k in ['userdataWrites', 'launch', 'uninstall', 'fullContainerBackupComplete', 'opaqueContentsVerified', 'installedBinaryBytesIndependentlyRead', 'runtimeOrGameplayQualified', 'nativeInstallerCanceledByWrapper', 'signed59InstalledAndClosed']:
+        need(r.get(k) is False, 'Diagnostic install boundary: ' + k)
+    need(type(r.get('nativeExitCode')) is type(r.get('nativeTerminalValue')) is int and r['nativeExitCode'] == r['nativeTerminalValue'] == 0 and (r.get('ownedObservationErrors') == {'monitor': None, 'observer': None}) and all((r.get(k) is None for k in ['error', 'observationError', 'fallbackError'])) and (type(r.get('seconds')) in (int, float)) and math.isfinite(r['seconds']) and (0 <= r['seconds'] <= p.WRAPPER_SECONDS), 'Real zero-return observer/native joins')
+    need(r.get('acceptedNative59ResultSha256') == p.ref.ACCEPTED_RESULT_SHA and re.fullmatch('[0-9a-f]{64}', r.get('signedNative60ReceiptSha256', '')) and re.fullmatch('[0-9A-F-]{36}', r.get('signedNative60MachOUuid', '')), 'Concrete signed59/prior58 identity')
+
+def command_evidence(stage, original, r, inputs, n):
+    paths = list(stage.glob('[0-9][0-9][0-9]-install-exact-native60.json'))
+    need(len(paths) == 1, 'One exact59 install command')
+    path = paths[0]
+    q = load(path)
+    bounded = load(path.with_name(path.stem + '-bounded-output.json'))
+    argv = ['devicectl', '--timeout', '120', '--json-output', str(path), '--quiet', 'device', 'install', 'app', original['artifacts']['60']['app'], '--device', DEVICE]
+    need(q.get('info', {}).get('arguments') == argv and q['info'].get('outcome') == 'success' and (q['info'].get('commandType') == 'devicectl.device.install.app'), 'Actual reviewed59 install argv/outcome')
+    need(type(bounded.get('exitCode')) is int and bounded['exitCode'] == 0 and (bounded.get('ownedChildWaited') is bounded.get('isSignedInstallCommand') is True) and (bounded.get('timedOut') is bounded.get('overflow') is False) and (bounded.get('discardedBytes') == 0), 'Joined finite install child')
+    apps = q['result']['installedApplications']
+    need(len(apps) == 1 and apps[0]['bundleID'] == BUNDLE, 'Installed app ID')
+    u = urlparse(apps[0]['installationURL'])
+    need(u.scheme == 'file' and (not u.netloc) and (not u.query) and (not u.fragment) and (unquote(u.path).rstrip('/') == r['observedBundlePath']), 'Actual observed fresh59 UUID')
+    a = sorted(stage.glob('[0-9][0-9][0-9]-strict-closed-apps.json'))
+    p = sorted(stage.glob('[0-9][0-9][0-9]-strict-closed-processes.json'))
+    need(a and p and (int(a[-1].name[:3]) > int(path.name[:3])) and (int(p[-1].name[:3]) == int(a[-1].name[:3]) + 1), 'Fresh after-install closed query pair')
+    (base, build, owned) = n.identity(load(a[-1])['result']['apps'], load(p[-1])['result']['runningProcesses'], ['60'], r['observedBundlePath'])
+    need(base == r['observedBundlePath'] and build == '60' and (not owned), 'Real closed59 same UUID')
+
+def inspect_install(path, digest):
+    path = regular(path)
+    need(path.name == 'result.json' and path.parent.parent == HERE and re.fullmatch('install-[0-9a-f]{12}', path.parent.name) and (sha(path) == digest), 'Exact actual59 result path/digest')
+    p = producer()
+    r = load(path)
+    result_contract(r, p)
+    plans = [q for q in HERE.glob('execution-plan-*.json') if sha(q) == r['planSha256']]
+    need(len(plans) == 1, 'Unique frozen59 plan')
+    (plan, x, w, c, n, policy, reference, original) = p.verify_execution_plan(plans[0], r['planSha256'])
+    need(r['signedNative60ReceiptSha256'] == plan['signedNative60ReceiptSha256'] and r['signedNative60MachOUuid'] == plan['signedNative60MachOUuid'] and (r['currentNative59ReferenceSha256'] == plan['currentNative59ReferenceSha256']) and (r['resourcePlanningBudget'] == plan['resourcePlanningBudget']) and (r['policySha256'] == p.POLICY_SHA), 'Actual59 result/plan lineage')
+    inputs = dict(plan['dependencyInputs'])
+    s.merge(inputs, {str(path): digest, str(plans[0]): r['planSha256']})
+    p.borrowed().s.old_reader().output_evidence(path.parent, r['outputEvidence'], inputs)
+    stage = path.parent
+    before = load(stage / 'before-full-inventory.json')
+    baseline = load(stage / 'fresh-before-current-provider-view.json')
+    proof = p.ref.transition(reference, before, policy)
+    need(load(stage / 'reference59-to-fresh-before-comparison.json') == proof, 'Exact initial58 reconciliation')
+    records = load(stage / 'fresh-before-system-file-providers.json')
+    wanted = p.ref.changed_file_records(reference, before, policy)
+    need(set(records) == set(wanted), 'Complete bounded changed before bytes')
+    for (index, k) in enumerate(sorted(records)):
+        row = records[k]
+        need(row['record'] == wanted[k] and row['path'] == str(stage / 'fresh-before-system-file-bytes' / ('%02d.bin' % index)), 'Bounded exact fresh file route')
+    (view, values) = p.ref.current_view(reference, before, records, p.provider_reader())
+    view.update(observedBuild='59', observedBundlePath=reference['observedBundlePath'], acceptedNative59ResultSha256=reference['acceptedNative59ResultSha256'], freshCompleteUsbBeforeInstall=True, transitionProof=proof)
+    need(baseline == view, 'No stale current58 providers or fabricated byte-copy claim')
+    s.merge(inputs, values)
+    after = load(stage / 'native60-after-full-inventory.json')
+    q = p.post_contract(x, n, policy, before, after)
+    need(load(stage / 'native60-full-comparison.json') == q and load(stage / 'native60-full-raw-difference.json') == p.raw_difference(before, after) and (r['accessibleUserdataRawEqual'] == (before == after)), 'Exact post59 system policy/protected data closure')
+    after_records = load(stage / 'native60-system-file-providers.json')
+    retention = p.verify_system_retention(x, policy, before, after, baseline, after_records, stage / 'native60-system-file-bytes')
+    need(load(stage / 'native60-complete-artifact-retention.json') == retention, 'Actual selected before/after bytes retained')
+    (current, values) = p.updated_view(after, baseline, after_records)
+    s.merge(inputs, values)
+    command_evidence(stage, original, r, inputs, n)
+    s.replay_inputs(inputs, s.declarations(r['signedNative60ReceiptSha256']))
+    return (r, inputs, current, Path(reference['protectedPayload']))
+
+def binding_record(path, digest, r, inputs, view, payload):
+    return {'schema': 1, 'status': STATUS, 'observedBuild': '60', 'observedBundlePath': r['observedBundlePath'], 'observedBundleUuid': str(uuid.UUID(r['observedBundlePath'].split('/')[-2])).upper(), 'nativeMachOUuid': r['signedNative60MachOUuid'], 'sourceFreezeSha256': s.CPU_FREEZE, 'compositeInstallationResult': str(path.relative_to(ROOT)), 'compositeInstallationResultSha256': digest, 'acceptedProducerType': 'exact_ten_observed_native59_rows_three_fresh_retained_files_preserved_sources_before_native60_update', 'signedNative60ReceiptSha256': r['signedNative60ReceiptSha256'], 'fexRuntimeSha256': s.FEX_SHA, 'acceptedNative59ResultSha256': r['acceptedNative59ResultSha256'], 'protectedAccessibleUserdataReadbackMatched': True, 'exactSystemArtifactPolicySatisfied': True, 'opaqueMetadataReadbackMatched': True, 'fullContainerBackupComplete': False, 'opaqueContentsVerified': False, 'installedBinaryBytesIndependentlyRead': False, 'jitVerified': False, 'deviceActions': False, 'launchReady': False, 'continuingQualified': False, 'cpuEightQualified': False, 'diagnosticOnly': False, 'historicalFailuresReclassified': False, 'inputs': inputs, 'collectorProtectedDataView': view, 'retainedProtectedPayload': str(payload)}
+
+def installation_claims(b, r, inputs, view, payload):
+    name = b.get('compositeInstallationResult')
+    need(type(name) is str and (not name.startswith('/')) and ('\\' not in name) and all((k not in ('', '.', '..') for k in name.split('/'))), 'Exact59 result relative path')
+    path = regular(ROOT / name)
+    digest = inputs.get(str(path))
+    need(digest and sha(path) == digest and (b == binding_record(path, digest, r, inputs, view, payload)), 'Exact sealed actual59 claims')
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('--bind-install', type=Path)
+    p.add_argument('--result-sha256')
+    a = p.parse_args()
+    if not a.bind_install:
+        print(json.dumps({'status': 'inert_actual59_reader_pending_genuine_signed59_install', 'bindingCreated': False, 'deviceActions': False}))
+        return 0
+    need(a.result_sha256, 'Real result digest')
+    (r, inputs, view, payload) = inspect_install(a.bind_install, a.result_sha256)
+    out = HERE / 'installation-binding.json'
+    with out.open('x') as f:
+        json.dump(binding_record(a.bind_install, a.result_sha256, r, inputs, view, payload), f, indent=2)
+        f.write('\n')
+    print(out)
+    return 0
+if __name__ == '__main__':
+    raise SystemExit(main())

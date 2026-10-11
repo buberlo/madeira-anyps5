@@ -1,0 +1,30 @@
+"""Exclusive source/evidence proof only; no plan, device or accepted59 replay."""
+import importlib.util,json,subprocess
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('partial60_source_review',HERE/'reference.py');r=importlib.util.module_from_spec(sp);sp.loader.exec_module(r);s=r.s
+def main():
+ prior=HERE.parent/'exact-observed59-preserved-source-update-proposal/draft-source-review.json'
+ values=dict(s.load(prior)['inputHashes']);values[str(prior)]=s.sha(prior)
+ _,_,note,evidence=r.observed_evidence()
+ tools=dict(s.load(prior)['currentToolInputs'])
+ for name,digest in evidence.items():
+  if Path(name).is_relative_to(s.ROOT):s.merge(values,{name:digest})
+  else:
+   s.need(s.PRIMITIVES.get(name)==digest,'Only the two already-pinned reader/query primitives');s.merge(tools,{name:digest})
+ for name in ['providers.py','support.py','reference.py','install.py','binding.py','package.py','test_native60.py','test_observed.py','test_partial.py','README.md','make_review.py','source-relocations.json','signature-observation.json','package-replay.json','observed-rows.json','partial-retention-observation.json']:
+  p=s.regular(HERE/name);s.merge(values,{str(p):s.sha(p)})
+ stamps={name:s.pv.seven(s.regular(name).stat())for name in values}
+ tool_stamps={name:s.pv.seven(Path(name).stat())for name in tools}
+ log=HERE/'offline-tests.log'
+ with log.open('x')as f:q=subprocess.run([s.tool.PYTHON,'-I','-B','-m','unittest','discover','-s',str(HERE),'-p','test_*.py'],stdout=f,stderr=subprocess.STDOUT,timeout=60)
+ s.need(q.returncode==0,'Meaningful retained/partial source and byte controls')
+ s.replay(values);s.replay(tools)
+ s.need({name:s.pv.seven(s.regular(name).stat())for name in values}==stamps and {name:s.pv.seven(Path(name).stat())for name in tools}==tool_stamps,'Full source/evidence identity closure')
+ r.observed_evidence()
+ values[str(log)]=s.sha(log);stamps[str(log)]=s.pv.seven(log.stat())
+ proof={'schema':1,'status':'source_only_native60_partial_read_exact_observed59_preserved_update_reader_not_executed','caseCount':40,'inputHashes':values,'inputFingerprints':stamps,'currentToolInputs':tools,'currentToolFingerprints':tool_stamps,'failedRetentionReceiptSha256':r.READ_RECEIPT_SHA,'partialRetentionObservationSha256':s.sha(r.PARTIAL_OBSERVATION),'partialByteCountVerified':note['fileBytesVerified'],'partialFirstInventoryRecordCount':6057,'retentionFinalClosedInventoryAccepted':False,'freshFullPreinstallInventoryRequired':True,'postInstallPolicyChanged':False,'historicalExpectedHashesRewritten':False,'deviceActions':False,'executionPlanCreated':False,'installed60':False,'cpuQualified':False}
+ p=HERE/'source-review-freeze.json'
+ with p.open('x')as f:json.dump(proof,f,indent=2);f.write('\n')
+ print(json.dumps({'sourceReview':str(p),'sha256':s.sha(p),'caseCount':40,'inputCount':len(values),'bytes':sum(Path(n).stat().st_size for n in values),'failedReaderKeptFailed':True}))
+if __name__=='__main__':main()

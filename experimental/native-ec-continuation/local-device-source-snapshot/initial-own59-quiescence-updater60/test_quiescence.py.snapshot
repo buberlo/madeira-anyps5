@@ -1,0 +1,60 @@
+"""Real held close algorithm, fake bounded transport; no device or plan."""
+import ast,asyncio,copy,importlib.util,json,tempfile,unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('initial_quiescence_tests',HERE/'install.py');i=importlib.util.module_from_spec(sp);sp.loader.exec_module(i)
+n=i.s.module(i.INITIAL_QUIESCENCE_NATIVE,i.INITIAL_QUIESCENCE_NATIVE_SHA,'actual_held_close_algorithm_controls')
+BASE=i.s.load(i.s.INSTALL59)['observedBundlePath'];MAIN=BASE+'/Madeira'
+class Session:
+ def __init__(self,stage,states):self.stage=stage;self.states=iter(states);self.counter=0;self.base=BASE;self.terminations=[]
+ def guard(self):return 1000
+ async def query(self,args,label,cap=25):
+  self.counter+=1;path=self.stage/('%03d-%s.json'%(self.counter,label))
+  if args[:2]==['info','apps']:value={'apps':[{'bundleIdentifier':n.BUNDLE,'bundleVersion':'59','url':'file://'+BASE+'/'}]}
+  elif args==['info','processes']:value={'runningProcesses':[{'executable':'file://'+p,'processIdentifier':pid}for pid,p in next(self.states).items()]}
+  else:self.terminations.append(args);value={}
+  path.write_text(json.dumps({'info':{'arguments':['devicectl','--timeout','25','--json-output',str(path),'--quiet','device',*args,'--device',n.DEVICE],'outcome':'success'},'result':value}))
+  path.with_name(path.stem+'-bounded-output.json').write_text(json.dumps({'exitCode':0,'ownedChildWaited':True,'timedOut':False,'overflow':False,'isSignedInstallCommand':False,'discardedBytes':0}))
+  await asyncio.sleep(0);return value
+class Quiescence(unittest.IsolatedAsyncioTestCase):
+ async def asyncSetUp(self):
+  self.temp=tempfile.TemporaryDirectory();self.stage=Path(self.temp.name).resolve();self.event=asyncio.Event();self.observer=asyncio.create_task(self.event.wait());self.stop=asyncio.Event();self.proof=SimpleNamespace(current=None);self.eligible=asyncio.Event();self.result={};self.boundary=i.Boundary(BASE)
+ async def asyncTearDown(self):
+  self.observer.cancel();await asyncio.gather(self.observer,return_exceptions=True);self.temp.cleanup()
+ async def call(self,states):
+  self.session=Session(self.stage,states)
+  await i.initial_owned_quiescence(n,self.session,self.boundary,self.observer,self.stop,self.proof,self.eligible,self.result)
+ def read_note(self):return json.loads((self.stage/'initial-own59-quiescence.json').read_text())
+ async def test_real_algorithm_closes_exact_main_and_evidence_reader(self):
+  await self.call([{42:MAIN},{42:MAIN},{}]);self.assertEqual(self.session.terminations,[['process','terminate','--kill','--pid','42']]);note=self.read_note();self.assertTrue(note['completed']);self.assertFalse(note['restartOriginProven'])
+  sp=importlib.util.spec_from_file_location('quiescence_evidence_reader',HERE/'binding.py');b=importlib.util.module_from_spec(sp);sp.loader.exec_module(b)
+  original=b.load
+  with patch.object(b,'load',side_effect=lambda p:json.loads(Path(p).read_text())if Path(p).is_relative_to(self.stage)else original(p)):
+   b.initial_quiescence_evidence(self.stage,self.result,n)
+ async def test_already_closed_no_termination(self):
+  await self.call([{},{}]);self.assertEqual(self.session.terminations,[]);self.assertEqual(len(self.read_note()['snapshots']),2)
+ async def test_pid_change_refuses_before_termination(self):
+  with self.assertRaises(ValueError):await self.call([{42:MAIN},{43:MAIN}])
+  self.assertEqual(self.session.terminations,[])
+ async def test_foreign_or_helper_refused(self):
+  for state in [{42:'/private/var/containers/Bundle/Application/AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA/Madeira.app/Madeira'},{42:BASE+'/PlugIns/MadeiraJITHelper.appex/MadeiraJITHelper'}]:
+   self.stage.joinpath('initial-own59-quiescence.json').unlink(missing_ok=True)
+   with self.assertRaises(ValueError):await self.call([state])
+   self.assertEqual(self.session.terminations,[])
+ async def test_restart_after_close_refuses(self):
+  with self.assertRaises(ValueError):await self.call([{42:MAIN},{42:MAIN},{43:MAIN}])
+  self.assertFalse(self.read_note()['completed']);self.assertNotIn('initialOwnClosed59Verified',self.result)
+ async def test_observer_loss_refuses(self):
+  self.observer.cancel();await asyncio.gather(self.observer,return_exceptions=True)
+  with self.assertRaises(ValueError):await self.call([{42:MAIN}])
+  self.assertEqual(self.session.terminations,[])
+ async def test_closed_pid_only_partial_proof_retired(self):
+  self.proof.current={'pid':42,'roleSuspended':False};self.eligible.set();await self.call([{42:MAIN},{42:MAIN},{}]);self.assertIsNone(self.proof.current);self.assertFalse(self.eligible.is_set());self.assertEqual(self.read_note()['retiredPartialProof']['pid'],42)
+ async def test_transform_refuses_unexpected_initial_gate(self):
+  tree=i.Adapter().visit(copy.deepcopy(i.borrowed().pbody.extracted()))
+  for node in ast.walk(tree):
+   if isinstance(node,ast.Constant)and node.value=='initial-own59-must-be-empty':node.value='unknown-initial-boundary'
+  self.assertRaises(ValueError,i.InitialQuiescenceGate().visit,tree)
+if __name__=='__main__':unittest.main()

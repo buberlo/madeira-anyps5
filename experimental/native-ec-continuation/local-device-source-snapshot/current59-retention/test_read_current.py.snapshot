@@ -1,0 +1,45 @@
+import copy,importlib.util,json,tempfile,unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('tested_exact_current59_read',HERE/'read_current.py');r=importlib.util.module_from_spec(sp);sp.loader.exec_module(r)
+class Selection(unittest.TestCase):
+ def setUp(self):self.rows=json.loads((HERE/'observed-rows.json').read_text());self.inv=json.loads(r.INVENTORY.read_text())
+ def test_actual_ten_record_selection(self):
+  selected=r.selection(self.inv,self.rows);self.assertEqual(len(selected),3);self.assertEqual(sum(x['bytes']for x in selected.values()),312179);self.assertNotIn('Documents/logs/game.exe-2026-10-09_08-03-09.txt',selected)
+ def test_wrong_current_controls(self):
+  self.inv['Documents/madeira-controls.json']['sha256']='0'*64;self.assertRaises(ValueError,r.selection,self.inv,self.rows)
+ def test_removed_log_reappears(self):
+  k='Documents/logs/game.exe-2026-10-09_08-03-09.txt';self.inv[k]=self.rows['rows'][k]['before'];self.assertRaises(ValueError,r.selection,self.inv,self.rows)
+ def test_incomplete_row_set(self):
+  self.rows['rows'].pop('Documents/madeira-controls.json');self.assertRaises(ValueError,r.selection,self.inv,self.rows)
+ def test_default_cli_inert(self):
+  with mock.patch('sys.argv',['read_current.py']),mock.patch.object(r,'execute',side_effect=AssertionError):self.assertEqual(r.main(),0)
+class Read(unittest.IsolatedAsyncioTestCase):
+ async def call(self,mode):
+  with tempfile.TemporaryDirectory()as temp:
+   selected={'Documents/test':{'kind':'file','bytes':1,'sha256':'0'*64}};current=copy.deepcopy(selected);events=[]
+   class Session:
+    stage=Path(temp).resolve()
+    output_budget=SimpleNamespace(save=lambda p,x:events.append('save-'+p.name),guard=lambda:events.append('budget'))
+    async def closed(self,builds):events.append('closed');assert builds==['59']
+    async def userdata(self,builds,destination=None):
+     events.append('inventory');x=copy.deepcopy(current)
+     if mode=='before':x['new']={'kind':'directory'}
+     if mode=='after'and events.count('inventory')==2:x['new']={'kind':'directory'}
+     return x
+   async def retain(x,n,policy,session,inventory,folder):
+    events.append('retain');assert policy.system_artifact_records(inventory)==selected
+    return {}if mode=='missing'else{'Documents/test':{'record':selected['Documents/test']}}
+   m=SimpleNamespace(retain_system_files=retain);b=SimpleNamespace(need=r.need)
+   result=await r.read(Session(),m,None,None,b,current,selected)
+   self.assertEqual(events,['closed','inventory','save-before-full-inventory.json','retain','budget','inventory','save-after-full-inventory.json','closed']);return result
+ async def test_two_complete_inventories_and_actual_retention(self):self.assertIn('Documents/test',await self.call('ok'))
+ async def test_before_drift_stops_before_copy(self):
+  with self.assertRaises(ValueError):await self.call('before')
+ async def test_after_drift_refuses_acceptance(self):
+  with self.assertRaises(ValueError):await self.call('after')
+ async def test_missing_current_provider(self):
+  with self.assertRaises(ValueError):await self.call('missing')
+if __name__=='__main__':unittest.main()

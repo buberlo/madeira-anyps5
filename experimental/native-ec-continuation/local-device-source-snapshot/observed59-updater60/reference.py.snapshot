@@ -1,0 +1,193 @@
+"""Accepted59 plus the exact own bounded sampler; fresh USB before60 remains mandatory."""
+import copy,hashlib,importlib.util,json,re
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('current59_reference_support',HERE/'support.py');s=importlib.util.module_from_spec(sp);sp.loader.exec_module(s)
+need=s.need;ROOT=s.ROOT
+ACCEPTED_RESULT_SHA=s.RESULT59_SHA
+FAILED=ROOT/'build/minigolf-upstream-20261010/cpu-device-probe-prep/native59-installed-current-python-rpm-critical-owner-sampler-diagnostic-proposal/plan-1c75d16781784669973bee8a3b51bcf9'
+PLAN_SHA='f2bee89cccd1e54feda6edfe1591c2c89f5155423de21ec393388ffbf76ceb30'
+RECEIPT_SHA='61ddc99bbbdf8b4d12b63064af08712a2a9e63b60b12213632816c6ecd6def58'
+LOG_SHA='3b8b772e48784cd64128bdb20776697e7ed00a2752c721d5d0c3aa47bbe7364c'
+MUTABLE_LOGS={'Documents/madeira-log.txt','Documents/madeira-log.prev.txt','Documents/madeira-log.archive-pending.txt'}
+FILE_LIMIT=16<<20;SYSTEM_LIMIT=128<<20
+
+def failed_origin():
+ files={str(FAILED/'plan.json'):PLAN_SHA,str(FAILED/'execution/receipt.json'):RECEIPT_SHA,str(FAILED/'execution/pre-cleanup.<LOCAL_LOG_LEAF>'):LOG_SHA}
+ for p,h in files.items():need(s.sha(s.regular(p))==h,'Exact own59 diagnostic evidence')
+ p=s.load(FAILED/'plan.json');r=s.load(FAILED/'execution/receipt.json')
+ need(r['status']=='actual_native59_bounded_sampler_capture_and_cleanup_complete_not_cpu_qualification'and r['planSha256']==PLAN_SHA and r['nativeBuild']==p['nativeBuild']=='59'and r['acceptedInstallationBindingSha256']==s.INSTALL59_SHA and r['acceptedInstallationResultSha256']==ACCEPTED_RESULT_SHA,'Diagnostic does not become CPU qualification')
+ need(r['ownProcessesClosed']is r['libraryRestored']is r['protectedMetadataPreserved']is True and r['cleanupErrors']==[] and r['guestZeroExitObservedBeforeAnyTermination']is r['acceptedEightCpuPhases']is r['full803ExceptionGatePassed']is False,'Own59 diagnostic cleanup, no CPU acceptance')
+ need(type(r['evidence'])is dict and len(r['evidence'])<=256,'Bounded diagnostic evidence')
+ for name,h in r['evidence'].items():
+  need(type(name)is str and re.fullmatch(r'[A-Za-z0-9_.-]+',name),'Exact evidence leaf');q=s.regular(FAILED/'execution'/name);need(q.stat().st_size<=8<<20 and s.sha(q)==h,'Every actual own diagnostic evidence byte');s.merge(files,{str(q):h})
+ need(sum(s.regular(q).stat().st_size for q in files)<=64<<20,'Bounded diagnostic local evidence')
+ need(p['packageFiles']['raw/guest_raise_exception_tests.exe']=='34ec640f54c8581ae833e8ff6d5276b9dea456ad5ca699460221e47f87dddb20'and len(p['packageFiles'])==63,'Unchanged Original50 fixture/package')
+ names=re.findall(r'\[INFO\] Session log: logs/([^\r\n\x00]+)',(FAILED/'execution/pre-cleanup.<LOCAL_LOG_LEAF>').read_bytes().replace(b'\x00',b'').decode(errors='strict'))
+ need(len(names)==1 and re.fullmatch(r'guest_raise_exception_tests\.exe-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.txt',names[0]),'Exact own59 log filename')
+ prefix=p['probeFolder'].lstrip('/');package=ROOT/p['package'];records={}
+ for name,h in p['packageFiles'].items():
+  q=s.regular(package/name);need(s.sha(q)==h,'Exact actual sampler package bytes');s.merge(files,{str(q):h});records[prefix+'/'+name]={'kind':'file','bytes':q.stat().st_size,'sha256':h}
+ dirs={prefix}
+ for key in records:
+  d=Path(key).parent
+  while str(d)!=prefix:dirs.add(d.as_posix());d=d.parent
+ # Twelve exact directory names from the already observed raw/unix AppConfig
+ # route, translated only to this actual sampler prefix; no descendant wildcard.
+ observed=s.load(ROOT/'build/minigolf-upstream-20261010/native59-device-prep/exact-observed58-validator-diagnostic-update-proposal/observed-rows.json')
+ original='Documents/wine/drive_c/MadeiraCPU-6c5d3f12f6d048589f8ea113f3c6c144'
+ extra=[prefix+k[len(original):]for k,v in observed['rows'].items()if v['after']=={'kind':'directory'}]
+ need(len(extra)==12 and all(k.startswith(prefix+'/raw/unix')for k in extra),'Exact source-derived twelve directory names only');dirs.update(extra)
+ # The complete actual diagnostic inputs are already a subset of the accepted
+ # install closure plus its source/package/small evidence. Keep all of them.
+ for name,h in p['inputs'].items():s.merge(files,{str(Path(name)if Path(name).is_absolute()else ROOT/name):h})
+ files=s.physical_map(files)
+ return p,records,dirs,'Documents/logs/'+names[0],files
+
+
+PREDECESSOR=HERE.parent/'native59-preserved-source-update-proposal'
+OBSERVED=PREDECESSOR/'install-ee28e49b6bd1/before-full-inventory.json'
+OBSERVED_SHA='da1536d19a778a8f7136464364d3d499e92f17f8376fa3a40c1bd01d2f601e67'
+REFUSED=OBSERVED.with_name('result.json')
+REFUSED_SHA='def42971b082424cd5e83da91de65e43fe578319af4b02d515a6422a34c18896'
+OBSERVED_ROWS=HERE/'observed-rows.json'
+OBSERVED_ROWS_SHA='43d5b526448c57185b3094ad6c00cc3dc7864bd7335bec70efb478ced8188e80'
+READ_SOURCE=ROOT/'build/native60-current59-drift-byte-retention-proposal-20261012/read_current.py'
+READ_SOURCE_SHA='c6000226d02fc2c39ed37460db059b8cde0d2eb727c09c1f26e5083da379210b'
+READ_REVIEW=READ_SOURCE.parent/'source-review-freeze.json'
+READ_REVIEW_SHA='a3ba5388a9fa48073dfa847659b3134bddfe94e49ffeb2e5ea583837c14543cc'
+READ_RECEIPT=READ_SOURCE.parent/'PENDING/receipt.json'
+READ_RECEIPT_SHA='PENDING'
+
+
+def adoption_validator():
+ return s.module(PREDECESSOR/'install.py','5222e081f9fef974d869836b742bfd9423f394270e89fd27666ac9bc8d20995b','held60_real_provider_factory').provider_reader()
+
+def observed_evidence():
+ need(re.fullmatch('[0-9a-f]{64}',READ_RECEIPT_SHA)and READ_RECEIPT.parent.parent==READ_SOURCE.parent and re.fullmatch('execution-[0-9a-f]{12}',READ_RECEIPT.parent.name),'Actual three-file/full-inventory retention remains mandatory')
+ files={str(OBSERVED):OBSERVED_SHA,str(REFUSED):REFUSED_SHA,str(OBSERVED_ROWS):OBSERVED_ROWS_SHA,str(READ_SOURCE):READ_SOURCE_SHA,str(READ_REVIEW):READ_REVIEW_SHA,str(READ_RECEIPT):READ_RECEIPT_SHA}
+ for path,h in files.items():need(s.sha(s.regular(path))==h,'Exact observed initial-adoption evidence changed: '+path)
+ observed=s.load(OBSERVED);failed=s.load(REFUSED);rows=s.load(OBSERVED_ROWS);receipt=s.load(READ_RECEIPT)
+ need(failed['success']is failed['installationAttempted']is failed['userdataWrites']is False and failed['nativeResultStatus']=='failed_no_install'and failed['nativeJoinConfirmed']is failed['monitorJoinConfirmed']is failed['observerJoinConfirmed']is True and failed['currentNative59ReferenceSha256']==s.INSTALL59_SHA and failed['planSha256']=='118141fe175bf594c7a089e7291ece5464b4e018cb792691da7b39240108fbc6','Genuine before-install refusal')
+ need(rows['schema']==1 and rows['rowCount']==len(rows['rows'])==10 and rows['acceptedNative59BindingSha256']==s.INSTALL59_SHA and rows['observedInventorySha256']==OBSERVED_SHA and rows['failedBeforeInstallResultSha256']==REFUSED_SHA and all(rows[k]is False for k in ['postInstallPolicyExceptionsAdded','fullBackupComplete','samplerQualifiedAsOriginal50','accepted60']),'Exact ten initial-only records')
+ need(failed['error'].split('complete list): ',1)[1].split(',')==list(rows['rows']),'Entire actual rejected list, no inferred eleventh row')
+ need(receipt['schema']==1 and receipt['status']=='exact_current59_three_file_bytes_and_complete_closed_inventory_retained_not_installation_acceptance'and receipt['sourceSha256']==READ_SOURCE_SHA and receipt['sourceReviewSha256']==READ_REVIEW_SHA and receipt['observedRowsSha256']==OBSERVED_ROWS_SHA and receipt['inventorySha256']==OBSERVED_SHA and receipt['refusalSha256']==REFUSED_SHA and receipt['planSha256']==failed['planSha256'] and receipt['bytesRetained']==312179 and receipt['inventoryRecordCount']==len(observed)==6057 and receipt['ownProcessesAbsentAtFinalSnapshot']is receipt['fullInventoryBeforeAfterEqual']is True and all(receipt[k]is False for k in ['deviceDataWrites','install','launch','processTermination','fullBackupComplete','accepted60']),'Actual current files and complete closed readback only')
+ stage=READ_RECEIPT.parent;actual={}
+ for path in stage.rglob('*'):
+  need(not path.is_symlink()and (path.is_file()or path.is_dir())and (not path.is_dir()or path==stage/'bytes'),'No hidden linked/special/unknown read output')
+  if path.is_file()and path!=READ_RECEIPT:actual[path.relative_to(stage).as_posix()]=s.sha(s.regular(path))
+ need(actual==receipt['outputs']and len(actual)<=128 and sum(s.regular(stage/k).stat().st_size for k in actual)<=16<<20,'Complete bounded read evidence')
+ need(s.load(stage/'before-full-inventory.json')==s.load(stage/'after-full-inventory.json')==observed,'Two genuine complete fresh inventories equal the exact observation')
+ for k,h in actual.items():s.merge(files,{str(stage/k):h})
+ review=s.load(READ_REVIEW);s.merge(files,review['inputHashes'])
+ return observed,rows['rows'],receipt,files
+
+def adopt_observed(reference,values,observed,rows,receipt,validator):
+ # Keep the old accepted inventory and all its physical provider inputs in values.
+ # Only the three current files have fresh providers; absence and directories do
+ # not become byte-copy/full-backup claims.
+ wanted={k:r['after'] for k,r in rows.items() if r['after'] and r['after']['kind']=='file'}
+ need(len(rows)==10 and len(wanted)==3 and len([r for r in rows.values() if r['after']is None])==1 and len([r for r in rows.values() if r['after']=={'kind':'directory'}])==6,'Exact three files, one absence, six directory rows')
+ need(set(receipt['providers'])==set(wanted),'Every adopted current file has a genuine retained provider')
+ reference=copy.deepcopy(reference);values=dict(values)
+ for key,row in rows.items():
+  need(reference['inventory'].get(key)==row['before'] and observed.get(key)==row['after'],'Exact historical and observed row: '+key)
+  if row['before'] and row['before']['kind']=='file':
+   prior=reference['providers'][key];validator.verified_file(prior['path'],row['before'],prior['stableLocalStat']);s.merge(values,{prior['path']:row['before']['sha256']})
+  if row['after']is None:reference['inventory'].pop(key);reference['providers'].pop(key,None)
+  else:reference['inventory'][key]=copy.deepcopy(row['after'])
+ for index,key in enumerate(sorted(wanted)):
+  row=receipt['providers'][key];need(row['record']==wanted[key] and row['path']==str(READ_RECEIPT.parent/'bytes'/('%02d.bin'%index)),'Exact retained provider route and bytes')
+  validator.verified_file(row['path'],wanted[key],row['stableLocalStat']);s.merge(values,{row['path']:wanted[key]['sha256']})
+  reference['providers'][key]={'path':row['path'],'bytes':wanted[key]['bytes'],'sha256':wanted[key]['sha256'],'stableLocalStat':row['stableLocalStat'],'origin':'actual-exact-current59-three-file-read-before-qualification60-not-full-backup'}
+ reference.update(initialObservedRows=copy.deepcopy(rows),initialObservedInventorySha256=OBSERVED_SHA,initialObservedRefusalSha256=REFUSED_SHA,initialObservedByteRetentionSha256=READ_RECEIPT_SHA,initialObservedHistoricalProvidersRetained=True,initialObservedAdoptionOnly=True)
+ return reference,values
+
+def inspect_reference():
+ observed,rows,receipt,evidence=observed_evidence()
+ b,values,view,payload=s.accepted59();p,cpu,dirs,session,extra=failed_origin();s.merge(values,extra)
+ need(b['compositeInstallationResultSha256']==ACCEPTED_RESULT_SHA and b['observedBuild']=='59'and p['expectedBundlePath']==b['observedBundlePath'],'Actual59 same installation diagnostic')
+ reference={**copy.deepcopy(view),'observedBuild':'59','observedBundlePath':b['observedBundlePath'],'protectedPayload':str(payload),'acceptedNative59ResultSha256':ACCEPTED_RESULT_SHA,'acceptedNative59BindingSha256':s.INSTALL59_SHA,'exactFailed50PlanSha256':PLAN_SHA,'approvedCpuRecords':cpu,'approvedCpuDirectories':sorted(dirs),'exactSessionLog':session,'exactConfig':p['entry']['config'],'originalLibrarySha256':p['originalLibrarySha256'],'failed50RetainedNotAccepted':True}
+ s.merge(values,evidence)
+ reference,values=adopt_observed(reference,values,observed,rows,receipt,adoption_validator())
+ policy=s.module(ROOT/'build/minigolf-upstream-20261010/native56-device-prep/prospective-preservation-contract-v2/preservation.py','30e23b37627a442549fc3603810e0981c38de8121fe48a2096d8a9f027b3323e','same_prospective_policy')
+ transition(reference,observed,policy)
+ return reference,values
+
+def delta(a, b):
+    return {'added': {k: b[k] for k in sorted(b.keys() - a.keys())}, 'removed': {k: a[k] for k in sorted(a.keys() - b.keys())}, 'changed': {k: {'before': a[k], 'after': b[k]} for k in sorted(a.keys() & b.keys()) if a[k] != b[k]}}
+
+def transition(reference, current, policy):
+    for (key, row) in reference.get('initialObservedRows', {}).items():
+        need(current.get(key) == row['after'], 'Only exact observed initial row/absence accepted: ' + key)
+    old = reference['inventory']
+    d = delta(old, current)
+    sys = set(policy.system_artifact_records(old)) | set(policy.system_artifact_records(current))
+    classification = {}
+    bad = []
+    for k in sorted(set(d['added']) | set(d['removed']) | set(d['changed'])):
+        before = old.get(k)
+        after = current.get(k)
+        if k in sys:
+            kind = 'unchanged-prospective-system-policy'
+            continue_allowed = True
+        elif k in reference['approvedCpuRecords'] and after == reference['approvedCpuRecords'][k] and (before is None):
+            kind = 'exact-failed50-package-file'
+            continue_allowed = True
+        elif k in reference['approvedCpuDirectories'] and after == {'kind': 'directory'} and (before is None):
+            kind = 'exact-failed50-package-directory'
+            continue_allowed = True
+        elif k in MUTABLE_LOGS | {reference['exactSessionLog']} and after is not None and (after.get('kind') == 'file') and (type(after.get('bytes')) is int) and (0 <= after['bytes'] <= FILE_LIMIT):
+            kind = 'exact-own-runtime-log-new-bytes-required'
+            continue_allowed = True
+        elif k == 'Library/Application Support/madeira-game.cfg' and after == {'kind': 'file', 'bytes': len(reference['exactConfig'].encode()), 'sha256': hashlib.sha256(reference['exactConfig'].encode()).hexdigest()}:
+            kind = 'exact-failed50-config'
+            continue_allowed = True
+        elif before and after and (before.get('kind') == after.get('kind') == 'symlink') and k.startswith('Documents/wine/'):
+            target = before.get('target', '')
+            match = re.fullmatch('(/private/var/containers/Bundle/Application/[0-9A-Fa-f-]{36}/Madeira\\.app)(/arm64ec-windows/[^/]+|/aarch64-windows/[^/]+)', target)
+            continue_allowed = bool(match and after['target'] == reference['observedBundlePath'] + match[2])
+            kind = 'existing-bootstrap-exact58-UUID-prefix'
+        else:
+            kind = 'UNAPPROVED'
+            continue_allowed = False
+        classification[k] = kind
+        if not continue_allowed:
+            bad.append(k)
+    need(not bad, 'Unapproved current58 rows (complete list): ' + ','.join(bad))
+    need(current.get('Documents/madeira-library.json', {}).get('sha256') == reference['originalLibrarySha256'], 'Failed50 raw library must remain restored')
+    reduced = {**current}
+    for k in set(d['added']) | set(d['removed']) | set(d['changed']):
+        if k not in sys:
+            if k in old:
+                reduced[k] = old[k]
+            else:
+                reduced.pop(k, None)
+    proof = policy.assess_preservation(old, reduced)
+    need(proof['preservationSatisfied'] is True and proof['strictProtectedInventoryEqual'] is True, 'Same original system policy')
+    return {'schema': 1, 'acceptedNative59BindingSha256': reference['acceptedNative59BindingSha256'], 'failed50PlanSha256': PLAN_SHA, 'rawDifference': d, 'classification': classification, 'initialObservedRows': reference.get('initialObservedRows', {}), 'initialObservedByteRetentionSha256': reference.get('initialObservedByteRetentionSha256'), 'unknownProtectedChangesAccepted': False, 'postInstallPolicyExceptionsAdded': False, 'systemPolicyProof': proof, 'failed50Qualified': False}
+
+def changed_file_records(reference, current, policy):
+    transition(reference, current, policy)
+    old = reference['inventory']
+    rows = {k: v for (k, v) in current.items() if v['kind'] == 'file' and old.get(k) != v and (k not in reference['approvedCpuRecords'])}
+    need(all((0 <= v['bytes'] <= FILE_LIMIT for v in rows.values())) and sum((v['bytes'] for v in rows.values())) <= SYSTEM_LIMIT, 'Bounded complete changed-byte copies, no full rematerialization')
+    return rows
+
+def current_view(reference, current, records, validator):
+    rows = {k: copy.deepcopy(v) for (k, v) in reference['providers'].items() if current.get(k) == reference['inventory'].get(k)}
+    (p, cpu, dirs, session, extra) = failed_origin()
+    package = ROOT / p['package']
+    for (name, record) in cpu.items():
+        if current.get(name) == record:
+            local = s.regular(package / name[len(p['probeFolder'].lstrip('/')) + 1:])
+            rows[name] = {'path': str(local), 'bytes': record['bytes'], 'sha256': record['sha256'], 'stableLocalStat': validator.verified_file(str(local), record), 'origin': 'exact-failed50-retained-package-not-runtime-pass'}
+    for (key, row) in records.items():
+        need(row['record'] == current[key], 'Exact current copied record')
+        rows[key] = {'path': row['path'], 'bytes': current[key]['bytes'], 'sha256': current[key]['sha256'], 'stableLocalStat': validator.verified_file(row['path'], current[key], row['stableLocalStat']), 'origin': 'fresh-complete-before59-bounded-changed-byte-retention'}
+    need(set(rows) == {k for (k, v) in current.items() if v['kind'] == 'file'}, 'Every current ordinary file must have actual independent bytes')
+    values = {}
+    for (k, row) in rows.items():
+        validator.verified_file(row['path'], current[k], row['stableLocalStat'])
+        s.merge(values, {row['path']: row['sha256']})
+    return ({**copy.deepcopy(reference), 'inventory': copy.deepcopy(current), 'providers': rows, 'providerType': 'fresh_usb_current_native59_provider_view_before_native60_update'}, values)

@@ -1,0 +1,318 @@
+"""Inert signed58-to-diagnostic59 preservation update. Root alone executes."""
+import argparse, asyncio, ast, hashlib, importlib.util, json, re, shutil, sys, time, uuid
+from pathlib import Path
+from types import SimpleNamespace
+sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[3]
+
+def _load(p):
+    sp = importlib.util.spec_from_file_location('isolated59_' + p.stem, p)
+    m = importlib.util.module_from_spec(sp)
+    sp.loader.exec_module(m)
+    return m
+s = _load(HERE / 'support.py')
+ref = _load(HERE / 'reference.py')
+need = s.need
+BORROWED = ROOT / 'build/minigolf-upstream-20261010/native58-device-prep/current-native57-reference-update-proposal'
+BORROWED_SHA = '5fcc2420a1297334f617db738b50bbdbed6b4f780e8b5484317f3e92d503099a'
+OLD57 = ROOT / 'build/minigolf-upstream-20261010/native57-device-prep/observed-composite-install-proposal/install.py'
+MIN_FREE = 6 << 30
+LIVE_RESERVE = 2 << 30
+MAX_OUTPUT = 1152 << 20
+STAGING_COPIES_PER_ATTEMPT = 3
+(INSTALL_SECONDS, FALLBACK_SECONDS, WRAPPER_SECONDS) = (1800, 900, 2850)
+(NATIVE_JOIN_SECONDS, FILE_LIMIT, SYSTEM_LIMIT) = (30, 16 << 20, 128 << 20)
+POLICY = ROOT / 'build/minigolf-upstream-20261010/native56-device-prep/prospective-preservation-contract-v2/preservation.py'
+POLICY_SHA = '30e23b37627a442549fc3603810e0981c38de8121fe48a2096d8a9f027b3323e'
+SCOPE = {'partialReadIsInitialPrerequisiteOnly': True, 'retentionFinalClosedInventoryNotClaimed': True, 'exactTenObservedRowsInitialAdoptionOnly': True, 'exactAccepted59SealedCurrentProviderReference': True, 'explicit673PreservedOldSourceView': True, 'original50Qualification60Only': True, 'freshCompleteUsbBeforeInstallRequired': True, 'futureInstallProtectedInventoryPolicyUnchanged': True, 'fullProviderClosureVerified': True, 'allThreeOwnTasksJoined': True, 'signed59FallbackOnFailure': True, 'nativeInstallNeverCanceledByObserver': True, 'fullBeforeAfterInventoriesRetained': True, 'postSystemFileBytesRetainedAndHashed': True, 'explicitSixGiBInitialInstallPlanningReserve': True, 'twoGiBLiveQueryAndFallbackReserve': True, 'userdataWrites': False, 'launch': False, 'uninstall': False, 'opaqueContentsVerified': False, 'fullContainerBackupComplete': False, 'runtimeOrGameplayQualified': False}
+
+def borrowed():
+    return s.module(BORROWED / 'install.py', BORROWED_SHA, 'held58_installer_definitions')
+
+def typed_output():
+    return borrowed().typed_output()
+
+def provider_reader():
+    return borrowed().provider_reader()
+
+class Adapter(ast.NodeTransformer):
+
+    def visit_Constant(self, n):
+        if type(n.value) is str:
+            n.value = {'57': '59', '58': '60'}.get(n.value, n.value.replace('native58', 'native60').replace('native57', 'native59').replace('initialOwnClosed57', 'initialOwnClosed59').replace('signed57', 'signed59').replace('fallback57', 'fallback59').replace('initial-own57', 'initial-own59'))
+        return n
+
+def install_online_definitions():
+    b = borrowed()
+    tree = b.pbody.extracted()
+    tree = Adapter().visit(tree)
+    ast.fix_missing_locations(tree)
+    exec(compile(tree, str(BORROWED / 'install.py') + '::native59-literal-only', 'exec'), globals())
+install_online_definitions()
+
+def offline_proof(x):
+    q = s.load(HERE / 'source-review-freeze.json')
+    need(q['status'] == 'source_only_native60_partial_read_exact_observed59_preserved_update_reader_not_executed' and q['deviceActions'] is False, 'Reviewed60 source required')
+    for (p, h) in {**q['inputHashes'], **q['currentToolInputs']}.items():
+        need(s.sha(p) == h, 'Held60 reviewed source drift')
+    s.tool.verify_current_python()
+    return q
+
+def deps(signed_digest):
+    v = s.source_view()
+    x = v.module(ROOT/'build/minigolf-upstream-20261010/native56-device-prep/native55-readonly-diagnostic/bounded-composite-recapture-proposal/recapture.py', 'a4a59b8c2c64e23d1160642605e0cb036d0776b2bd56413bf19a38ecee7c80a3', 'held_composite_definition_loader')
+    (w, d, old, c, n) = x.dependencies()
+    c = SimpleNamespace(**{k:value for k,value in vars(c).items() if not k.startswith('__')})
+    c.PrewarmProof = v.module(ROOT/'build/minigolf-upstream-20261010/native56-device-prep/native56-reconciliation-proposal/prewarm.py','feeaaba4b6806f640f090cc40275cc8cc2cc245daa3d0ac60881aeddbcbc189a','held_current_prewarm_proof').PrewarmProof
+    policy = v.module(POLICY, POLICY_SHA,'unchanged_prospective_policy')
+    (signed, values) = s.signed_contract(s.SIGNED, signed_digest)
+    (prior, prior_values) = s.signed59_contract()
+    r60 = s.artifact(signed, signed_digest)
+    r59 = s.artifact(prior, s.SIGNED59_SHA)
+    need(r60['signedEntitlements'] == r59['signedEntitlements'] and r60['helperSignedEntitlements'] == r59['helperSignedEntitlements'] and (r60['profileSha256'] == r59['profileSha256']), 'Exact retained59 identity/access/profiles')
+    n.BUILDS = {**n.BUILDS, '59': s.SIGNED59.parent, '60': s.BUILD_DIR}
+    need(s.sha(s.INSTALL59) == s.INSTALL59_SHA, 'Actual accepted59 reference binding')
+    binding = s.load(s.INSTALL59)
+    result_path = s.regular(ROOT / binding['compositeInstallationResult'])
+    need(s.sha(result_path) == ref.ACCEPTED_RESULT_SHA, 'Actual accepted59 result')
+    installed = s.load(result_path)
+    plans = [Path(k) for (k, h) in binding['inputs'].items() if h == installed['planSha256'] and Path(k).parent == s.OLD59 and re.fullmatch('execution-plan-[0-9a-f]{12}\\.json', Path(k).name)]
+    need(len(plans) == 1 and s.sha(s.regular(plans[0])) == installed['planSha256'], 'Exact accepted59 original operation manifest')
+    original = s.load(plans[0])['originalPlan']
+    need(original['afcPythonResolved'] == s.tool.PYTHON and original['afcPythonSha256'] == s.tool.CURRENT, 'Current declared execution tool')
+    s.tool.verify_current_python()
+    original = {**original, 'artifacts': {'59': r59, '60': r60}}
+
+    def artifact(build, verify):
+        need(build in ('59', '60'), 'Only actual59 rollback/60 qualification target')
+        if build == '60':
+            (q, _) = s.signed_contract(s.SIGNED, signed_digest)
+            return s.artifact(q, signed_digest)
+        (q, _) = s.signed59_contract()
+        return s.artifact(q, s.SIGNED59_SHA)
+    n.inspect_artifact = artifact
+    return (x, w, d, c, n, policy, original, {**prior_values, **values})
+
+def source_inputs(x):
+    q = s.load(HERE / 'source-review-freeze.json')
+    values = dict(q['inputHashes'])
+    s.merge(values, q['currentToolInputs'])
+    values[str(HERE / 'source-review-freeze.json')] = s.sha(HERE / 'source-review-freeze.json')
+    return values
+
+def updated_view(after, baseline, records, build='60'):
+    need(build in ('59', '60'), 'Exact58/59 provider-view version')
+    (view, values) = borrowed().s.old_reader().current_provider_view(after, baseline, records, provider_reader())
+    view['providerType'] = 'protected_data_view_with_current_bytes_of_accepted_native60_not_physical_baseline' if build == '60' else 'fresh_usb_current_native59_provider_view_before_qualification60_update'
+    for key in records:
+        view['providers'][key]['origin'] = 'native60-current-system-retention' if build == '60' else 'fresh-before-native59-system-retention'
+    return (view, values)
+
+async def fresh_before(x, n, policy, session, reference, healthy):
+    await session.closed(['59'])
+    need(healthy(), 'Observer healthy before complete58 read')
+    before = await session.userdata(['59'], destination=None)
+    n.save(session.stage / 'before-full-inventory.json', before)
+    proof = ref.transition(reference, before, policy)
+    n.save(session.stage / 'reference59-to-fresh-before-comparison.json', proof)
+    extra = ref.changed_file_records(reference, before, policy)
+    select = SimpleNamespace(system_artifact_records=lambda inventory: {k: inventory[k] for k in extra})
+    records = await retain_system_files(x, n, select, session, before, session.stage / 'fresh-before-system-file-bytes')
+    n.save(session.stage / 'fresh-before-system-file-providers.json', records)
+    (baseline, values) = ref.current_view(reference, before, records, provider_reader())
+    baseline.update(observedBuild='59', observedBundlePath=session.boundary.base, acceptedNative59ResultSha256=reference['acceptedNative59ResultSha256'], freshCompleteUsbBeforeInstall=True, transitionProof=proof)
+    verify_fresh_providers(baseline)
+    need(healthy(), 'Observer healthy after current provider replay')
+    await session.closed(['59'])
+    n.save(session.stage / 'fresh-before-current-provider-view.json', baseline)
+    return baseline
+
+def planning_budget(original):
+    observed = {}
+    for build in ['59', '60']:
+        app = Path(original['artifacts'][build]['app'])
+        need(app.is_absolute() and app == app.resolve() and app.is_dir(), 'Exact current signed apps')
+        files = list(app.rglob('*'))
+        need(not any((p.is_symlink() or (not p.is_dir() and (not p.is_file())) for p in files)), 'No linked/special staging app files')
+        observed[build] = sum((p.stat().st_size for p in files if p.is_file()))
+    planned = LIVE_RESERVE + MAX_OUTPUT + STAGING_COPIES_PER_ATTEMPT * sum(observed.values())
+    need(planned <= MIN_FREE, 'Actual signed60+59 sizes exceed six GiB planning allowance')
+    return {'initialReserveBytes': MIN_FREE, 'liveReserveBytes': LIVE_RESERVE, 'boundedOwnOutputBytes': MAX_OUTPUT, 'signedAppBytes': observed, 'transientCopiesPlanningAllowancePerAttempt': STAGING_COPIES_PER_ATTEMPT, 'plannedBytes': planned, 'planningMarginBytes': MIN_FREE - planned, 'nativeOsStagingHardBoundProven': False, 'nativeOsStagingMayExceedPlanningAllowance': True}
+
+def disk_guard():
+    need(shutil.disk_usage(HERE).free >= MIN_FREE, 'Six GiB initial install reserve')
+
+def verify_fresh_providers(b):
+    q = provider_reader()
+    q.validate_inventory(b['inventory'])
+    values = {}
+    need(set(b['providers']) == {k for (k, r) in b['inventory'].items() if r['kind'] == 'file'}, 'Complete current per-file provider map')
+    for (key, row) in b['providers'].items():
+        r = b['inventory'][key]
+        need(row['bytes'] == r['bytes'] and row['sha256'] == r['sha256'], 'Exact current provider bytes')
+        q.verified_file(row['path'], r, row['stableLocalStat'])
+        values[row['path']] = r['sha256']
+    return values
+
+async def perform_install(x, n, policy, session, original, reference, result, healthy):
+    attempted = False
+    baseline = None
+    try:
+        session.deadline = session.started + INSTALL_SECONDS
+        baseline = await fresh_before(x, n, policy, session, reference, healthy)
+        for build in ['59', '60']:
+            need(n.inspect_artifact(build, True) == original['artifacts'][build], 'Actual signed apps changed')
+        session.verify_inputs()
+        await session.closed(['59'])
+        need(healthy(), 'Observation failed before exact signed install')
+        result['resourcePlanningBudget'] = planning_budget(original)
+        disk_guard()
+        session.output_budget.guard()
+        session.boundary.begin('60')
+        attempted = True
+        await session.query(['install', 'app', original['artifacts']['60']['app']], 'install-exact-native60', 120)
+        await confirm_boundary(n, session, session.boundary, '60')
+        await session.closed(['60'])
+        after = await session.userdata(['60'], destination=None)
+        n.save(session.stage / 'native60-after-full-inventory.json', after)
+        proof = post_contract(x, n, policy, baseline['inventory'], after)
+        n.save(session.stage / 'native60-full-comparison.json', proof)
+        n.save(session.stage / 'native60-full-raw-difference.json', raw_difference(baseline['inventory'], after))
+        records = await retain_system_files(x, n, policy, session, after, session.stage / 'native60-system-file-bytes')
+        n.save(session.stage / 'native60-system-file-providers.json', records)
+        retention = verify_system_retention(x, policy, baseline['inventory'], after, baseline, records, session.stage / 'native60-system-file-bytes')
+        n.save(session.stage / 'native60-complete-artifact-retention.json', retention)
+        verify_fresh_providers(baseline)
+        session.verify_inputs()
+        await session.closed(['60'])
+        need(healthy(), 'Observation failed after exact final source/provider replay')
+        result.update(status='native60_composite_update_protected_accessible_data_and_exact_system_policy_verified_not_launched', success=True, observedBuild='60', observedBundlePath=session.boundary.base, protectedAccessibleUserdataReadbackMatched=True, exactSystemArtifactPolicySatisfied=True, accessibleUserdataRawEqual=baseline['inventory'] == after, opaqueMetadataReadbackMatched=True, fullBeforeAfterInventoriesRetained=True, postSystemFileBytesRetained=True, freshCompleteUsbBeforeInstall=True)
+    except Exception as e:
+        result.update(success=False, status='failed_no_install' if not attempted else 'failed_composite_install_or_data_verification', error=type(e).__name__ + ': ' + str(e))
+        if attempted:
+            session.deadline = session.started + INSTALL_SECONDS + FALLBACK_SECONDS
+            try:
+                need(n.inspect_artifact('59', True) == original['artifacts']['59'], 'Exact signed59 fallback changed')
+                if not session.boundary.installing:
+                    session.boundary.begin('59')
+                await confirm_boundary(n, session, session.boundary, '59', recovery=True)
+                await session.closed([session.boundary.build])
+                session.boundary.begin('59')
+                session.output_budget.guard()
+                await session.query(['install', 'app', original['artifacts']['59']['app']], 'fallback-exact-signed-native59', 120)
+                await confirm_boundary(n, session, session.boundary, '59')
+                await session.closed(['59'])
+                result['signed59InstalledAndClosed'] = True
+                after = await session.userdata(['59'], destination=None)
+                n.save(session.stage / 'fallback59-full-inventory.json', after)
+                proof = post_contract(x, n, policy, baseline['inventory'], after)
+                n.save(session.stage / 'fallback59-full-comparison.json', proof)
+                n.save(session.stage / 'fallback59-full-raw-difference.json', raw_difference(baseline['inventory'], after))
+                records = await retain_system_files(x, n, policy, session, after, session.stage / 'fallback59-system-file-bytes')
+                n.save(session.stage / 'fallback59-system-file-providers.json', records)
+                retention = verify_system_retention(x, policy, baseline['inventory'], after, baseline, records, session.stage / 'fallback59-system-file-bytes')
+                n.save(session.stage / 'fallback59-complete-artifact-retention.json', retention)
+                verify_fresh_providers(baseline)
+                session.verify_inputs()
+                await session.closed(['59'])
+                need(healthy(), 'Observation failed after fallback source/provider replay')
+                result.update(status='native60_failed_signed59_fallback_protected_data_policy_verified', fallbackProtectedDataVerified=True, observedBuild='59', observedBundlePath=session.boundary.base)
+            except Exception as fallback:
+                result.update(status='native60_failed_fallback_or_data_state_unconfirmed', fallbackProtectedDataVerified=False, fallbackError=type(fallback).__name__ + ': ' + str(fallback))
+    finally:
+        result['installationAttempted'] = attempted
+    return 0 if result['success'] else 1
+
+async def run(path, digest, opaque, approved_policy):
+    need(opaque is True and approved_policy is True, 'Explicit opaque/preservation-policy approval')
+    (plan, x, w, c, n, policy, reference, original) = verify_execution_plan(path, digest)
+    need(str(Path(sys.executable).resolve()) == original['afcPythonResolved'] and x.sha(original['afcPython']) == original['afcPythonSha256'], 'Pinned actual device interpreter')
+    stage = HERE / ('install-' + uuid.uuid4().hex[:12])
+    session = session_type(n)(original, stage, WRAPPER_SECONDS)
+    session.base = reference['observedBundlePath']
+    session.guard()
+    disk_guard()
+    stage.mkdir(exist_ok=False)
+    old_save = typed_output().enable_save(n, session)
+    result = {'schema': 1, 'status': 'failed_composite_update_not_accepted', 'success': False, 'sourceSha256': s.sha(Path(__file__)), 'planSha256': digest, 'acceptedNative59ResultSha256': ref.ACCEPTED_RESULT_SHA, 'currentNative59ReferenceSha256': plan['currentNative59ReferenceSha256'], 'signedNative60ReceiptSha256': plan['signedNative60ReceiptSha256'], 'signedNative60MachOUuid': plan['signedNative60MachOUuid'], 'policySha256': POLICY_SHA, 'scope': SCOPE, 'device': n.DEVICE, 'bundle': n.BUNDLE, 'deviceActions': True, 'userdataWrites': False, 'launch': False, 'uninstall': False, 'fullContainerBackupComplete': False, 'opaqueContentsVerified': False, 'installedBinaryBytesIndependentlyRead': False, 'runtimeOrGameplayQualified': False, 'initialOwnClosed59Verified': False, 'installationAttempted': False, 'signed59InstalledAndClosed': False, 'jointObservationAccepted': False, 'livePrewarmClosureAttempts': [], 'livePrewarmClosures': [], 'retainedOwnLogBytes': 0}
+    declared = s.declarations(plan['signedNative60ReceiptSha256'])
+    initial = s.adapter().fingerprints(plan['dependencyInputs'], declared)
+    live = None
+
+    def verify_inputs():
+        nonlocal live
+        values = source_inputs(x)
+        values.update(deps(plan['signedNative60ReceiptSha256'])[-1])
+        values.update(plan['referenceEvidence'])
+        s.replay_inputs(values, declared)
+        need(values == plan['dependencyInputs'], 'Complete source/signed/provider closure changed')
+        live = s.adapter().fingerprints(plan['dependencyInputs'], declared)
+        need(live == initial, 'Provider fingerprint drift')
+        result['sourceClosureReplayedUnderLiveObserver'] = True
+    session.verify_inputs = verify_inputs
+    try:
+        code = await observe_install(x, w, c, n, policy, session, original, reference, result)
+        if result.get('success') or result.get('fallbackProtectedDataVerified'):
+            need(live is not None and live == s.adapter().fingerprints(plan['dependencyInputs'], declared), 'Post-join exact source fingerprint closure')
+            result['postJoinSourceFingerprintClosureUnchanged'] = True
+    except Exception as e:
+        result.update(success=False, jointObservationAccepted=False, error=type(e).__name__ + ': ' + str(e))
+        code = 1
+    finally:
+        result['seconds'] = time.monotonic() - session.started
+        result['outputEvidence'] = {q.name: x.sha(q) for q in sorted(stage.iterdir()) if q.is_file()}
+        try:
+            n.save(stage / 'result.json', result)
+        finally:
+            n.save = old_save
+        print(json.dumps({'stage': str(stage), 'status': result['status'], 'success': result['success']}))
+    return code
+
+def plan_record(signed_digest):
+    (x, w, d, c, n, policy, original, signedinputs) = deps(signed_digest)
+    offline_proof(x)
+    (reference, evidence) = ref.inspect_reference()
+    values = source_inputs(x)
+    s.merge(values, signedinputs)
+    s.merge(values, evidence)
+    s.replay_inputs(values, s.declarations(signed_digest))
+    return ({'schema': 1, 'status': 'frozen_inert_partial_read_exact_observed59_preserved_reference_qualification60_update_not_executed', 'sourceSha256': s.sha(Path(__file__)), 'signedNative60Receipt': str(s.SIGNED), 'signedNative60ReceiptSha256': signed_digest, 'signedNative60MachOUuid': s.load(s.SIGNED)['uuid'], 'acceptedNative59ResultSha256': ref.ACCEPTED_RESULT_SHA, 'currentNative59ReferenceSha256': s.INSTALL59_SHA, 'referenceEvidence': evidence, 'dependencyInputs': values, 'scope': SCOPE, 'policySha256': POLICY_SHA, 'originalPlan': original, 'artifacts': original['artifacts'], 'resourcePlanningBudget': planning_budget(original), 'installSeconds': INSTALL_SECONDS, 'fallbackSeconds': FALLBACK_SECONDS, 'totalSeconds': WRAPPER_SECONDS, 'minFreeBytes': MIN_FREE, 'deviceActionsExecuted': False}, (x, w, c, n, policy, reference, original))
+
+def freeze_plan(signed_digest):
+    (p, _) = plan_record(signed_digest)
+    path = HERE / ('execution-plan-' + uuid.uuid4().hex[:12] + '.json')
+    with path.open('x') as f:
+        json.dump(p, f, indent=2)
+        f.write('\n')
+    return path
+
+def verify_execution_plan(path, digest):
+    path = s.regular(path)
+    need(path.parent == HERE and re.fullmatch('execution-plan-[0-9a-f]{12}\\.json', path.name) and (s.sha(path) == digest), 'Exact reviewed60 execution plan')
+    p = s.load(path)
+    (expected, parts) = plan_record(p['signedNative60ReceiptSha256'])
+    need(p == expected, 'No changed60 source/reference/budget/artifact lineage')
+    return (p, *parts)
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('--freeze-plan', action='store_true')
+    p.add_argument('--signed-native60-receipt-sha256')
+    p.add_argument('--execute', type=Path)
+    p.add_argument('--plan-sha256')
+    p.add_argument('--accept-opaque-systemdata-boundary', action='store_true')
+    p.add_argument('--accept-prospective-system-artifact-policy', action='store_true')
+    a = p.parse_args()
+    if a.freeze_plan:
+        need(a.signed_native60_receipt_sha256, 'Actual59 signed SHA')
+        q = freeze_plan(a.signed_native60_receipt_sha256)
+        print(json.dumps({'plan': str(q), 'sha256': s.sha(q), 'deviceActions': False}))
+        return 0
+    if a.execute:
+        need(a.plan_sha256, 'Concrete plan SHA')
+        return asyncio.run(run(a.execute, a.plan_sha256, a.accept_opaque_systemdata_boundary, a.accept_prospective_system_artifact_policy))
+    print(json.dumps({'status': 'inert_qualification60_updater_pending_actual_signed59_and_review', 'deviceActions': False}))
+    return 0
+if __name__ == '__main__':
+    raise SystemExit(main())
