@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "status": "native_arm64_conversion_tools_built_and_ctest_qualified_not_game_or_runtime",
+  "recordedAt": "2026-10-11T21:30:43.408030+00:00",
+  "upstreamCommit": "0a8b1d32b12a6d6a3acd462787750b482bf78884",
+  "patchCount": 17,
+  "sourceEntryCount": 2137,
+  "sourceMapSha256": "937c52b9ff6af979842a6d8c97bafbeb8be03e877d92345ac24e4bc84929baef",
+  "actualReceiptSha256": "e70aff3ccfddfdb9b0b0c1b4abe204a43df5b328049995e5a04eaa5432051533",
+  "actualPreparationSha256": "da870f22304abc131b3ac2ccb5eb7f42fbd197b7aa2fd8f2febd8f912486e681",
+  "sourceReviewSha256": "dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44",
+  "sourceBeforeAfterUnchanged": true,
+  "allElevenDependenciesCleanAtExpectedGitlinksBeforeAfter": true,
+  "toolchain": {
+    "clang": {
+      "sha256": "34129c71a01a74f7f3b2443521519b2e5447553fa187f5fcafaaf8c42cc192e2",
+      "version": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+      "versionExitCode": 0
+    },
+    "cmake": {
+      "sha256": "64c16ba19481b4e8fa5fc51afa37a7609128d5e5c10236eb1492d16d22d029c4",
+      "version": "cmake version 4.4.4\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+      "versionExitCode": 0
+    },
+    "effectiveClangSelectedByXcrun": {
+      "sha256": "1590ac950a3d627817d09ade5cb60b2115f17a72182a3141e010b4bcc482a0c9",
+      "version": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin27.0.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+      "versionExitCode": 0
+    },
+    "ninja": {
+      "sha256": "1474a6ef89624613732e0fc9e6d9fe5338b8885916cf64ab8c1c6097123f3ef6",
+      "version": "1.13.2\n",
+      "versionExitCode": 0
+    },
+    "python": {
+      "sha256": "4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc",
+      "version": "Python 3.12.14\n",
+      "versionExitCode": 0
+    }
+  },
+  "configureExitCode": 0,
+  "buildExitCode": 0,
+  "ctestExitCode": 0,
+  "maxBuildJobs": 2,
+  "registeredTests": 110,
+  "executedCTestCases": 110,
+  "passedCTestCases": 110,
+  "failedCTestCases": 0,
+  "skippedCTestCases": 0,
+  "registeredAndExecutedNamesMatch": true,
+  "groups": {
+    "relinker": 95,
+    "rootTooling": 13,
+    "nidPatcher": 2
+  },
+  "hostExecutionLimitations": [
+    {
+      "name": "linux_guest_stack",
+      "notes": [
+        "Native dlopen execution skipped: Linux x86-64 required"
+      ]
+    },
+    {
+      "name": "guest_module_args",
+      "notes": [
+        "Guest module argument tests passed: native execution skipped"
+      ]
+    },
+    {
+      "name": "guest_init_fini",
+      "notes": [
+        "Native lifecycle execution skipped: Linux x86-64 or Windows required"
+      ]
+    }
+  ],
+  "binaries": {
+    "nid_patcher": {
+      "bytes": 191064,
+      "format": "Mach-O 64-bit executable arm64",
+      "sha256": "79863c1696316ad1e0d26d87380e1dcea0107e29d7cfff8735f1eee8e5dc9d01"
+    },
+    "relinker": {
+      "bytes": 962616,
+      "format": "Mach-O 64-bit executable arm64",
+      "sha256": "35f6ce265587fc98670571afb1f3c96ca0397d88f4a3a85ae9d201c9fe1702e6"
+    }
+  },
+  "evidenceSha256": {
+    "build.log": "b2a842f6b07843dd4521fb818cd124ddb641be861ebfcd313e4218567a90a02a",
+    "build/CMakeCache.txt": "d5b3a93966468f0ee7a078598a2a7756f7e1358d7bc583d3a8f36da46cf2d948",
+    "build/Testing/Temporary/LastTest.log": "b61bbad1dc732e048208efc01c6b692c046e718d235cb5875f90c5a5b68e1ed4",
+    "build/build.ninja": "a91a91a847e8a0171ba1430403c6d01175e6e9d53d8d13f486fb950a436ebfe2",
+    "configure.log": "51e584a23448228b8380295a0e16999d565c4223da87ebc16204a865bf766ef4",
+    "ctest.log": "7adfa8c8e491b61e86b2cc7d7966a5c437a4a842c19604c6cf19e47b54a8aa38",
+    "source-after.json": "ade69e06ff2fdf6b49eb3e58dd2e208bad4480ebe0faa78a6b29326f865e66dc",
+    "source-before.json": "ade69e06ff2fdf6b49eb3e58dd2e208bad4480ebe0faa78a6b29326f865e66dc",
+    "test-inventory.json": "9493da69ec708c50814f61c4d37c4b093657ceee8e9d7b79f64eea763c9972b5",
+    "tests.xml": "c784bc4b0af0f5b01d699610fd18d42ae3388d0c5b18194ae394a8aefd9d031f"
+  },
+  "publicHelperFilesSha256": {
+    "CMakeLists.txt": "99ba8c205fcb92183366db68a979a3b4ed6f0f634bc65d4c4df36302401eec81",
+    "README.md": "12997ec2c263cdd8ded1eb93fcf3e3f42aa88e41461d7603f9358b7992881bd5",
+    "finalize.py": "8b1005992124166f320603032bbbe1b25d174546fb4c6371215e8386adb51e9d",
+    "receipt.py": "fd90198910daba38cde177c5b3ac8f5280dcb2b764ab59084c91e622c8692fa1"
+  },
+  "priorPython39Attempt": {
+    "actualReceiptSha256": "176a6e192657e53b5120ae8b7c099127a50914bb4ffeb583dbb1fbcb74854bfd",
+    "passed": 109,
+    "failed": 1,
+    "reason": "Unchanged pr_overlap_encoding regression requires subprocess._text_encoding, unavailable on Python 3.9. Original failure retained; source and expectations unchanged."
+  },
+  "hleQualified": false,
+  "guestExecutedOnIpad": false,
+  "gameImportsQualified": false,
+  "gpuQualified": false,
+  "gameplayVerified": false,
+  "scope": "Native conversion tools and portable synthetic regression outputs for the explicitly bound seventeen-patch source. Existing platform guards retain their incompatible guest-execution limitations. No game, device, HLE or GPU acceptance is inferred."
+}

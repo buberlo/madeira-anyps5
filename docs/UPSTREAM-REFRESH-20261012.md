@@ -96,6 +96,15 @@ this arena; that result does not establish allocation on the iPad.
 [Actual test-host observations](../experimental/windows-placeholder-host-probe/actual-observation.json),
 [preceding runtime attempt](evidence/anyps5-latest-memory-host-run-20261012.json).
 
+The native ARM64 conversion tools have also been freshly rebuilt for this
+seventeen-patch source. **All 110 registered CTest cases pass**: 95 relinker,
+13 root tooling and two NID-patcher regressions. Source and all eleven vendor
+trees match before and after the run. Existing host guards inspect emitted
+x86-64 images without attempting incompatible guest execution; this result
+qualifies the conversion tools, not the game or HLE runtime.
+[Actual native tool results](evidence/native-host-tools-latest17-20261012.json),
+[portable build harness](../tools/checks/experimental/native-host-tools/README.md).
+
 The earlier **95 host/relinker passes**, scoped once-provider execution and
 older 47-library/production-PRX results retain their source identities. They
 are not automatically results of the current seventeen-patch runtime.
