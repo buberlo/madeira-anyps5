@@ -54,6 +54,15 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def source_commit(source):
+    # An exported candidate inside the wrapper repository otherwise inherits
+    # the wrapper's Git HEAD/diff and is mislabeled as an AnyPS5 checkout.
+    top = Path(subprocess.check_output(['git', '-C', str(source), 'rev-parse', '--show-toplevel'], text=True).strip()).resolve()
+    if top != source.resolve():
+        raise ValueError('HLE source must be its own AnyPS5 Git checkout, not an exported tree inside another repository')
+    return subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+
+
 def runtime_input_hashes(build_directory, toolchain_directory):
     """Identify actual host-test binaries and their compiler runtime inputs."""
     paths = {path.resolve() for path in build_directory.rglob('*')
@@ -118,6 +127,50 @@ def choose_additional_tests(source, requested):
         if not re.fullmatch(r'[A-Za-z0-9_]+_tests', name) or name not in available or name in TESTS:
             raise ValueError('Unknown, unsafe or already selected additional test target: ' + name)
     return sorted(requested)
+
+
+def prepare_codemodel(build):
+    query = build / '.cmake/api/v1/query/client-anyps5-hle/codemodel-v2'
+    query.parent.mkdir(parents=True, exist_ok=True)
+    query.write_bytes(b'')
+
+
+def configured_targets(build):
+    """Read this client's configured targets, including platform conditions."""
+    reply = build / '.cmake/api/v1/reply'
+    indexes = sorted(reply.glob('index-*.json'))
+    if not indexes:
+        raise ValueError('CMake did not produce the requested configured codemodel')
+
+    def read(name):
+        if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_.-]+\.json', name):
+            raise ValueError('Unsafe CMake codemodel reply filename')
+        return json.loads((reply / name).read_text())
+
+    index = read(indexes[-1].name)
+    model = read(index['reply']['client-anyps5-hle']['codemodel-v2']['jsonFile'])
+    if model.get('kind') != 'codemodel' or model.get('version', {}).get('major') != 2:
+        raise ValueError('Unexpected CMake codemodel version')
+    configurations = [c for c in model['configurations'] if c['name'] == 'Release']
+    if len(configurations) != 1:
+        raise ValueError('Exactly one configured Release target inventory required')
+    targets = {}
+    for entry in configurations[0]['targets']:
+        target = read(entry['jsonFile'])
+        name = target['name']
+        if name != entry['name'] or name in targets:
+            raise ValueError('Duplicate or conflicting configured CMake target')
+        targets[name] = target['type']
+    return targets
+
+
+def validate_configured_targets(available, libraries, additional):
+    for name in libraries:
+        if available.get(name) != 'SHARED_LIBRARY':
+            raise ValueError('Selected PRX is not a configured shared library: ' + name)
+    for name in ('relinker', 'nid_patcher', *TESTS, *additional):
+        if available.get(name) != 'EXECUTABLE':
+            raise ValueError('Selected test/tool is unavailable for the configured platform: ' + name)
 
 
 def additional_ctest_inventory(targets, text):
@@ -227,11 +280,13 @@ def main():
     if args.jobs < 1:
         parser.error('--jobs must be positive')
     source = args.source.resolve()
+    anyps5_commit = source_commit(source)
     targets = choose_targets(source, args.targets, args.from_hle)
     additional_tests = choose_additional_tests(source, args.additional_test)
     if os.name != 'nt' and not args.wine:
         parser.error('Set APS5_WINE or --wine to the local Wine executable')
     args.build.mkdir(parents=True, exist_ok=True)
+    prepare_codemodel(args.build)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     toolarchive = ROOT / 'build/toolchains/winlibs-15.2.0posix-seh.7z'
     fetch(TOOLCHAIN_URL, toolarchive, TOOLCHAIN_SHA)
@@ -262,7 +317,6 @@ def main():
 
     environment = dict(os.environ)
     project_commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
-    anyps5_commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
     # The runtime manifest identifies the HLE source, not the wrapper project.
     # Keep both commits separately so a pin upgrade cannot mislabel its binaries.
     environment['APS5_SOURCE_COMMIT'] = anyps5_commit
@@ -289,9 +343,11 @@ def main():
     run('configure', ['cmake', '-S', win(source), '-B', win(args.build), '-G', 'Ninja',
                      '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER=gcc', '-DCMAKE_CXX_COMPILER=g++',
                      '-DCMAKE_OBJCOPY=' + win(args.toolchain / 'bin/objcopy.exe'),
-                     '-DBUILD_TESTING=ON', '-DAPS5_SLIM=ON', '-DAPS5_ENABLE_TIMING_LOG=OFF',
+                     '-DBUILD_TESTING=ON', '-DAPS5_SLIM=ON', '-DANYPS5_USE_SYSTEM_DEPS=OFF', '-DAPS5_ENABLE_TIMING_LOG=OFF',
                      '-DAPS5_AGC_CREATE_LOG=OFF', '-DFFMPEG_PREBUILT_DIR=' + win(args.ffmpeg),
                      '-DPython3_EXECUTABLE=' + win(python_home / 'python.exe')])
+    actual_targets = configured_targets(args.build)
+    validate_configured_targets(actual_targets, targets, additional_tests)
     run('build', ['cmake', '--build', win(args.build), '--target', 'relinker', 'nid_patcher',
                   *targets, *TESTS, *additional_tests, '--parallel', str(args.jobs)])
     runtime_inputs_before = runtime_input_hashes(args.build, args.toolchain) if not args.skip_tests else None
@@ -348,7 +404,8 @@ def main():
         'anyps5_commit': anyps5_commit,
         'patches': {p.name: digest(p) for p in sorted((ROOT / 'patches/anyps5').glob('*.patch'))},
         'anyps5_diff_sha256': hashlib.sha256(subprocess.check_output(['git', '-C', str(source), 'diff', 'HEAD'])).hexdigest(),
-        'flags': {'build_type': 'Release', 'APS5_SLIM': True, 'APS5_ENABLE_TIMING_LOG': False, 'APS5_AGC_CREATE_LOG': False},
+        'flags': {'build_type': 'Release', 'APS5_SLIM': True, 'ANYPS5_USE_SYSTEM_DEPS': False, 'APS5_ENABLE_TIMING_LOG': False, 'APS5_AGC_CREATE_LOG': False},
+        'configured_target_types': {name: actual_targets[name] for name in sorted(set(targets) | set(TESTS) | set(additional_tests) | {'relinker', 'nid_patcher'})},
         'host_tests_passed': passed, 'host_test_runtime': 'Windows' if os.name == 'nt' else 'local Wine',
         'additional_host_tests_passed': additional_tests if passed else [],
         'wine_prefix': environment.get('WINEPREFIX') if os.name != 'nt' else None,

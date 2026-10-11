@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-10-12",
+  "status": "native59_bounded_cpu_diagnostic_captured_and_restored_fixture_incomplete",
+  "actualExecutionReceiptSha256": "61ddc99bbbdf8b4d12b63064af08712a2a9e63b60b12213632816c6ecd6def58",
+  "nativeBuild": 59,
+  "fexRuntimeSha256": "a7d7f381aea5472c8542fb0601c5916b8d70e03ca56ce62d809801392e79089d",
+  "nativeMachOUuid": "3839DED6-DC05-37C9-802E-644DE7256D13",
+  "observationSeconds": 45,
+  "actualCollectorSeconds": 61.64097758400021,
+  "capturedInterruptedContexts": 0,
+  "guestExitedBeforeCollectorTermination": false,
+  "samplerBursts": 1,
+  "validOwnershipRows": 2,
+  "observedRpmOwnersAndDepths": [
+    [
+      "0x0",
+      0
+    ],
+    [
+      "0x0",
+      0
+    ]
+  ],
+  "observedCriticalDepths": [
+    0,
+    0
+  ],
+  "mainObservation": "Wine server wait_select_reply",
+  "workerObservation": "unhandled native read fault at address 2 with PC and LR equal to 2, preceding sampler",
+  "causativeWriteEstablished": false,
+  "rpmLockCycleEstablished": false,
+  "samplingPerturbsScheduling": true,
+  "authoritativeStackUnwind": false,
+  "libraryRestored": true,
+  "protectedMetadataPreserved": true,
+  "ownProcessesClosed": true,
+  "cleanupErrors": [],
+  "acceptedCpuPhases": false,
+  "gpuQualified": false,
+  "gamePlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Synthetic CPU diagnostic only; the sampler does not qualify exception delivery. The earlier Native57 allocator spin does not establish the cause of this Native59 fault. Pairing and game saves are not written by the collector; a full save inventory is not claimed."
+}

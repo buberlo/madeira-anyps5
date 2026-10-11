@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "date": "2026-10-12",
+  "status": "complete_merged_source_integrated_local_host_and_shader_checks_pass_windows_hle_build_in_progress",
+  "anyps5": {
+    "previousBase": "c963432db05f8b35c62e212b3a36494501522fe2",
+    "base": "a11c8f7f70a0ed4e71504a89de69e8cdae687817",
+    "mergedCommitsAdded": 1721,
+    "patchCount": 11,
+    "completeSourceFilesMatched": 2130,
+    "locallyChangedFiles": 227,
+    "applyReverseReapplyBytesAndModesVerified": true,
+    "nestedDependencyPinsVerified": 11,
+    "patches": [
+      {
+        "name": "0001-ipad-runtime-compatibility.patch",
+        "sha256": "54556375d528116843dc6a412b41dee27c4dab90cb7e9a9c3c016ca1a889d6d6"
+      },
+      {
+        "name": "0002-bounded-exception-and-context-bridge.patch",
+        "sha256": "4f05c6f29b37ed46228ce91f7eaa1c5cd34cf2e604616188a0d1951ebe29e51a"
+      },
+      {
+        "name": "0003-shader-image-policy-request17-cache28.patch",
+        "sha256": "f649f9b5ef6e6f9811638c49312c02883133ba8c0ae480117bde271b51f038c2"
+      },
+      {
+        "name": "0004-qualified-interpolation-proofs.patch",
+        "sha256": "d0cf14afd0b2000c94a8a62a670f371a227fbdaad112fca86df0d0b24bf07e86"
+      },
+      {
+        "name": "0005-bounded-audioout-trace-and-frame-pacing.patch",
+        "sha256": "d4cddf858ce2a9ccc83fc5d11d232df77b5c3dae76f4ff6cf662f4c72d946b44"
+      },
+      {
+        "name": "0006-grouped-color-samples-and-transfers.patch",
+        "sha256": "cb390fd6ff9a4ddd7608b7bcb9e8c86cbbb06e78e50347f68a13270eee112037"
+      },
+      {
+        "name": "0007-grouped-depth-stencil-contracts.patch",
+        "sha256": "1df9e9dcd21ad8a4e8b1c8970f48acf4c58383ba1f682d8c2741971e94cc40fa"
+      },
+      {
+        "name": "0008-descriptor-snapshots-and-resource-lifetime.patch",
+        "sha256": "8308b53d0badb1095732ca9c04dfe5b6582ec57639a138c9f48b9936c13de498"
+      },
+      {
+        "name": "0009-device-profile-pipeline-and-typed-images.patch",
+        "sha256": "d1cc2523df8798161bca31e73c7034892d4d5a3f8c0cf9261748b7c2e4fe6094"
+      },
+      {
+        "name": "0010-guarded-guest-module-lifecycle-and-relinker.patch",
+        "sha256": "2047feb188a30181933d3c6f3a8856be106317fc34c87c1e2c13c75766f84f2c"
+      },
+      {
+        "name": "0011-integration-and-regression-tests.patch",
+        "sha256": "af8d2192a29fdab32e262a728d40018415f3c5c46ab500c3ab73c2ee46504555"
+      }
+    ],
+    "requestVersion": 17,
+    "diskCacheFormat": 28,
+    "mergedAppleChanges": [
+      1776,
+      1831,
+      2015
+    ]
+  },
+  "madeira": {
+    "base": "48f976429c189f8396e23d251d8a82f43c705922",
+    "mergedMainMatchesPin": true
+  },
+  "fex": {
+    "base": "14c92681f4d62cf84d901460e0358de09c8847a7",
+    "latestRelease": "FEX-2610",
+    "officialMainAndReleaseMatchPin": true,
+    "iosPortBaseline": "3bec2ac498bf78156ab47c0c194b0e8cb2849756",
+    "localArm64ecBoundsPatch": 6021
+  },
+  "actualChecks": {
+    "hostRelinkerRegisteredPassed": 95,
+    "hostRelinkerFailed": 0,
+    "hostRelinkerSkipped": 0,
+    "hostJUnitSha256": "07272b70f37866fc804c39d6871ec29fef9121d8601fadf3c43f582347deee70",
+    "hostLogSha256": "46a1f4f3ddec804d7e54b11f701c9580d78373dc16acc6c5b6a5b8f03d9b178a",
+    "nativeShaderSuitesPassed": 6,
+    "nativeShaderReceiptSha256": "d3a4b2778cde34e0a18cbf126a8b94e20ce3cd9619da8fd529db0876023d6c98",
+    "graphicsSyntaxPass": true,
+    "graphicsSyntaxReceiptSha256": "d8901e34d2651dad13862656b8681b89862fa0484674eb829603aa24ffad1309",
+    "hleHelperAndResultValidatorControlsPassed": 49
+  },
+  "privateEvidenceDigests": {
+    "sourceProvenance": "ca2a5a39ab3257165f1d339c60ad57f0ddd58065570a35f818121cff7cdc0039",
+    "sourceStackVerification": "aaa367031395b1a19cd91abf8dc22d50a20e1208a569cfd6e0159099eee1c99d",
+    "independentRootStackVerification": "36ff0ca6ac2b0405e26bf6b5dda55e982b48f1a5683b874a2a3a2c26fd418a37",
+    "nestedDependencies": "04327a085e12c521f7c8ac3df7c8c55f6da71154825b09dba47cc08767584bd4"
+  },
+  "fresh47ModuleRuntimeQualified": false,
+  "nativeWindowsGpuQualified": false,
+  "ipadCpuContinuationQualified": false,
+  "miniGolfPlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Fresh source and local CPU/compiler checks only. Existing installed Native59 and prior game packages retain their earlier provenance. PC/LR=2 continuation fault remains under investigation. No private game inputs or raw diagnostic paths are published."
+}

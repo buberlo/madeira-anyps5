@@ -7,7 +7,7 @@ submodule by hand and forget to refresh the patch.
 
 | Series | Files |
 | --- | --- |
-| `anyps5` | Eleven patches on `c963432d`: reconciled iPad/Wine runtime, strict shader/image policy, bounded logging/audio diagnostics, frame pacing, large LDS spill, complete descriptor-array snapshots, typed image fallback, macOS cache directory and restored qualified interpolation proofs. See [active series](anyps5/README.md). |
+| `anyps5` | Eleven patches on full merged main `a11c8f7f`: iPad/Wine runtime, exception/context bridge, request17/cache28 image policy, interpolation proofs, audio/frame pacing, grouped color/depth contracts, resource lifetime, pipeline profiles, guarded module lifecycle and regression tests. Merged Apple implementations come from upstream. See [active series](anyps5/README.md). |
 | `madeira` | Forty patches: static Vulkan/binder integration, memory repair, atomic write-fault classification and lifecycle with explicit menu activation, reported display timing, bounded diagnostics, quiet measurement, memory reporting, hardware audio period, menu-app identity and device build checkpoints. |
 | `fex` | Four patches on official FEX-2610: reconciled iOS port and local CPU repairs, rpmalloc iOS adapter, opt-in invalidation diagnostics and ARM64EC lookup bounds. Diagnostic instrumentation remains opt-in. `experimental/` is excluded. See [FEX series](fex/README.md). |
 | `wine` | Linux portability guards and bounded diagnostics, rebased on `257f271c`. |

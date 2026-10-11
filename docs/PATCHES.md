@@ -1,6 +1,17 @@
 # Patch status
 
-The active AnyPS5 series targets full upstream main `d70b8998`: one consolidated
+The active AnyPS5 series targets full merged main `a11c8f7f` with eleven
+reconciled patches. Fresh complete-source application and reversal, all 95
+host/relinker tests and six native shader suites pass. Request17/cache28
+separates upstream wire changes from retained local image/sample policies.
+The full 47-library runtime build is being qualified separately; Native59's
+current CPU diagnostic still fails before MiniGolf starts.
+[Current integration and limits](UPSTREAM-REFRESH-20261012.md),
+[active patch inventory](../patches/anyps5/README.md).
+
+## Historical patch qualifications
+
+The preceding AnyPS5 series targeted full upstream main `d70b8998`: one consolidated
 iPad/runtime compatibility patch, bounded exception logging in patch0002,
 strict valid-image descriptor policy in patch0003, EXEC-aware unused-input
 proof in patch0004, then unchanged patches0062 and0065. The combined six-patch

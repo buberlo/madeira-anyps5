@@ -1,11 +1,11 @@
 # Pinned upstreams
 
-Rechecked 2026-10-10. `git submodule status` checks local checkouts. The table
+Rechecked 2026-10-12. `git submodule status` checks local checkouts. The table
 records fixed source inputs; subsequent upstream movement needs a new review.
 
 | Path | Remote | Commit | Branch |
 | --- | --- | --- | --- |
-| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `c963432db05f8b35c62e212b3a36494501522fe2` | `main` |
+| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `a11c8f7f70a0ed4e71504a89de69e8cdae687817` | `main` |
 | `upstreams/Madeira` | https://github.com/willfaust/Madeira.git | `48f976429c189f8396e23d251d8a82f43c705922` | `main` |
 | `upstreams/FEX` | https://github.com/FEX-Emu/FEX.git | `14c92681f4d62cf84d901460e0358de09c8847a7` | `FEX-2610` tag |
 | `upstreams/wine` | https://github.com/willfaust/wine.git | `257f271cfffed9f22f7987cac53bc00095d092fe` | `madeira-lgpl` |
@@ -36,15 +36,27 @@ fetched a branch tip. The gitlink is the full commit id either way.
 
 The [2026-10-08 refresh report](UPSTREAM-REFRESH.md) preserves the earlier
 AnyPS5 update and reconciliation of the local patch series. The current table
-records the 2026-10-10 check at 03:11 UTC, retaining the official monthly FEX
-release. Madeira and Wine required no additional pin change. Later upstream
-movement is separate.
+records the 2026-10-12 check, retaining the official monthly FEX release.
+Madeira main, official FEX main/release and the Madeira FEX iOS-port baseline
+required no additional pin change. Later upstream movement is separate.
 Installed game packages have separate provenance and do not change when this
 source pin is updated.
 
-## Targeted Apple GPU additions, 2026-10-11
+## Complete main refresh, 2026-10-12
 
-The AnyPS5 pin remains `c963432d`. Its existing macOS/Apple changes #927, #1565,
+AnyPS5 includes all 1,721 merged commits after `c963432d`. The merged Apple
+implementations, including #1776, #1831 and now #2015, are part of this pin.
+Eleven reconciled patches retain our iPad runtime and stricter shader/resource
+contracts. Fresh application matches 2,130 source files; reversal restores
+the complete upstream tree and file modes. The previous patch series is archived.
+Current shader requests use version 17 and disk caches use format 28; old cache
+entries are rejected. The 95 host/relinker tests and six native shader suites
+pass. The fresh 47-library Windows build and physical execution are separate
+qualification steps. [Refresh and measured boundaries](UPSTREAM-REFRESH-20261012.md).
+
+## Historical targeted Apple GPU additions, 2026-10-11
+
+At this checkpoint the AnyPS5 pin was `c963432d`. Its existing macOS/Apple changes #927, #1565,
 #1571 and #1580 are retained. Three later changes are explicit local backports:
 merged #1776 (`b7502114`) spills oversized compute LDS to a per-workgroup storage
 buffer; merged #1831 (`b23bd732`) preserves complete descriptor-array ranges
@@ -59,7 +71,7 @@ Native ARM64 CPU tests pass. The fresh 47-library Windows HLE build also passes
 replays and twelve null-pixel cases. Actual GPU/game qualification remains
 separate. [Implementation, source identities and limitations](APPLE-GPU-20261011.md).
 
-## MiniGolf refresh, 2026-10-10
+## Historical MiniGolf refresh, 2026-10-10
 
 The complete AnyPS5 snapshot adds all 424 merged commits after `d70b8998`.
 All six local patches were reconciled, preserving protected guest memory,

@@ -1,0 +1,1802 @@
+diff --git a/core/libs/prx/libc/src/exception/RawLogOutput.hpp b/core/libs/prx/libc/src/exception/RawLogOutput.hpp
+new file mode 100644
+index 0000000..030f293
+--- /dev/null
++++ b/core/libs/prx/libc/src/exception/RawLogOutput.hpp
+@@ -0,0 +1,86 @@
++#pragma once
++#include <cstddef>
++#ifdef _WIN32
++#include <windows.h>
++#else
++#include <unistd.h>
++#endif
++
++namespace LibcException::RawLogOutput {
++namespace {
++
++inline constexpr std::size_t MaximumTextBytes = 1024 * 1024;
++inline constexpr std::size_t MaximumChunkBytes = 4096;
++inline constexpr std::size_t MaximumWriteCalls = 65536;
++inline constexpr char TruncationMarker[] = "\n[libc] exception text truncated at 1048576 bytes\n";
++
++enum class Result { Complete, Truncated, WriteFailed };
++
++class StderrWriter {
++#ifdef _WIN32
++    HANDLE handle = GetStdHandle(STD_ERROR_HANDLE);
++#endif
++public:
++    std::ptrdiff_t operator()(const char* data, std::size_t size) noexcept {
++#ifdef _WIN32
++        DWORD written = 0;
++        if (!WriteFile(handle, data, static_cast<DWORD>(size), &written, nullptr)) return -1;
++        return static_cast<std::ptrdiff_t>(written);
++#else
++        return ::write(STDERR_FILENO, data, size);
++#endif
++    }
++};
++
++template<class TWrite>
++static bool WriteBytes(TWrite& write, const char* data, std::size_t size, std::size_t& calls) noexcept {
++    while (size) {
++        if (calls == MaximumWriteCalls) return false;
++        ++calls;
++        const std::size_t request = size < MaximumChunkBytes ? size : MaximumChunkBytes;
++        const auto written = write(data, request);
++        if (written <= 0 || static_cast<std::size_t>(written) > request) return false;
++        data += written;
++        size -= static_cast<std::size_t>(written);
++    }
++    return true;
++}
++
++template<class TWrite>
++static Result WriteText(TWrite& write, const char* text) noexcept {
++    if (!text) text = "(null)";
++    std::size_t offset = 0;
++    std::size_t calls = 0;
++    while (offset < MaximumTextBytes) {
++        const std::size_t remaining = MaximumTextBytes - offset;
++        const std::size_t limit = remaining < MaximumChunkBytes ? remaining : MaximumChunkBytes;
++        std::size_t length = 0;
++        while (length < limit && text[offset + length]) ++length;
++        if (!WriteBytes(write, text + offset, length, calls)) return Result::WriteFailed;
++        offset += length;
++        if (length < limit) return Result::Complete;
++    }
++    if (!text[offset]) return Result::Complete;
++    if (!WriteBytes(write, TruncationMarker, sizeof(TruncationMarker) - 1, calls)) return Result::WriteFailed;
++    return Result::Truncated;
++}
++
++template<class TWrite>
++static Result WriteException(TWrite& write, const char* type, const char* what) noexcept {
++    const char* parts[] = {"terminate called after throwing an instance of '", type, "'\n"};
++    for (const char* part : parts) {
++        const auto result = WriteText(write, part);
++        if (result != Result::Complete) return result;
++    }
++    if (!what) return Result::Complete;
++    const auto prefix = WriteText(write, "  what():  ");
++    if (prefix != Result::Complete) return prefix;
++    const auto result = WriteText(write, what);
++    if (result == Result::WriteFailed) return result;
++    if (WriteText(write, "\n") != Result::Complete) return Result::WriteFailed;
++    return result;
++}
++
++}
++
++}
+diff --git a/core/libs/prx/libc/src/exception/Runtime.cpp b/core/libs/prx/libc/src/exception/Runtime.cpp
+index b9e26d7..7d5bd04 100644
+--- a/core/libs/prx/libc/src/exception/Runtime.cpp
++++ b/core/libs/prx/libc/src/exception/Runtime.cpp
+@@ -1,10 +1,8 @@
+ #include "prx/libc/include/exceptions/Runtime.hpp"
++#include "RawLogOutput.hpp"
+ #include <cstdarg>
+ #include <cstdio>
+ #include <limits>
+-#ifdef _WIN32
+-#include <windows.h>
+-#endif
+ 
+ namespace LibcException {
+ 
+@@ -18,12 +16,9 @@ static void RawLog(const char* format, ...) {
+     va_end(args);
+     if (length <= 0) return;
+     if (length > static_cast<int>(sizeof(buffer)) - 1) length = sizeof(buffer) - 1;
+-#ifdef _WIN32
+-    DWORD written = 0;
+-    WriteFile(GetStdHandle(STD_ERROR_HANDLE), buffer, static_cast<DWORD>(length), &written, nullptr);
+-#else
+-    std::fwrite(buffer, 1, length, stderr);
+-#endif
++    RawLogOutput::StderrWriter writer;
++    std::size_t calls = 0;
++    RawLogOutput::WriteBytes(writer, buffer, static_cast<std::size_t>(length), calls);
+ }
+ 
+ [[noreturn]] static void DefaultTerminate() {
+@@ -47,10 +42,8 @@ static void RawLog(const char* format, ...) {
+         int status = 0;
+         char* demangled = abi::__cxa_demangle(typeName, nullptr, nullptr, &status);
+         const char* displayName = (status == 0 && demangled) ? demangled : typeName;
+-        if (what)
+-            RawLog("terminate called after throwing an instance of '%s'\n  what():  %s\n", displayName, what);
+-        else
+-            RawLog("terminate called after throwing an instance of '%s'\n", displayName);
++        RawLogOutput::StderrWriter writer;
++        RawLogOutput::WriteException(writer, displayName, what);
+         std::free(demangled);
+     } else {
+         RawLog("terminate called without an active exception\n");
+diff --git a/core/libs/prx/libc/src/specifics/windows/CrashReport.cpp b/core/libs/prx/libc/src/specifics/windows/CrashReport.cpp
+index 099d639..c03112c 100644
+--- a/core/libs/prx/libc/src/specifics/windows/CrashReport.cpp
++++ b/core/libs/prx/libc/src/specifics/windows/CrashReport.cpp
+@@ -1,6 +1,11 @@
+ #ifdef _WIN32
+ #include <windows.h>
+ #include <tlhelp32.h>
++// mingw-w64 11 (Ubuntu 24.04) imports GetThreadDescription from kernel32 but
++// does not prototype it. WinLibs GCC 15 / mingw-w64 12+ declare it.
++#if defined(__MINGW64_VERSION_MAJOR) && __MINGW64_VERSION_MAJOR < 12
++extern "C" HRESULT WINAPI GetThreadDescription(HANDLE thread, PWSTR* description);
++#endif
+ #include "prx/libc/include/GuestArena.hpp"
+ #include <atomic>
+ #include <chrono>
+@@ -13,6 +18,7 @@
+ #include <utility>
+ #include <mutex>
+ #include "Sse4aEmulation.hpp"
++#include "ExceptionStateBridge.hpp"
+ 
+ namespace {
+ 
+@@ -238,6 +244,12 @@ bool HandleSse4a(EXCEPTION_POINTERS* info) {
+     return true;
+ }
+ 
++using QueryExceptionState = LONG (WINAPI *)(HANDLE,DWORD,void*,ULONG,ULONG*);
++QueryExceptionState g_queryExceptionState = nullptr;
++bool g_requireExceptionState = false;
++using IsExceptionEcCode = BOOLEAN (WINAPI *)(ULONG_PTR);
++IsExceptionEcCode g_isExceptionEcCode = nullptr;
++
+ LONG WINAPI ReportCrash(EXCEPTION_POINTERS* info) {
+     static std::atomic<bool> reported{false};
+     const auto* fault = info->ExceptionRecord;
+@@ -448,6 +460,46 @@ void ReportBacktrace(const char* what, bool reportThreads) {
+     std::fflush(stderr);
+ }
+ 
++LONG WINAPI ReportCrashWithState(EXCEPTION_POINTERS* pointers) {
++    aps5_veh_state_info saved{};
++    const auto* fault = pointers->ExceptionRecord;
++    if (g_queryExceptionState && fault->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && fault->NumberParameters >= 2) {
++        saved.version = 1;
++        saved.code = fault->ExceptionCode;
++        saved.direction = fault->ExceptionInformation[0];
++        saved.rip = pointers->ContextRecord->Rip;
++        saved.rsp = pointers->ContextRecord->Rsp;
++        saved.address = fault->ExceptionInformation[1];
++        ULONG bytes = 0;
++        const auto status = g_queryExceptionState(GetCurrentThread(), APS5_THREAD_VEH_STATE, &saved, sizeof(saved), &bytes);
++        if (!status && bytes == sizeof(saved)) pointers->ContextRecord->EFlags = saved.flags;
++        else saved.token = 0;
++    }
++    const auto result = ReportCrash(pointers);
++    if (result == EXCEPTION_CONTINUE_EXECUTION && g_requireExceptionState && !saved.token &&
++        fault->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
++        !(g_isExceptionEcCode && (g_isExceptionEcCode(pointers->ContextRecord->Rip) ||
++                                  g_isExceptionEcCode(reinterpret_cast<ULONG_PTR>(fault->ExceptionAddress))))) {
++        Report("[veh-state] handled access violation has no matching native snapshot; refusing corrupted continuation\n");
++        TerminateProcess(GetCurrentProcess(), 0xc000000d);
++        return EXCEPTION_CONTINUE_SEARCH;
++    }
++    if (result == EXCEPTION_CONTINUE_EXECUTION && saved.token) {
++        saved.operation = 1;
++        saved.resume_rip = pointers->ContextRecord->Rip;
++        saved.resume_rsp = pointers->ContextRecord->Rsp;
++        saved.flags = pointers->ContextRecord->EFlags;
++        ULONG bytes = 0;
++        const auto status = g_queryExceptionState(GetCurrentThread(), APS5_THREAD_VEH_STATE, &saved, sizeof(saved), &bytes);
++        if (status || bytes != sizeof(saved)) {
++            Report("[veh-state] failed to prepare restoration status=%lx; refusing corrupted continuation\n", static_cast<unsigned long>(status));
++            TerminateProcess(GetCurrentProcess(), 0xc000000d);
++            return EXCEPTION_CONTINUE_SEARCH;
++        }
++    }
++    return result;
++}
++
+ void AbortSignalHandler(int) {
+     ReportBacktrace("abort() (SIGABRT)", true);
+ }
+@@ -467,7 +519,17 @@ struct ExitReporter {
+ const bool g_crashReportInstalled = [] {
+     g_sse4aEmulation = !IsEnvironmentSet("APS5_NO_SSE4A_EMULATION");
+     g_sse4aTrace = IsEnvironmentSet("APS5_TRACE_SSE4A");
+-    AddVectoredExceptionHandler(1, ReportCrash);
++    if (const auto* flag = std::getenv("APS5_VEH_CONTEXT_BRIDGE"); flag && std::strcmp(flag, "1") == 0) {
++        g_queryExceptionState = reinterpret_cast<QueryExceptionState>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
++        g_isExceptionEcCode = reinterpret_cast<IsExceptionEcCode>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlIsEcCode"));
++        // Capability check without a live exception. A native provider checks
++        // this class's exact length before reading data; ordinary Wine lacks it.
++        if (g_queryExceptionState) {
++            const auto status = g_queryExceptionState(GetCurrentThread(), APS5_THREAD_VEH_STATE, nullptr, 0, nullptr);
++            g_requireExceptionState = status == static_cast<LONG>(0xc0000004u);
++        }
++    }
++    AddVectoredExceptionHandler(1, ReportCrashWithState);
+     std::signal(SIGABRT, AbortSignalHandler);
+     _set_invalid_parameter_handler(InvalidParameterHandler);
+     InstallWatch();
+diff --git a/core/libs/prx/libc/src/specifics/windows/ExceptionStateBridge.hpp b/core/libs/prx/libc/src/specifics/windows/ExceptionStateBridge.hpp
+new file mode 100644
+index 0000000..3afa5e2
+--- /dev/null
++++ b/core/libs/prx/libc/src/specifics/windows/ExceptionStateBridge.hpp
+@@ -0,0 +1,12 @@
++#ifndef APS5_VEH_STATE_H
++#define APS5_VEH_STATE_H
++#include <stdint.h>
++#define APS5_THREAD_VEH_STATE 0x7fff4151u
++struct aps5_veh_state_info {
++    uint32_t version, operation, code, direction, flags, has_avx;
++    uint64_t rip, rsp, address, resume_rip, resume_rsp, token;
++    uint64_t ymm_upper[32];
++};
++#endif
++
++static_assert(sizeof(aps5_veh_state_info) == 328);
+diff --git a/core/libs/prx/libkernel/System/src/Exception.cpp b/core/libs/prx/libkernel/System/src/Exception.cpp
+index 6dbef36..900c30a 100644
+--- a/core/libs/prx/libkernel/System/src/Exception.cpp
++++ b/core/libs/prx/libkernel/System/src/Exception.cpp
+@@ -8,6 +8,8 @@
+ #include <chrono>
+ #include <atomic>
+ #include <cstring>
++#include <cstdlib>
++
+ #include <memory>
+ #include <mutex>
+ #include <stdexcept>
+@@ -26,7 +28,7 @@
+ extern "C" Pthread APS5_VABI scePthreadSelf();
+ #ifdef _WIN32
+ extern "C" void Aps5RedirectedEntryStub();
+-extern "C" [[noreturn]] void Aps5RedirectedExit(CONTEXT* context, const void* vectors, void (*restore)(CONTEXT*, EXCEPTION_RECORD*));
++extern "C" void Aps5ResumeFlags();
+ #endif
+ 
+ namespace {
+@@ -134,23 +136,74 @@ void CallHandler(GuestExceptionHandler handler, int signum, GuestUcontext& ucont
+ #ifdef _WIN32
+ constexpr std::size_t RedZone = 128;
+ constexpr std::size_t HomeArea = 32;
+-constexpr auto RetryLimit = std::chrono::seconds(1);
+-constexpr std::size_t VectorBytes = 16 * 32;
+ 
+ struct Delivery {
+     GuestExceptionHandler handler;
+     int signum;
+     CONTEXT context;
+-    std::uint8_t vectors[VectorBytes];
+-    std::uint64_t saveVectors;
++    std::atomic<int>* waitState = nullptr;
++    bool preserveAvx = false;
++    alignas(16) M128A ymmUpper[16]{};
++    bool preserveFlags = false;
++    // Space below the SysV red zone for the final no-register-clobber return.
++    alignas(16) std::uint64_t continuationScratch[4]{};
++};
++static_assert(offsetof(Delivery, preserveAvx) == 1256);
++static_assert(offsetof(Delivery, ymmUpper) == 1264);
++using NativeContinue = LONG (WINAPI *)(CONTEXT*, BOOLEAN);
++extern "C" LONG Aps5RestoreExtended(CONTEXT*, const M128A*, NativeContinue);
++
++bool PreserveAsyncAvx() {
++    static const bool enabled = [] {
++        const char* value = std::getenv("APS5_PRESERVE_ASYNC_AVX");
++        if (value && std::strcmp(value, "1") != 0) return false;
++#if defined(__GNUC__) || defined(__clang__)
++        __builtin_cpu_init();
++        return __builtin_cpu_supports("avx") != 0;
++#else
++        return IsProcessorFeaturePresent(PF_AVX_INSTRUCTIONS_AVAILABLE) != FALSE;
++#endif
++    }();
++    return enabled;
++}
++bool PreserveAsyncFlags() {
++    static const bool enabled = [] {
++        const char* value = std::getenv("APS5_PRESERVE_ASYNC_FLAGS");
++        return value && std::strcmp(value, "1") == 0;
++    }();
++    return enabled;
++}
++struct AsyncFlagsInfo {
++    std::uint32_t version, flags;
++    std::uint64_t rip, rsp;
+ };
++static_assert(sizeof(AsyncFlagsInfo) == 24);
++using QueryThread = LONG (WINAPI *)(HANDLE, DWORD, void*, ULONG, ULONG*);
++using IsEcCode = BOOLEAN (WINAPI *)(ULONG_PTR);
++QueryThread QueryFunction() {
++    static const auto function = reinterpret_cast<QueryThread>(
++        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
++    return function;
++}
++IsEcCode EcFunction() {
++    static const auto function = reinterpret_cast<IsEcCode>(
++        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlIsEcCode"));
++    return function;
++}
++
++NativeContinue ContinueFunction() {
++    static const auto function = reinterpret_cast<NativeContinue>(
++        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtContinue"));
++    return function;
++}
++
++// Non-compacted XSAVE layout: 512-byte FXSAVE, 64-byte header, YMM high halves.
++constexpr std::size_t XstateHeaderOffset = 512;
++constexpr std::size_t YmmUpperOffset = 576;
++static_assert(YmmUpperOffset + sizeof(Delivery::ymmUpper) == sizeof(GuestMcontext::fpstate));
+ 
+-const bool SaveVectors = [] {
+-    __builtin_cpu_init();
+-    return __builtin_cpu_supports("avx") != 0;
+-}();
+ 
+-void Deliver(GuestExceptionHandler handler, int signum, CONTEXT& context) {
++void Deliver(GuestExceptionHandler handler, int signum, CONTEXT& context, M128A* ymmUpper = nullptr) {
+     GuestUcontext ucontext{};
+     auto& m = ucontext.mcontext;
+     m.rdi = context.Rdi;
+@@ -176,6 +229,12 @@ void Deliver(GuestExceptionHandler handler, int signum, CONTEXT& context) {
+     m.len = sizeof(GuestMcontext);
+     static_assert(sizeof(context.FltSave) <= sizeof(m.fpstate));
+     std::memcpy(m.fpstate, &context.FltSave, sizeof(context.FltSave));
++    if (ymmUpper) {
++        const std::uint64_t xstateMask = 7; // x87, SSE, AVX
++        auto* state = reinterpret_cast<unsigned char*>(m.fpstate);
++        std::memcpy(state + XstateHeaderOffset, &xstateMask, sizeof(xstateMask));
++        std::memcpy(state + YmmUpperOffset, ymmUpper, sizeof(Delivery::ymmUpper));
++    }
+     CallHandler(handler, signum, ucontext);
+     context.Rdi = m.rdi;
+     context.Rsi = m.rsi;
+@@ -197,12 +256,42 @@ void Deliver(GuestExceptionHandler handler, int signum, CONTEXT& context) {
+     context.EFlags = static_cast<DWORD>(m.rflags);
+     std::memcpy(&context.FltSave, m.fpstate, sizeof(context.FltSave));
+     context.MxCsr = context.FltSave.MxCsr;
++    if (ymmUpper) {
++        const auto* state = reinterpret_cast<const unsigned char*>(m.fpstate);
++        std::uint64_t xstateMask;
++        std::memcpy(&xstateMask, state + XstateHeaderOffset, sizeof(xstateMask));
++        if (xstateMask & 4) std::memcpy(ymmUpper, state + YmmUpperOffset, sizeof(Delivery::ymmUpper));
++        else std::memset(ymmUpper, 0, sizeof(Delivery::ymmUpper));
++    }
+ }
+ 
++bool StackWritable(DWORD64 low, DWORD64 high);
++
+ [[noreturn]] void RedirectedEntry(Delivery* delivery) {
+     CONTEXT context = delivery->context;
+-    Deliver(delivery->handler, delivery->signum, context);
+-    Aps5RedirectedExit(&context, delivery->saveVectors != 0 ? delivery->vectors : nullptr, RtlRestoreContext);
++    Deliver(delivery->handler, delivery->signum, context, delivery->preserveAvx ? delivery->ymmUpper : nullptr);
++    if (delivery->preserveFlags) {
++        // Reserved below the interrupted red zone. The small resume stub changes
++        // neither GPRs nor vector state, and POPFQ avoids ARM64EC's lossy flag map.
++        if (!EcFunction() || EcFunction()(context.Rip)) std::abort();
++        const auto originalRsp = context.Rsp;
++        const auto originalRip = context.Rip;
++        const auto resumeRsp = originalRsp - RedZone - 24;
++        if (originalRsp < RedZone + 24 || !StackWritable(resumeRsp, originalRsp - RedZone)) std::abort();
++        const std::uint64_t flags = context.EFlags;
++        std::memcpy(reinterpret_cast<void*>(resumeRsp), &flags, sizeof(flags));
++        std::memcpy(reinterpret_cast<void*>(originalRsp - RedZone - 8), &originalRip, sizeof(originalRip));
++        context.Rsp = resumeRsp;
++        context.Rip = reinterpret_cast<DWORD64>(&Aps5ResumeFlags);
++    }
++    if (delivery->preserveAvx) {
++        // Restore the high halves immediately before NtContinue. No C++ call may
++        // intervene: a handler or compiler-generated vzeroupper can destroy them.
++        Aps5RestoreExtended(&context, delivery->ymmUpper, ContinueFunction());
++        std::abort(); // NtContinue returns only on failure.
++    }
++    RtlRestoreContext(&context, nullptr);
++    std::abort();
+ }
+ 
+ bool StackWritable(DWORD64 low, DWORD64 high) {
+@@ -219,6 +308,7 @@ void CALLBACK WaitingEntry(ULONG_PTR parameter) {
+     auto* delivery = reinterpret_cast<Delivery*>(parameter);
+     const auto handler = delivery->handler;
+     const int signum = delivery->signum;
++    TimedWait::CompleteWaitDelivery(*delivery->waitState);
+     delete delivery;
+     CONTEXT context{};
+     RtlCaptureContext(&context);
+@@ -227,7 +317,6 @@ void CALLBACK WaitingEntry(ULONG_PTR parameter) {
+ 
+ static_assert(HomeArea + 8 == 40, "Aps5RedirectedEntryStub finds the delivery 40 bytes above its stack pointer");
+ static_assert(offsetof(Delivery, context) == 16 && offsetof(CONTEXT, Rax) == 0x78 && offsetof(CONTEXT, Rbp) == 0xa0 && offsetof(CONTEXT, R15) == 0xf0, "Aps5RedirectedEntryStub stores the live registers into the delivery's context");
+-static_assert(offsetof(Delivery, vectors) == 1248 && offsetof(Delivery, saveVectors) == 1760, "Aps5RedirectedEntryStub stores ymm0-ymm15 into the delivery when saveVectors is set");
+ 
+ bool Exited(HANDLE native) {
+     return WaitForSingleObject(native, 0) == WAIT_OBJECT_0;
+@@ -243,6 +332,85 @@ bool RestoringContext(DWORD64 rip) {
+     return false;
+ }
+ 
++// BEGIN APS5_WINE_DISPATCHER_RANGE (portable production classifier)
++struct WineDispatcherRange {
++    std::uint64_t begin = 0;
++    std::uint64_t end = 0;
++    bool Contains(std::uint64_t rip) const { return begin != 0 && rip >= begin && rip < end; }
++};
++
++template<typename Read>
++WineDispatcherRange ResolveWineDispatcherRange(std::uint64_t syscallCell, std::uint64_t unixCell,
++    std::uint64_t ecUnixCell, std::uint64_t imageBase, std::uint64_t imageBytes, const Read& read) {
++    if (syscallCell == 0 && unixCell == 0 && ecUnixCell == 0) return {}; // Native Windows.
++    if (syscallCell == 0 || (unixCell == 0 && ecUnixCell == 0))
++        throw std::runtime_error("sceKernelRaiseException: incomplete Wine dispatcher exports");
++    if (imageBase == 0 || imageBytes < sizeof(std::uint64_t) || imageBytes > 512u * 1024u * 1024u ||
++        imageBase > UINT64_MAX - imageBytes)
++        throw std::runtime_error("sceKernelRaiseException: invalid ntdll image bounds");
++    std::array<std::uint64_t, 3> pointers{};
++    const std::array<std::uint64_t, 3> cells{syscallCell, unixCell, ecUnixCell};
++    for (std::size_t index = 0; index < cells.size(); ++index) {
++        const auto cell = cells[index];
++        if (cell == 0) continue;
++        if (cell < imageBase || cell - imageBase > imageBytes - sizeof(std::uint64_t) ||
++            !read(cell, &pointers[index], sizeof(pointers[index])) || pointers[index] == 0)
++            throw std::runtime_error("sceKernelRaiseException: unreadable or invalid Wine dispatcher cell");
++    }
++    // ARM64EC's plain Unix cell can be a guest/direct thunk, not the native boundary.
++    const WineDispatcherRange range{pointers[0], pointers[ecUnixCell != 0 ? 2 : 1]};
++    if (range.end <= range.begin || range.end - range.begin > 64u * 1024u)
++        throw std::runtime_error("sceKernelRaiseException: invalid native Wine dispatcher interval");
++    std::array<unsigned char, 256> bytes{};
++    bool nonzero = false;
++    for (auto address = range.begin; address < range.end;) {
++        const auto count = static_cast<std::size_t>(range.end - address < bytes.size() ? range.end - address : bytes.size());
++        if (!read(address, bytes.data(), count))
++            throw std::runtime_error("sceKernelRaiseException: native Wine dispatcher interval is not safely readable");
++        for (std::size_t index = 0; index < count; ++index) nonzero |= bytes[index] != 0;
++        address += count;
++    }
++    if (!nonzero) throw std::runtime_error("sceKernelRaiseException: native Wine dispatcher interval contains no code");
++    return range;
++}
++// END APS5_WINE_DISPATCHER_RANGE
++
++const WineDispatcherRange& NativeWineDispatcherRange() {
++    static const auto range = [] {
++        const HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
++        if (ntdll == nullptr) throw std::runtime_error("sceKernelRaiseException: ntdll is unavailable");
++        const auto syscallCell = reinterpret_cast<std::uint64_t>(GetProcAddress(ntdll, "__wine_syscall_dispatcher"));
++        const auto unixCell = reinterpret_cast<std::uint64_t>(GetProcAddress(ntdll, "__wine_unix_call_dispatcher"));
++        const auto ecUnixCell = reinterpret_cast<std::uint64_t>(GetProcAddress(ntdll, "__wine_unix_call_dispatcher_arm64ec"));
++        if (syscallCell == 0 && unixCell == 0 && ecUnixCell == 0) return WineDispatcherRange{};
++        // Resolve this imported function and pseudo handle before suspending a target.
++        const auto readMemory = &ReadProcessMemory;
++        const HANDLE process = GetCurrentProcess();
++        const auto read = [&](std::uint64_t address, void* destination, std::size_t bytes) {
++            SIZE_T copied = 0;
++            return readMemory(process, reinterpret_cast<const void*>(address), destination, bytes, &copied) != FALSE && copied == bytes;
++        };
++        const auto imageBase = reinterpret_cast<std::uint64_t>(ntdll);
++        IMAGE_DOS_HEADER dos{};
++        if (!read(imageBase, &dos, sizeof(dos)) || dos.e_magic != IMAGE_DOS_SIGNATURE ||
++            dos.e_lfanew < static_cast<LONG>(sizeof(dos)) || dos.e_lfanew > 1024 * 1024 ||
++            imageBase > UINT64_MAX - static_cast<std::uint64_t>(dos.e_lfanew))
++            throw std::runtime_error("sceKernelRaiseException: unreadable ntdll DOS header");
++        IMAGE_NT_HEADERS64 header{};
++        if (!read(imageBase + dos.e_lfanew, &header, sizeof(header)) || header.Signature != IMAGE_NT_SIGNATURE ||
++            header.OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
++            header.FileHeader.SizeOfOptionalHeader < sizeof(IMAGE_OPTIONAL_HEADER64) ||
++            static_cast<std::uint64_t>(dos.e_lfanew) + sizeof(header) > header.OptionalHeader.SizeOfImage)
++            throw std::runtime_error("sceKernelRaiseException: unreadable ntdll PE image bounds");
++        // Wine reports native Mach-O code as MEM_FREE to VirtualQuery. The exported
++        // cells must belong to ntdll's PE image; the native interval is validated
++        // by bounded fault-safe reads, not guest virtual-memory classification.
++        return ResolveWineDispatcherRange(syscallCell, unixCell, ecUnixCell, imageBase,
++                                           header.OptionalHeader.SizeOfImage, read);
++    }();
++    return range;
++}
++
+ bool InWinpthread(DWORD64 rip) {
+     static const HMODULE winpthread = GetModuleHandleW(L"libwinpthread-1.dll");
+     MEMORY_BASIC_INFORMATION info{};
+@@ -256,10 +424,39 @@ bool RaiseOn(Pthread thread, GuestExceptionHandler handler, int signum) {
+         Deliver(handler, signum, context);
+         return true;
+     }
++    // Resolve features and loader functions before suspending another thread;
++    // the target could own CRT or loader locks needed by these operations.
++    const bool preserveAvx = PreserveAsyncAvx();
++    const bool preserveFlags = PreserveAsyncFlags();
++    if (preserveFlags) { QueryFunction(); EcFunction(); }
++    if ((preserveAvx || preserveFlags) && !ContinueFunction()) throw std::runtime_error("sceKernelRaiseException: NtContinue unavailable");
+     const auto native = static_cast<HANDLE>(thread->nativeHandle);
+-    auto queued = std::make_unique<Delivery>(Delivery{handler, signum, {}, {}, 0});
+-    alignas(16) Delivery delivery{handler, signum, {}, {}, SaveVectors ? 1u : 0u};
+-    const auto retryDeadline = std::chrono::steady_clock::now() + RetryLimit;
++    auto queued = std::make_unique<Delivery>(Delivery{handler, signum, {}});
++    const auto queueWhileWaiting = [&] {
++        bool waiting;
++        try {
++            waiting = TimedWait::ReserveWaitDelivery(thread->waitCount);
++        } catch (...) {
++            ResumeThread(native);
++            throw;
++        }
++        if (!waiting) return false;
++        queued->waitState = &thread->waitCount;
++        const bool accepted = QueueUserAPC(WaitingEntry, native, reinterpret_cast<ULONG_PTR>(queued.get())) != 0;
++        if (!accepted) TimedWait::CompleteWaitDelivery(thread->waitCount);
++        // Release ownership before resuming: the callback can immediately delete it.
++        if (accepted) queued.release();
++        ResumeThread(native);
++        if (!accepted) throw std::runtime_error("sceKernelRaiseException: cannot queue delivery to the waiting thread");
++        return true;
++    };
++    // Resolve loader lookups before the target can hold a suspended loader lock.
++    RestoringContext(0);
++    InWinpthread(0);
++    const auto& wineDispatcher = NativeWineDispatcherRange();
++    alignas(16) Delivery delivery{handler, signum, {}};
++    delivery.preserveAvx = preserveAvx;
++    const auto retryDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+     for (;;) {
+         if (SuspendThread(native) == static_cast<DWORD>(-1)) {
+             if (Exited(native)) return false;
+@@ -269,23 +466,35 @@ bool RaiseOn(Pthread thread, GuestExceptionHandler handler, int signum) {
+             ResumeThread(native);
+             return false;
+         }
+-        delivery.context.ContextFlags = CONTEXT_FULL | CONTEXT_SEGMENTS;
++        if (queueWhileWaiting()) return true;
++        delivery.context.ContextFlags = CONTEXT_FULL | CONTEXT_FLOATING_POINT | CONTEXT_SEGMENTS;
+         if (!GetThreadContext(native, &delivery.context)) {
++            const bool exited = Exited(native);
+             ResumeThread(native);
++            if (exited) return false;
+             throw std::runtime_error("sceKernelRaiseException: cannot read the target thread context");
+         }
+-        if (thread->waitCount.load(std::memory_order_seq_cst) > 0) {
+-            const bool accepted = QueueUserAPC(WaitingEntry, native, reinterpret_cast<ULONG_PTR>(queued.get())) != 0;
+-            ResumeThread(native);
+-            if (!accepted) throw std::runtime_error("sceKernelRaiseException: cannot queue delivery to the waiting thread");
+-            queued.release();
+-            return true;
+-        }
+-        if (!RestoringContext(delivery.context.Rip) && !InWinpthread(delivery.context.Rip)) break;
++        if (!RestoringContext(delivery.context.Rip) && !InWinpthread(delivery.context.Rip) &&
++            !wineDispatcher.Contains(delivery.context.Rip)) break;
+         ResumeThread(native);
+-        if (std::chrono::steady_clock::now() >= retryDeadline) throw std::runtime_error("sceKernelRaiseException: the target thread stayed inside NtContinue or winpthreads for 1 s");
++        if (std::chrono::steady_clock::now() >= retryDeadline)
++            throw std::runtime_error("sceKernelRaiseException: the target thread stayed inside a context restore, Wine dispatcher or winpthreads for 1 s");
+         SwitchToThread();
+     }
++    if (preserveFlags && QueryFunction() && EcFunction()) {
++        AsyncFlagsInfo info{};
++        ULONG returned = 0;
++        const auto status = QueryFunction()(native, 0x7fff4150u, &info, sizeof(info), &returned);
++        if (status == 0 && returned == sizeof(info) && info.version == 1 &&
++            info.rip == delivery.context.Rip && info.rsp == delivery.context.Rsp &&
++            !EcFunction()(delivery.context.Rip)) {
++            delivery.context.EFlags = info.flags;
++            delivery.preserveFlags = true;
++        }
++    }
++    // SuspendThread returns before the target stops. It may have entered an
++    // alertable wait after the first reservation attempt but before this barrier.
++    if (queueWhileWaiting()) return true;
+     const DWORD64 slot = (delivery.context.Rsp - RedZone - sizeof(Delivery)) & ~static_cast<DWORD64>(15);
+     if (!StackWritable(slot - HomeArea - 8, delivery.context.Rsp - RedZone)) {
+         ResumeThread(native);
+@@ -302,7 +511,7 @@ bool RaiseOn(Pthread thread, GuestExceptionHandler handler, int signum) {
+     ResumeThread(native);
+     return true;
+ }
+-#else
++#elif defined(__linux__)
+ constexpr int HostSignal = SIGUSR1;
+ constexpr std::size_t FxsaveRegisterBytes = 416;
+ 
+@@ -415,6 +624,13 @@ bool RaiseOn(Pthread thread) {
+     if (thread->_finished.load(std::memory_order_acquire)) return false;
+     return Send(thread);
+ }
++#else
++bool RaiseOn(Pthread) {
++    // Preserve the prior unsupported-host behavior; Linux gregs/fpregs do not
++    // describe Darwin's mcontext_t. A native Darwin signal adapter is separate.
++    NotImplemented_nid_no_patch("sceKernelRaiseException on this host");
++    return false;
++}
+ #endif
+ 
+ }
+@@ -426,6 +642,25 @@ extern "C" [[noreturn]] void Aps5RedirectedEntry(void* delivery) {
+ asm(".text\n"
+     ".globl Aps5RedirectedEntryStub\n"
+     "Aps5RedirectedEntryStub:\n"
++    "    cmpb $0, 1296(%rsp)\n"
++    "    je 1f\n"
++    "    vextractf128 $1, %ymm0, 1304(%rsp)\n"
++    "    vextractf128 $1, %ymm1, 1320(%rsp)\n"
++    "    vextractf128 $1, %ymm2, 1336(%rsp)\n"
++    "    vextractf128 $1, %ymm3, 1352(%rsp)\n"
++    "    vextractf128 $1, %ymm4, 1368(%rsp)\n"
++    "    vextractf128 $1, %ymm5, 1384(%rsp)\n"
++    "    vextractf128 $1, %ymm6, 1400(%rsp)\n"
++    "    vextractf128 $1, %ymm7, 1416(%rsp)\n"
++    "    vextractf128 $1, %ymm8, 1432(%rsp)\n"
++    "    vextractf128 $1, %ymm9, 1448(%rsp)\n"
++    "    vextractf128 $1, %ymm10, 1464(%rsp)\n"
++    "    vextractf128 $1, %ymm11, 1480(%rsp)\n"
++    "    vextractf128 $1, %ymm12, 1496(%rsp)\n"
++    "    vextractf128 $1, %ymm13, 1512(%rsp)\n"
++    "    vextractf128 $1, %ymm14, 1528(%rsp)\n"
++    "    vextractf128 $1, %ymm15, 1544(%rsp)\n"
++    "1:\n"
+     "    movq %rax, 176(%rsp)\n"
+     "    movq %rcx, 184(%rsp)\n"
+     "    movq %rdx, 192(%rsp)\n"
+@@ -441,50 +676,35 @@ asm(".text\n"
+     "    movq %r13, 280(%rsp)\n"
+     "    movq %r14, 288(%rsp)\n"
+     "    movq %r15, 296(%rsp)\n"
+-    "    cmpq $0, 1800(%rsp)\n"
+-    "    je 1f\n"
+-    "    vmovdqu %ymm0, 1288(%rsp)\n"
+-    "    vmovdqu %ymm1, 1320(%rsp)\n"
+-    "    vmovdqu %ymm2, 1352(%rsp)\n"
+-    "    vmovdqu %ymm3, 1384(%rsp)\n"
+-    "    vmovdqu %ymm4, 1416(%rsp)\n"
+-    "    vmovdqu %ymm5, 1448(%rsp)\n"
+-    "    vmovdqu %ymm6, 1480(%rsp)\n"
+-    "    vmovdqu %ymm7, 1512(%rsp)\n"
+-    "    vmovdqu %ymm8, 1544(%rsp)\n"
+-    "    vmovdqu %ymm9, 1576(%rsp)\n"
+-    "    vmovdqu %ymm10, 1608(%rsp)\n"
+-    "    vmovdqu %ymm11, 1640(%rsp)\n"
+-    "    vmovdqu %ymm12, 1672(%rsp)\n"
+-    "    vmovdqu %ymm13, 1704(%rsp)\n"
+-    "    vmovdqu %ymm14, 1736(%rsp)\n"
+-    "    vmovdqu %ymm15, 1768(%rsp)\n"
+-    "1:\n"
+     "    leaq 40(%rsp), %rcx\n"
++    "    cld\n"
+     "    jmp Aps5RedirectedEntry\n"
+-    ".globl Aps5RedirectedExit\n"
+-    "Aps5RedirectedExit:\n"
+-    "    testq %rdx, %rdx\n"
+-    "    je 1f\n"
+-    "    vmovdqu 0(%rdx), %ymm0\n"
+-    "    vmovdqu 32(%rdx), %ymm1\n"
+-    "    vmovdqu 64(%rdx), %ymm2\n"
+-    "    vmovdqu 96(%rdx), %ymm3\n"
+-    "    vmovdqu 128(%rdx), %ymm4\n"
+-    "    vmovdqu 160(%rdx), %ymm5\n"
+-    "    vmovdqu 192(%rdx), %ymm6\n"
+-    "    vmovdqu 224(%rdx), %ymm7\n"
+-    "    vmovdqu 256(%rdx), %ymm8\n"
+-    "    vmovdqu 288(%rdx), %ymm9\n"
+-    "    vmovdqu 320(%rdx), %ymm10\n"
+-    "    vmovdqu 352(%rdx), %ymm11\n"
+-    "    vmovdqu 384(%rdx), %ymm12\n"
+-    "    vmovdqu 416(%rdx), %ymm13\n"
+-    "    vmovdqu 448(%rdx), %ymm14\n"
+-    "    vmovdqu 480(%rdx), %ymm15\n"
+-    "1:\n"
++    ".globl Aps5ResumeFlags\n"
++    "Aps5ResumeFlags:\n"
++    "    popfq\n"
++    "    leaq 144(%rsp), %rsp\n"
++    "    jmp *-136(%rsp)\n"
++    ".globl Aps5RestoreExtended\n"
++    "Aps5RestoreExtended:\n"
++    "    vinsertf128 $1, 0(%rdx), %ymm0, %ymm0\n"
++    "    vinsertf128 $1, 16(%rdx), %ymm1, %ymm1\n"
++    "    vinsertf128 $1, 32(%rdx), %ymm2, %ymm2\n"
++    "    vinsertf128 $1, 48(%rdx), %ymm3, %ymm3\n"
++    "    vinsertf128 $1, 64(%rdx), %ymm4, %ymm4\n"
++    "    vinsertf128 $1, 80(%rdx), %ymm5, %ymm5\n"
++    "    vinsertf128 $1, 96(%rdx), %ymm6, %ymm6\n"
++    "    vinsertf128 $1, 112(%rdx), %ymm7, %ymm7\n"
++    "    vinsertf128 $1, 128(%rdx), %ymm8, %ymm8\n"
++    "    vinsertf128 $1, 144(%rdx), %ymm9, %ymm9\n"
++    "    vinsertf128 $1, 160(%rdx), %ymm10, %ymm10\n"
++    "    vinsertf128 $1, 176(%rdx), %ymm11, %ymm11\n"
++    "    vinsertf128 $1, 192(%rdx), %ymm12, %ymm12\n"
++    "    vinsertf128 $1, 208(%rdx), %ymm13, %ymm13\n"
++    "    vinsertf128 $1, 224(%rdx), %ymm14, %ymm14\n"
++    "    vinsertf128 $1, 240(%rdx), %ymm15, %ymm15\n"
+     "    xorl %edx, %edx\n"
+-    "    jmp *%r8\n");
++    "    jmp *%r8\n"
++);
+ #endif
+ 
+ extern "C" {
+diff --git a/core/libs/tests/ExceptionPersonality.cpp b/core/libs/tests/ExceptionPersonality.cpp
+index 75d8115..3c185f0 100644
+--- a/core/libs/tests/ExceptionPersonality.cpp
++++ b/core/libs/tests/ExceptionPersonality.cpp
+@@ -1,69 +1,100 @@
+ #include "prx/libc/include/exceptions/Unwind.hpp"
++#include <array>
+ #include <cstdio>
+ #include <cstdlib>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ 
+ namespace LibcUnwind {
+ _Unwind_Reason_Code CallPersonality(Word personality, _Unwind_Action actions, _Unwind_Exception* exception, _Unwind_Context* context);
+ }
+ 
+-static void Require(bool value) { if (!value) std::abort(); }
++#ifndef __APPLE__
++extern "C" _Unwind_Reason_Code __gcc_personality_v0(int, _Unwind_Action, std::uint64_t, _Unwind_Exception*, _Unwind_Context*);
++#endif
+ 
+-static const unsigned char cleanupTable[] = {0xff, 0xff, 0x01, 0x04, 0x10, 0x20, 0x40, 0x00};
+-static const unsigned char noLandingTable[] = {0xff, 0xff, 0x01, 0x04, 0x10, 0x20, 0x00, 0x00};
++static void Require(bool value) { if (!value) std::abort(); }
+ 
+-constexpr std::uintptr_t region = 0x10000;
++static constexpr unsigned char cleanupTable[] = {0xff, 0xff, 0x01, 0x04, 0x10, 0x20, 0x40, 0x00};
++static constexpr unsigned char noLandingTable[] = {0xff, 0xff, 0x01, 0x04, 0x10, 0x20, 0x00, 0x00};
++static constexpr std::uintptr_t region = 0x10000;
+ 
+ struct Frame {
+     _Unwind_Context context {};
+     _Unwind_Exception exception {};
+ 
+     Frame(const unsigned char* table, std::uintptr_t resume, bool signalFrame = false) {
++        for (unsigned i = 0; i < 17; ++i) context.registers[i] = 0xa000 + i;
+         context.region = region;
+         context.lsda = reinterpret_cast<std::uintptr_t>(table);
+         context.registers[16] = region + resume;
+         context.signalFrame = signalFrame;
++        exception.exception_class = 0x434c45414e555000;
+     }
+ };
+ 
+ static _Unwind_Reason_Code Direct(Frame& frame, _Unwind_Action actions, int version = 1) {
+-    return __gcc_personality_v0_nid_postfix(version, actions, 0, &frame.exception, &frame.context);
++    return __gcc_personality_v0_nid_postfix(version, actions, frame.exception.exception_class, &frame.exception, &frame.context);
+ }
+ 
+-static _Unwind_Reason_Code Routed(Frame& frame, _Unwind_Action actions) {
+-    return LibcUnwind::CallPersonality(reinterpret_cast<std::uintptr_t>(__gcc_personality_v0_nid_postfix), actions, &frame.exception, &frame.context);
++static _Unwind_Reason_Code Routed(Frame& frame, _Unwind_Action actions, std::uintptr_t personality) {
++    return LibcUnwind::CallPersonality(personality, actions, &frame.exception, &frame.context);
+ }
+ 
+ static void RequireInstalled(Frame& frame) {
+     Require(frame.context.registers[0] == reinterpret_cast<std::uintptr_t>(&frame.exception));
+     Require(frame.context.registers[1] == 0);
+     Require(frame.context.registers[16] == region + 0x40);
++    for (unsigned i = 2; i < 16; ++i) Require(frame.context.registers[i] == 0xa000 + i);
+ }
+ 
+-int main() {
++static void CheckRoute(std::uintptr_t personality) {
+     {
+         Frame frame(cleanupTable, 0x18);
+-        Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_INSTALL_CONTEXT);
++        Require(Routed(frame, _UA_CLEANUP_PHASE, personality) == _URC_INSTALL_CONTEXT);
+         RequireInstalled(frame);
+     }
+     {
+         Frame frame(cleanupTable, 0x18);
+-        Require(Routed(frame, _UA_CLEANUP_PHASE) == _URC_INSTALL_CONTEXT);
++        Require(Routed(frame, _UA_CLEANUP_PHASE | _UA_FORCE_UNWIND, personality) == _URC_INSTALL_CONTEXT);
+         RequireInstalled(frame);
+     }
+     {
+         Frame frame(cleanupTable, 0x18);
+-        Require(Direct(frame, _UA_SEARCH_PHASE) == _URC_CONTINUE_UNWIND);
+-        Require(frame.context.registers[16] == region + 0x18);
++        Require(Routed(frame, _UA_SEARCH_PHASE, personality) == _URC_CONTINUE_UNWIND);
++        Require(frame.context.registers[0] == 0xa000 && frame.context.registers[16] == region + 0x18);
++    }
++}
++
++int main(int argc, char** argv) {
++#ifndef _WIN32
++    (void)argc;
++    (void)argv;
++#endif
++    {
++        Frame frame(cleanupTable, 0x18);
++        Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_INSTALL_CONTEXT);
++        RequireInstalled(frame);
+     }
++    CheckRoute(reinterpret_cast<std::uintptr_t>(__gcc_personality_v0_nid_postfix));
++#ifndef __APPLE__
++    CheckRoute(reinterpret_cast<std::uintptr_t>(__gcc_personality_v0));
+     {
+         Frame frame(cleanupTable, 0x18);
+-        Require(Routed(frame, _UA_SEARCH_PHASE) == _URC_CONTINUE_UNWIND);
++        Require(__gcc_personality_v0(1, _UA_CLEANUP_PHASE, frame.exception.exception_class, &frame.exception, &frame.context) == _URC_INSTALL_CONTEXT);
++        RequireInstalled(frame);
++    }
++#endif
++    for (std::uintptr_t resume : {0x10, 0x31}) {
++        Frame frame(cleanupTable, resume);
++        Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_CONTINUE_UNWIND);
++        Require(frame.context.registers[0] == 0xa000 && frame.context.registers[16] == region + resume);
+     }
+     {
+-        Frame before(cleanupTable, 0x10);
+-        Require(Direct(before, _UA_CLEANUP_PHASE) == _URC_CONTINUE_UNWIND);
+-        Frame after(cleanupTable, 0x31);
+-        Require(Direct(after, _UA_CLEANUP_PHASE) == _URC_CONTINUE_UNWIND);
++        Frame frame(cleanupTable, 0x30);
++        Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_INSTALL_CONTEXT);
++        RequireInstalled(frame);
+     }
+     {
+         Frame frame(cleanupTable, 0x10, true);
+@@ -71,22 +102,60 @@ int main() {
+         RequireInstalled(frame);
+     }
+     {
+-        Frame frame(noLandingTable, 0x18);
++        Frame frame(cleanupTable, 0x30, true);
+         Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_CONTINUE_UNWIND);
+     }
+-    {
+-        Frame frame(nullptr, 0x18);
++    for (const unsigned char* table : {noLandingTable, static_cast<const unsigned char*>(nullptr)}) {
++        Frame frame(table, 0x18);
+         Require(Direct(frame, _UA_CLEANUP_PHASE) == _URC_CONTINUE_UNWIND);
++        Require(frame.context.registers[0] == 0xa000 && frame.context.registers[16] == region + 0x18);
+     }
+     {
+         Frame frame(cleanupTable, 0x18);
++        Require(Direct(frame, _UA_SEARCH_PHASE) == _URC_CONTINUE_UNWIND);
+         Require(Direct(frame, _UA_CLEANUP_PHASE, 2) == _URC_FATAL_PHASE1_ERROR);
+     }
+     {
++        std::array<unsigned char, 16> unknown {};
+         Frame frame(cleanupTable, 0x18);
+-        Require(LibcUnwind::CallPersonality(0x1000, _UA_SEARCH_PHASE, &frame.exception, &frame.context) == _URC_FATAL_PHASE1_ERROR);
+-        Require(LibcUnwind::CallPersonality(0x1000, _UA_CLEANUP_PHASE, &frame.exception, &frame.context) == _URC_FATAL_PHASE2_ERROR);
++        Require(Routed(frame, _UA_SEARCH_PHASE, reinterpret_cast<std::uintptr_t>(unknown.data())) == _URC_FATAL_PHASE1_ERROR);
++        Require(Routed(frame, _UA_CLEANUP_PHASE, reinterpret_cast<std::uintptr_t>(unknown.data())) == _URC_FATAL_PHASE2_ERROR);
++    }
++#ifdef _WIN32
++    const HMODULE module = GetModuleHandleA("libc.prx");
++    Require(module != nullptr);
++    for (const char* name : {"__gcc_personality_v0_nid_postfix", "__gcc_personality_v0"}) {
++        const auto personality = reinterpret_cast<std::uintptr_t>(GetProcAddress(module, name));
++        Require(personality != 0);
++        CheckRoute(personality);
++        struct Thunk { unsigned char code[6]; std::uintptr_t target; } thunk {{0xff, 0x25, 0, 0, 0, 0}, personality};
++        const auto displacement = static_cast<std::int32_t>(offsetof(Thunk, target) - 6);
++        std::memcpy(thunk.code + 2, &displacement, sizeof(displacement));
++        CheckRoute(reinterpret_cast<std::uintptr_t>(&thunk));
++    }
++    if (argc == 2) {
++        const HMODULE patched = LoadLibraryA(argv[1]);
++        Require(patched != nullptr);
++        using GuestPersonality = _Unwind_Reason_Code (APS5_VABI *)(int, _Unwind_Action, std::uint64_t, _Unwind_Exception*, _Unwind_Context*);
++        const auto personality = reinterpret_cast<GuestPersonality>(GetProcAddress(patched, "FW2QeoYK7-c"));
++        if (personality == nullptr) {
++            FreeLibrary(patched);
++            std::fputs("NID-patched guest C personality export missing\n", stderr);
++            return 37;
++        }
++        Frame frame(cleanupTable, 0x18);
++        const auto result = personality(1, _UA_CLEANUP_PHASE, frame.exception.exception_class, &frame.exception, &frame.context);
++        if (result != _URC_INSTALL_CONTEXT) {
++            FreeLibrary(patched);
++            std::fprintf(stderr, "NID-patched guest C personality cleanup failed: %d\n", result);
++            return 38;
++        }
++        RequireInstalled(frame);
++        Require(personality(1, _UA_SEARCH_PHASE, frame.exception.exception_class, &frame.exception, &frame.context) == _URC_CONTINUE_UNWIND);
++        Require(FreeLibrary(patched) != 0);
++        std::puts("NID-patched guest C personality export: SysV ABI and cleanup passed");
+     }
+-    std::puts("exception personality tests passed");
++#endif
++    std::puts("Guest C personality: cleanup, dispatch, host ABI, Windows import thunks, boundaries and registers passed");
+     return 0;
+ }
+diff --git a/core/libs/tests/GuestRaiseException.cpp b/core/libs/tests/GuestRaiseException.cpp
+index ee3bde7..cbe3a3f 100644
+--- a/core/libs/tests/GuestRaiseException.cpp
++++ b/core/libs/tests/GuestRaiseException.cpp
+@@ -11,6 +11,8 @@
+ #ifdef _WIN32
+ #include <windows.h>
+ #endif
++#include <cstdio>
++#include <source_location>
+ 
+ extern "C" {
+ int APS5_VABI sceKernelInstallExceptionHandler(int signum, void* handler);
+@@ -47,11 +49,16 @@ static constexpr std::size_t MxcsrOffset = 0x140 + 24;
+ static constexpr std::uint32_t FlushToZero = 0x8000;
+ static constexpr std::uint32_t ReservedMxcsrBit = 0x10000;
+ static constexpr int StartingRounds = 50;
++static constexpr int LockRounds = 10;
++static constexpr int NewContextAndLockDeliveries = 1 + StartingRounds + 3 * LockRounds;
++static_assert(NewContextAndLockDeliveries == 81);
+ static constexpr std::uint64_t SpinMarker = 0x0123456789abcdefULL;
+ static constexpr std::uint64_t PatchedR12 = 0x5a5a1234abcd0001ULL;
+ static constexpr std::uint64_t PatchedXmm8 = 0x7e7e5678dcba0002ULL;
+ 
+-static void Require(bool value) { if (!value) std::abort(); }
++static void Require(bool value, std::source_location at = std::source_location::current()) {
++    if (!value) { std::fprintf(stderr, "Guest exception check failed at line %u\n", at.line()); std::abort(); }
++}
+ 
+ static std::atomic<int> calls{0};
+ static std::atomic<std::thread::id> handlerThread;
+@@ -64,6 +71,22 @@ static std::atomic<std::uint64_t> observedR13{0};
+ static std::atomic<std::uint64_t> observedXmm8{0};
+ static std::atomic<std::uint32_t> observedMxcsr{0};
+ 
++static std::atomic<int> vectorMode{0};
++static std::uint64_t vectorPattern[64];
++static constexpr std::uint64_t VectorMutation = UINT64_C(0x0102030405060708);
++
++extern "C" {
++std::atomic<bool> GprStarted{false};
++std::uint64_t GprInputFlags;
++std::uint64_t GprOutput[17];
++std::uint64_t GprContext[17];
++void APS5_VABI HoldIntegerState();
++void IntegerExit();
++}
++static std::atomic<bool> integerMode{false};
++static std::uint64_t integerFlagMutation = 0;
++static constexpr std::uint64_t IntegerMutation = UINT64_C(0x1122334455667788);
++
+ static void APS5_VABI Handler(int signum, void* context) {
+     Require(signum == SIGUSR1);
+     auto* bytes = static_cast<unsigned char*>(context);
+@@ -89,6 +112,62 @@ static void APS5_VABI Handler(int signum, void* context) {
+     handlerThread.store(std::this_thread::get_id());
+     handlerSelf.store(scePthreadSelf());
+     if (clobberVectors.load()) asm volatile("vzeroall" ::: "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15");
++    if (const int mode = vectorMode.load()) {
++        auto* state = static_cast<unsigned char*>(context) + 0x140;
++        std::uint64_t mask;
++        std::memcpy(&mask, state + 512, sizeof(mask));
++        Require((mask & 7) == 7);
++        for (int reg = 0; reg < 16; ++reg) {
++            for (int lane = 0; lane < 4; ++lane) {
++                auto* address = state + (lane < 2 ? 160 : 576) + reg * 16 + (lane % 2) * 8;
++                std::uint64_t value;
++                std::memcpy(&value, address, sizeof(value));
++                Require(value == vectorPattern[reg * 4 + lane]);
++                if (mode == 2) {
++                    value ^= VectorMutation;
++                    std::memcpy(address, &value, sizeof(value));
++                }
++            }
++        }
++        if (mode == 3) {
++            mask &= ~UINT64_C(4);
++            std::memcpy(state + 512, &mask, sizeof(mask));
++        }
++        __asm__ volatile("vzeroall" : : : "xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7","xmm8","xmm9","xmm10","xmm11","xmm12","xmm13","xmm14","xmm15");
++    }
++#ifdef _WIN32
++    if (integerMode.load()) {
++        std::uint64_t callbackFlags;
++        __asm__ volatile("pushfq; popq %0" : "=r"(callbackFlags));
++        Require((callbackFlags & 0x400) == 0); // SysV C++ callbacks require DF clear.
++        const auto* saved = static_cast<const unsigned char*>(context);
++        std::memcpy(&GprContext[0], saved + 120, 8);
++        std::memcpy(&GprContext[1], saved + 96, 8);
++        std::memcpy(&GprContext[2], saved + 88, 8);
++        std::memcpy(&GprContext[3], saved + 128, 8);
++        std::memcpy(&GprContext[4], saved + 136, 8);
++        std::memcpy(&GprContext[5], saved + 80, 8);
++        std::memcpy(&GprContext[6], saved + 72, 8);
++        std::memcpy(&GprContext[7], saved + 104, 8);
++        std::memcpy(&GprContext[8], saved + 112, 8);
++        std::memcpy(&GprContext[9], saved + 144, 8);
++        std::memcpy(&GprContext[10], saved + 152, 8);
++        std::memcpy(&GprContext[11], saved + 160, 8);
++        std::memcpy(&GprContext[12], saved + 168, 8);
++        std::memcpy(&GprContext[13], saved + 176, 8);
++        std::memcpy(&GprContext[14], saved + 184, 8);
++        std::memcpy(&GprContext[15], saved + 0xf0, 8);
++        std::memcpy(&GprContext[16], saved + 0xf8, 8);
++        if (integerFlagMutation) {
++            const auto changed = GprContext[15] ^ integerFlagMutation;
++            std::memcpy(static_cast<unsigned char*>(context) + 0xf0, &changed, 8);
++            const auto reg = GprContext[9] ^ IntegerMutation;
++            std::memcpy(static_cast<unsigned char*>(context) + 144, &reg, 8);
++        }
++        const auto exit = reinterpret_cast<std::uint64_t>(&IntegerExit);
++        std::memcpy(static_cast<unsigned char*>(context) + 0xe0, &exit, 8);
++    }
++#endif
+     calls.fetch_add(1);
+ }
+ 
+@@ -238,8 +317,20 @@ static void* APS5_VABI Looping(void* arg) {
+ }
+ 
+ static constexpr int VectorRounds = 100;
++static constexpr int NativeWaitRounds = 10;
++static constexpr int NativeWaitModes = 2;
++static constexpr int AsyncReadOnlyRounds = 100;
++static constexpr int AsyncMutatingRounds = 1;
++static constexpr int AsyncVectorDeliveries = AsyncReadOnlyRounds + 2 * AsyncMutatingRounds;
++static constexpr std::uint64_t IntegerStateFlags[] = {0x202, 0x206, 0x212, 0x216, 0x602, 0xa03, 0xad7, 0xed7};
++static constexpr int IntegerStateDeliveries = sizeof(IntegerStateFlags) / sizeof(IntegerStateFlags[0]) + 2;
++static constexpr int BaseDeliveries = 1 + 2 * Repeats + HostRounds + LeavingRounds +
++                                      ContinuingRounds + SelfingRounds + NativeWaitModes * NativeWaitRounds + NewContextAndLockDeliveries;
++static_assert(BaseDeliveries + IntegerStateDeliveries == 682);
++static_assert(BaseDeliveries + VectorRounds + IntegerStateDeliveries == 782);
++static_assert(BaseDeliveries + VectorRounds + AsyncVectorDeliveries + IntegerStateDeliveries == 884);
+ static constexpr std::size_t VectorBytes = 16 * 32;
+-alignas(32) static std::uint8_t vectorPattern[VectorBytes];
++alignas(32) static std::uint8_t nativeVectorPattern[VectorBytes];
+ alignas(32) static std::uint8_t vectorResult[VectorBytes];
+ static volatile std::uint8_t vectorStop = 0;
+ 
+@@ -286,7 +377,7 @@ static void* APS5_VABI Vectors(void* arg) {
+         "vmovdqu %%ymm15, 480(%[result])\n"
+         "vzeroupper\n"
+         :
+-        : [pattern] "r"(vectorPattern), [result] "r"(vectorResult), [stop] "r"(&vectorStop)
++        : [pattern] "r"(nativeVectorPattern), [result] "r"(vectorResult), [stop] "r"(&vectorStop)
+         : "memory", "cc", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15");
+     return nullptr;
+ }
+@@ -404,12 +495,12 @@ static void NestedWaitKeepsOuterWake() {
+ 
+ static void ExpectDelivery(int before, std::thread::id thread) {
+     for (int attempt = 0; attempt < 5000 && calls.load() == before; ++attempt) std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    if (calls.load() != before + 1) std::fprintf(stderr, "Delivery count: expected=%d actual=%d\n", before + 1, calls.load());
+     Require(calls.load() == before + 1);
+     Require(handlerThread.load() == thread);
+     Require(handlerRsp.load() != 0 && handlerFrame.load() < handlerRsp.load());
+ }
+ 
+-static constexpr int LockRounds = 10;
+ static PthreadMutex guestMutex = nullptr;
+ static PthreadRwlock guestRwlock = nullptr;
+ 
+@@ -463,6 +554,348 @@ static void ExpectDeliveryWhileLockHeld(int (*lock)(), int (*unlock)(), int befo
+     Require(scePthreadJoin(thread, nullptr) == 0);
+ }
+ 
++#ifdef _WIN32
++struct NativeWaitWorker {
++    Worker worker;
++    HANDLE event = nullptr;
++    DWORD timeout = 0;
++    DWORD result = WAIT_FAILED;
++};
++
++static void* APS5_VABI NativeWaiting(void* arg) {
++    auto& native = *static_cast<NativeWaitWorker*>(arg);
++    native.worker.id = std::this_thread::get_id();
++    native.worker.started.store(true);
++    native.result = WaitForSingleObject(native.event, native.timeout);
++    return nullptr;
++}
++
++static void CheckNativeWait(bool signalEvent) {
++    for (int round = 0; round < NativeWaitRounds; ++round) {
++        NativeWaitWorker native;
++        native.event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
++        Require(native.event != nullptr);
++        native.timeout = signalEvent ? 5000 : 80;
++        Pthread target = nullptr;
++        Require(scePthreadCreate(&target, nullptr, NativeWaiting, &native, "native wait") == 0);
++        while (!native.worker.started.load()) std::this_thread::yield();
++        std::this_thread::sleep_for(std::chrono::milliseconds(20));
++        const int before = calls.load();
++        Require(sceKernelRaiseException(target, SIGUSR1) == 0);
++        if (signalEvent) Require(SetEvent(native.event) != FALSE);
++        ExpectDelivery(before, native.worker.id);
++        Require(scePthreadJoin(target, nullptr) == 0);
++        const DWORD expected = signalEvent ? WAIT_OBJECT_0 : WAIT_TIMEOUT;
++        if (native.result != expected) std::fprintf(stderr, "Native wait expected=%lu actual=%lu\n", expected, native.result);
++        Require(native.result == expected);
++        Require(CloseHandle(native.event) != FALSE);
++        std::fprintf(stderr, "Native wait verified mode=%s round=%d result=%lu\n", signalEvent ? "signaled" : "timeout", round, native.result);
++    }
++}
++
++struct VectorWorker {
++    Worker worker;
++    std::atomic<std::uint32_t> resumed{0};
++    alignas(32) std::uint64_t result[64];
++};
++extern "C" void APS5_VABI HoldVectorState(const void*, void*, const void*, void*, void*);
++__asm__(
++    ".text\n.global HoldVectorState\nHoldVectorState:\n"
++    "vmovdqu 0(%rdi), %ymm0\n"
++    "vmovdqu 32(%rdi), %ymm1\n"
++    "vmovdqu 64(%rdi), %ymm2\n"
++    "vmovdqu 96(%rdi), %ymm3\n"
++    "vmovdqu 128(%rdi), %ymm4\n"
++    "vmovdqu 160(%rdi), %ymm5\n"
++    "vmovdqu 192(%rdi), %ymm6\n"
++    "vmovdqu 224(%rdi), %ymm7\n"
++    "vmovdqu 256(%rdi), %ymm8\n"
++    "vmovdqu 288(%rdi), %ymm9\n"
++    "vmovdqu 320(%rdi), %ymm10\n"
++    "vmovdqu 352(%rdi), %ymm11\n"
++    "vmovdqu 384(%rdi), %ymm12\n"
++    "vmovdqu 416(%rdi), %ymm13\n"
++    "vmovdqu 448(%rdi), %ymm14\n"
++    "vmovdqu 480(%rdi), %ymm15\n"
++    "movb $1, (%rcx)\n"
++    "vector_spin:\nlock incl (%r8)\ncmpb $0, (%rdx)\nje vector_spin\n"
++    "vmovdqu %ymm0, 0(%rsi)\n"
++    "vmovdqu %ymm1, 32(%rsi)\n"
++    "vmovdqu %ymm2, 64(%rsi)\n"
++    "vmovdqu %ymm3, 96(%rsi)\n"
++    "vmovdqu %ymm4, 128(%rsi)\n"
++    "vmovdqu %ymm5, 160(%rsi)\n"
++    "vmovdqu %ymm6, 192(%rsi)\n"
++    "vmovdqu %ymm7, 224(%rsi)\n"
++    "vmovdqu %ymm8, 256(%rsi)\n"
++    "vmovdqu %ymm9, 288(%rsi)\n"
++    "vmovdqu %ymm10, 320(%rsi)\n"
++    "vmovdqu %ymm11, 352(%rsi)\n"
++    "vmovdqu %ymm12, 384(%rsi)\n"
++    "vmovdqu %ymm13, 416(%rsi)\n"
++    "vmovdqu %ymm14, 448(%rsi)\n"
++    "vmovdqu %ymm15, 480(%rsi)\n"
++    "vzeroupper\nret\n"
++);
++static void* APS5_VABI VectorBusy(void* arg) {
++    auto& vector = *static_cast<VectorWorker*>(arg);
++    vector.worker.id = std::this_thread::get_id();
++    HoldVectorState(vectorPattern, vector.result, &vector.worker.stop, &vector.worker.started, &vector.resumed);
++    return nullptr;
++}
++static void CheckVectors(int mode) {
++    VectorWorker vector{};
++    for (int i = 0; i < 64; ++i) vectorPattern[i] = UINT64_C(0x123456789abcdef0) ^ ((std::uint64_t)(i + 1) << 40);
++    vectorMode.store(mode);
++    Pthread target = nullptr;
++    Require(scePthreadCreate(&target, nullptr, VectorBusy, &vector, "vector busy") == 0);
++    while (!vector.worker.started.load()) std::this_thread::yield();
++    for (int round = 0; round < (mode == 1 ? AsyncReadOnlyRounds : AsyncMutatingRounds); ++round) {
++        int before = calls.load();
++        Require(sceKernelRaiseException(target, SIGUSR1) == 0);
++        ExpectDelivery(before, vector.worker.id);
++        const auto resumed = vector.resumed.load();
++        for (int attempt = 0; attempt < 5000 && vector.resumed.load() == resumed; ++attempt)
++            std::this_thread::sleep_for(std::chrono::milliseconds(1));
++        Require(vector.resumed.load() != resumed);
++    }
++    vector.worker.stop.store(true);
++    Require(scePthreadJoin(target, nullptr) == 0);
++    vectorMode.store(0);
++    int errors = 0;
++    for (int i = 0; i < 64; ++i) {
++        const auto expected = mode == 3 && i % 4 >= 2 ? 0 : vectorPattern[i] ^ (mode == 2 ? VectorMutation : 0);
++        if (expected != vector.result[i]) {
++            ++errors;
++            std::fprintf(stderr, "Vector lane=%d upper=%d expected=%llx actual=%llx\n", i, i % 4 >= 2,
++                         (unsigned long long)expected, (unsigned long long)vector.result[i]);
++        }
++    }
++    std::fprintf(stderr, "Async vector checks=64 mode=%s errors=%d\n", mode == 2 ? "mutate" : mode == 3 ? "reset-avx" : "preserve", errors);
++    Require(errors == 0);
++}
++
++__asm__(
++    ".text\n.global HoldIntegerState\nHoldIntegerState:\n"
++    "pushq %rbp\npushq %rbx\npushq %r12\npushq %r13\npushq %r14\npushq %r15\n"
++    "movabsq $0x123457789abcdef0, %rax\n"
++    "movabsq $0x123454789abcdef0, %rcx\n"
++    "movabsq $0x123455789abcdef0, %rdx\n"
++    "movabsq $0x123452789abcdef0, %rbx\n"
++    "movabsq $0x123453789abcdef0, %rbp\n"
++    "movabsq $0x123450789abcdef0, %rsi\n"
++    "movabsq $0x123451789abcdef0, %rdi\n"
++    "movabsq $0x12345e789abcdef0, %r8\n"
++    "movabsq $0x12345f789abcdef0, %r9\n"
++    "movabsq $0x12345c789abcdef0, %r10\n"
++    "movabsq $0x12345d789abcdef0, %r11\n"
++    "movabsq $0x12345a789abcdef0, %r12\n"
++    "movabsq $0x12345b789abcdef0, %r13\n"
++    "movabsq $0x123458789abcdef0, %r14\n"
++    "movabsq $0x123459789abcdef0, %r15\n"
++    "pushq GprInputFlags(%rip)\npopfq\nmovb $1, GprStarted(%rip)\n"
++    "integer_spin:\njmp integer_spin\n"
++    ".global IntegerExit\nIntegerExit:\n"
++    "movq %rax, GprOutput+0(%rip)\n"
++    "movq %rcx, GprOutput+8(%rip)\n"
++    "movq %rdx, GprOutput+16(%rip)\n"
++    "movq %rbx, GprOutput+24(%rip)\n"
++    "movq %rbp, GprOutput+32(%rip)\n"
++    "movq %rsi, GprOutput+40(%rip)\n"
++    "movq %rdi, GprOutput+48(%rip)\n"
++    "movq %r8, GprOutput+56(%rip)\n"
++    "movq %r9, GprOutput+64(%rip)\n"
++    "movq %r10, GprOutput+72(%rip)\n"
++    "movq %r11, GprOutput+80(%rip)\n"
++    "movq %r12, GprOutput+88(%rip)\n"
++    "movq %r13, GprOutput+96(%rip)\n"
++    "movq %r14, GprOutput+104(%rip)\n"
++    "movq %r15, GprOutput+112(%rip)\n"
++    "pushfq\npopq GprOutput+120(%rip)\nmovq %rsp, GprOutput+128(%rip)\ncld\n"
++    "popq %r15\npopq %r14\npopq %r13\npopq %r12\npopq %rbx\npopq %rbp\nret\n"
++);
++static void* APS5_VABI IntegerBusy(void* arg) {
++    auto& worker = *static_cast<Worker*>(arg);
++    worker.id = std::this_thread::get_id();
++    HoldIntegerState();
++    return nullptr;
++}
++static void CheckIntegerState(std::uint64_t flags, std::uint64_t mutation = 0) {
++    integerFlagMutation = mutation;
++    Worker worker;
++    GprInputFlags = flags;
++    GprStarted.store(false);
++    integerMode.store(true);
++    Pthread target = nullptr;
++    Require(scePthreadCreate(&target, nullptr, IntegerBusy, &worker, "integer busy") == 0);
++    while (!GprStarted.load()) std::this_thread::yield();
++    int before = calls.load();
++    Require(sceKernelRaiseException(target, SIGUSR1) == 0);
++    ExpectDelivery(before, worker.id);
++    Require(scePthreadJoin(target, nullptr) == 0);
++    integerMode.store(false);
++    int errors = 0;
++    for (int i = 0; i < 15; ++i) {
++        const auto expected = UINT64_C(0x123456789abcdef0) ^ ((std::uint64_t)(i + 1) << 40);
++        const auto restored = expected ^ ((mutation && i == 9) ? IntegerMutation : 0);
++        if (GprContext[i] != expected || GprOutput[i] != restored) {
++            ++errors;
++            std::fprintf(stderr, "GPR index=%d expected=%llx context=%llx restored=%llx\n", i,
++                         (unsigned long long)expected, (unsigned long long)GprContext[i], (unsigned long long)GprOutput[i]);
++        }
++    }
++    const std::uint64_t mask = 0xcd5; // OF, DF, SF, ZF, AF, PF, CF; no TF/IF comparison.
++    std::fprintf(stderr, "GPR checks=15 errors=%d flags expected=%llx context=%llx restored=%llx stack=%llx/%llx\n",
++                 errors, (unsigned long long)(flags & mask), (unsigned long long)(GprContext[15] & mask),
++                 (unsigned long long)(GprOutput[15] & mask), (unsigned long long)GprContext[16], (unsigned long long)GprOutput[16]);
++    Require(errors == 0);
++    Require((GprContext[15] & ~UINT64_C(0x3f7fd7)) == 0);
++    Require(GprContext[16] == GprOutput[16]);
++    Require((GprContext[15] & mask) == (flags & mask));
++    Require((GprOutput[15] & mask) == ((flags ^ mutation) & mask));
++}
++
++// A separate handler/counter preserves every ordinary SIGUSR1 delivery total.
++// The public API only accepts signal 30, so run this after removing Handler and
++// before installing NestedHandler rather than inventing SIGUSR2 support.
++using PrivateExecutableEntry = void(WINAPI*)(volatile LONG*, volatile LONG*);
++static std::atomic<int> privateExecutableCalls{0};
++static std::atomic<std::thread::id> privateExecutableHandlerThread;
++static std::atomic<Pthread> privateExecutableHandlerSelf{nullptr};
++static std::atomic<std::uint64_t> privateExecutableHandlerRip{0};
++
++struct PrivateExecutableWorker {
++    PrivateExecutableEntry entry = nullptr;
++    alignas(4) volatile LONG stop = 0;
++    alignas(4) volatile LONG progress = 0;
++    std::thread::id id;
++    std::atomic<bool> finished{false};
++};
++
++static void APS5_VABI PrivateExecutableHandler(int signum, void* context) {
++    Require(signum == SIGUSR1 && context != nullptr);
++    std::uint64_t rip = 0;
++    std::memcpy(&rip, static_cast<const unsigned char*>(context) + 0xe0, sizeof(rip));
++    privateExecutableHandlerRip.store(rip);
++    privateExecutableHandlerThread.store(std::this_thread::get_id());
++    privateExecutableHandlerSelf.store(scePthreadSelf());
++    privateExecutableCalls.fetch_add(1);
++}
++
++static void* APS5_VABI PrivateExecutableBusy(void* arg) {
++    auto& worker = *static_cast<PrivateExecutableWorker*>(arg);
++    worker.id = std::this_thread::get_id();
++    worker.entry(&worker.stop, &worker.progress);
++    worker.finished.store(true);
++    return nullptr;
++}
++
++static void StopAndJoinPrivateExecutable(PrivateExecutableWorker& worker, Pthread target) {
++    InterlockedExchange(&worker.stop, 1);
++    const auto finishedDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++    while (!worker.finished.load() && std::chrono::steady_clock::now() < finishedDeadline)
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    // If the worker cannot leave, abort without freeing code it may still use.
++    Require(worker.finished.load());
++    Require(scePthreadJoin(target, nullptr) == 0);
++}
++
++static void CheckPrivateExecutableDelivery() {
++    // Microsoft x64 ABI: RCX=&stop, RDX=&progress. LOCK INC publishes entry;
++    // aligned CMP observes InterlockedExchange's release. No host wait/call is
++    // made while spinning in this wholly owned, private executable allocation.
++    static constexpr unsigned char code[] = {
++        0xf0, 0xff, 0x02,       // lock inc dword ptr [rdx]
++        0x83, 0x39, 0x00,       // cmp dword ptr [rcx], 0
++        0x74, 0xf8,             // je code
++        0xc3                    // ret
++    };
++    static_assert(sizeof(LONG) == 4 && alignof(LONG) >= 4 && sizeof(code) == 9);
++    const int normalBefore = calls.load();
++    Require(privateExecutableCalls.load() == 0);
++    void* const allocation = VirtualAlloc(nullptr, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
++    Require(allocation != nullptr);
++    std::memcpy(allocation, code, sizeof(code));
++    DWORD oldProtection = 0;
++    const bool executable = VirtualProtect(allocation, 4096, PAGE_EXECUTE_READ, &oldProtection) != FALSE;
++    const bool flushed = executable && FlushInstructionCache(GetCurrentProcess(), allocation, sizeof(code)) != FALSE;
++    MEMORY_BASIC_INFORMATION info{};
++    const bool privateRx = flushed && VirtualQuery(allocation, &info, sizeof(info)) == sizeof(info) &&
++                           info.AllocationBase == allocation && info.Type == MEM_PRIVATE &&
++                           info.State == MEM_COMMIT && info.Protect == PAGE_EXECUTE_READ &&
++                           info.RegionSize >= sizeof(code);
++    if (!privateRx) {
++        Require(VirtualFree(allocation, 0, MEM_RELEASE) != FALSE);
++        Require(privateRx);
++    }
++    int installed = SCE_KERNEL_ERROR_ESRCH;
++    bool installThrew = false;
++    try {
++        installed = sceKernelInstallExceptionHandler(SIGUSR1, reinterpret_cast<void*>(&PrivateExecutableHandler));
++    } catch (...) {
++        installThrew = true;
++    }
++    if (installThrew || installed != 0) {
++        // The handler is static code; removing it is safe even if installation
++        // failed before publication. No worker has been created at this point.
++        const int removed = sceKernelRemoveExceptionHandler(SIGUSR1);
++        const bool freed = VirtualFree(allocation, 0, MEM_RELEASE) != FALSE;
++        Require(removed == 0 && freed && !installThrew && installed == 0);
++    }
++    PrivateExecutableWorker worker;
++    worker.entry = reinterpret_cast<PrivateExecutableEntry>(allocation);
++    Pthread target = nullptr;
++    int created = SCE_KERNEL_ERROR_ESRCH;
++    bool createThrew = false;
++    try {
++        created = scePthreadCreate(&target, nullptr, PrivateExecutableBusy, &worker, "private executable");
++    } catch (...) {
++        createThrew = true;
++    }
++    if (createThrew || created != 0) {
++        // Current scePthreadCreate never publishes failed initialization. Also
++        // clean a published target defensively before releasing its code.
++        if (target != nullptr) StopAndJoinPrivateExecutable(worker, target);
++        const int removed = sceKernelRemoveExceptionHandler(SIGUSR1);
++        const bool freed = VirtualFree(allocation, 0, MEM_RELEASE) != FALSE;
++        Require(removed == 0 && freed && !createThrew && created == 0);
++    }
++    const auto enteredDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++    while (InterlockedCompareExchange(&worker.progress, 0, 0) == 0 &&
++           std::chrono::steady_clock::now() < enteredDeadline)
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    const bool entered = InterlockedCompareExchange(&worker.progress, 0, 0) != 0;
++    int raised = SCE_KERNEL_ERROR_ESRCH;
++    bool raiseThrew = false;
++    try {
++        if (entered) raised = sceKernelRaiseException(target, SIGUSR1);
++    } catch (...) {
++        raiseThrew = true;
++    }
++    const auto deliveryDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++    while (!raiseThrew && raised == 0 && privateExecutableCalls.load() == 0 &&
++           std::chrono::steady_clock::now() < deliveryDeadline)
++        std::this_thread::sleep_for(std::chrono::milliseconds(1));
++    const int deliveries = privateExecutableCalls.load();
++    const auto begin = reinterpret_cast<std::uint64_t>(allocation);
++    const auto rip = privateExecutableHandlerRip.load();
++    const bool capturedOwnRip = rip >= begin && rip < begin + sizeof(code);
++    // Capture identity before Join releases the target's PthreadPrivate object.
++    const bool rightThread = deliveries == 1 && privateExecutableHandlerThread.load() == worker.id &&
++                             privateExecutableHandlerSelf.load() == target;
++    // Always release the code loop before checking the delivery assertions.
++    // Join may finish native thread cleanup; the owning test runner's finite
++    // process timeout bounds it, not the five-second loop-return deadline.
++    StopAndJoinPrivateExecutable(worker, target);
++    const int removed = sceKernelRemoveExceptionHandler(SIGUSR1);
++    const bool freed = VirtualFree(allocation, 0, MEM_RELEASE) != FALSE;
++    Require(entered && !raiseThrew && raised == 0 && deliveries == 1 && privateExecutableCalls.load() == 1);
++    Require(capturedOwnRip && rightThread && removed == 0 && freed);
++    Require(calls.load() == normalBefore);
++    std::fprintf(stderr, "Private executable exception verified: deliveries=1 rip-in-owned-rx=1 joined=1 freed=1.\n");
++}
++#endif
++
+ int main() {
+     Require(sceKernelRaiseException(scePthreadSelf(), 11) == SCE_KERNEL_ERROR_EINVAL);
+     bool rejected = false;
+@@ -592,8 +1025,11 @@ int main() {
+     CloseHandle(loopingHandle);
+     Require(scePthreadJoin(loopingThread, nullptr) == 0);
+ 
+-    if (__builtin_cpu_supports("avx")) {
+-        for (std::size_t i = 0; i < VectorBytes; ++i) vectorPattern[i] = static_cast<std::uint8_t>(i * 7 + 1);
++    __builtin_cpu_init();
++    const bool nativeVectors = __builtin_cpu_supports("avx");
++    std::fprintf(stderr, "Native AVX feature available: %d\n", nativeVectors ? 1 : 0);
++    if (nativeVectors) {
++        for (std::size_t i = 0; i < VectorBytes; ++i) nativeVectorPattern[i] = static_cast<std::uint8_t>(i * 7 + 1);
+         clobberVectors.store(true);
+         Worker vectors;
+         Pthread vectorsThread = nullptr;
+@@ -607,7 +1043,7 @@ int main() {
+         clobberVectors.store(false);
+         vectorStop = 1;
+         Require(scePthreadJoin(vectorsThread, nullptr) == 0);
+-        Require(std::memcmp(vectorPattern, vectorResult, VectorBytes) == 0);
++        Require(std::memcmp(nativeVectorPattern, vectorResult, VectorBytes) == 0);
+     }
+ #endif
+ 
+@@ -624,6 +1060,7 @@ int main() {
+     Require(observedR13.load() == SpinMarker && observedXmm8.load() == SpinMarker);
+     Require(spin.r12 == PatchedR12 && spin.xmm8 == PatchedXmm8);
+     Require(spin.mxcsr == (observedMxcsr.load() | FlushToZero));
++    std::fprintf(stderr, "Context mutation verified: deliveries=1 joined=1 integer=1 vector=1 mxcsr=1\n");
+ 
+     for (int round = 0; round < StartingRounds; ++round) {
+         const int before = calls.load();
+@@ -637,14 +1074,18 @@ int main() {
+         startingRelease.store(true);
+         Require(scePthreadJoin(startingThread, nullptr) == 0);
+     }
++    std::fprintf(stderr, "Immediate startup exception verified: deliveries=%d joined=%d\n", StartingRounds, StartingRounds);
+ 
+     const int beforeLocks = calls.load();
+     Require(scePthreadMutexInit(&guestMutex, nullptr, "raise") == 0);
+     ExpectDeliveryWhileLockHeld(LockMutex, UnlockMutex, beforeLocks);
++    std::fprintf(stderr, "Lock wait exception verified: mode=mutex deliveries=%d joined=1\n", LockRounds);
+     ExpectDeliveryWhileLockHeld(TimedLockMutex, UnlockMutex, beforeLocks + LockRounds);
++    std::fprintf(stderr, "Lock wait exception verified: mode=timed-mutex deliveries=%d joined=1\n", LockRounds);
+     Require(scePthreadMutexDestroy(&guestMutex) == 0);
+     Require(scePthreadRwlockInit(&guestRwlock, nullptr, "raise") == 0);
+     ExpectDeliveryWhileLockHeld(LockRwlock, UnlockRwlock, beforeLocks + 2 * LockRounds);
++    std::fprintf(stderr, "Lock wait exception verified: mode=rwlock deliveries=%d joined=1\n", LockRounds);
+     Require(scePthreadRwlockDestroy(&guestRwlock) == 0);
+ 
+     Pthread finishedThread = nullptr;
+@@ -654,10 +1095,39 @@ int main() {
+     Require(sceKernelRaiseException(finishedThread, SIGUSR1) == SCE_KERNEL_ERROR_ESRCH);
+     Require(scePthreadJoin(finishedThread, nullptr) == 0);
+ 
++#ifdef _WIN32
++    CheckNativeWait(false);
++    CheckNativeWait(true);
++    const int beforeAsyncVectors = BaseDeliveries + (nativeVectors ? VectorRounds : 0);
++    Require(calls.load() == beforeAsyncVectors);
++    const bool vectors = nativeVectors && std::getenv("APS5_PRESERVE_ASYNC_AVX") &&
++                         std::strcmp(std::getenv("APS5_PRESERVE_ASYNC_AVX"), "1") == 0;
++    if (vectors) {
++        CheckVectors(1);
++        CheckVectors(2);
++        CheckVectors(3);
++    } else std::fprintf(stderr, "Async AVX checks skipped: CPU feature or opt-in unavailable.\n");
++    Require(calls.load() == beforeAsyncVectors + (vectors ? AsyncVectorDeliveries : 0));
++    for (auto flags : IntegerStateFlags)
++        CheckIntegerState(flags);
++    CheckIntegerState(0xed7, 0xcd5);
++    CheckIntegerState(0x202, 0xcd5);
++    Require(calls.load() == beforeAsyncVectors + (vectors ? AsyncVectorDeliveries : 0) + IntegerStateDeliveries);
++    Require(sceKernelRemoveExceptionHandler(SIGUSR1) == 0);
++
++    CheckPrivateExecutableDelivery();
++#else
++    Require(calls.load() == 1 + 2 * Repeats + HostRounds + LeavingRounds + NewContextAndLockDeliveries);
+     Require(sceKernelRemoveExceptionHandler(SIGUSR1) == 0);
++#endif
+ 
+     Require(sceKernelInstallExceptionHandler(SIGUSR1, reinterpret_cast<void*>(&NestedHandler)) == 0);
+     NestedWaitKeepsLaterWaiters();
+     NestedWaitKeepsOuterWake();
+     Require(sceKernelRemoveExceptionHandler(SIGUSR1) == 0);
++#ifdef _WIN32
++    std::fprintf(stderr, "All %d exception deliveries verified; AVX=%s; integer state verified.\n", calls.load(), vectors ? "verified" : "skipped");
++#else
++    std::fprintf(stderr, "All %d exception deliveries verified; POSIX context and lock state verified.\n", calls.load());
++#endif
+ }
+diff --git a/core/libs/tests/RawLogOutput.cpp b/core/libs/tests/RawLogOutput.cpp
+new file mode 100644
+index 0000000..d6c79f9
+--- /dev/null
++++ b/core/libs/tests/RawLogOutput.cpp
+@@ -0,0 +1,267 @@
++#include "prx/libc/src/exception/RawLogOutput.hpp"
++#include <algorithm>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <new>
++#include <stdexcept>
++#include <string>
++#include <vector>
++#ifdef _WIN32
++#include <io.h>
++#else
++#include <sys/mman.h>
++#endif
++
++namespace {
++bool forbidAllocation = false;
++int cases = 0;
++void Require(bool condition, const char* message) {
++    if (!condition) throw std::runtime_error(message);
++}
++void Passed(const char* name) {
++    ++cases;
++    std::printf("PASS %s\n", name);
++}
++using namespace LibcException::RawLogOutput;
++
++struct Recorder {
++    char* data;
++    std::size_t capacity, size = 0, calls = 0, maximumRequest = 0, shortLimit = MaximumChunkBytes;
++    int failAt = -1, zeroAt = -1, overAt = -1;
++    std::ptrdiff_t operator()(const char* input, std::size_t requested) noexcept {
++        maximumRequest = std::max(maximumRequest, requested);
++        ++calls;
++        if (static_cast<int>(calls) == failAt) return -1;
++        if (static_cast<int>(calls) == zeroAt) return 0;
++        if (static_cast<int>(calls) == overAt) return static_cast<std::ptrdiff_t>(requested + 1);
++        const auto count = std::min({requested, shortLimit, capacity - size});
++        std::memcpy(data + size, input, count);
++        size += count;
++        return static_cast<std::ptrdiff_t>(count);
++    }
++};
++
++class StderrFile {
++    FILE* file = std::tmpfile();
++#ifdef _WIN32
++    HANDLE original = GetStdHandle(STD_ERROR_HANDLE);
++#else
++    int original = ::dup(STDERR_FILENO);
++#endif
++    bool restored = false;
++public:
++    StderrFile() {
++        Require(file != nullptr, "tmpfile unavailable");
++#ifdef _WIN32
++        Require(SetStdHandle(STD_ERROR_HANDLE, reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(file)))) != 0,
++                "SetStdHandle failed");
++#else
++        Require(original >= 0 && ::dup2(fileno(file), STDERR_FILENO) >= 0, "stderr dup failed");
++#endif
++    }
++    void Restore() {
++        if (restored) return;
++#ifdef _WIN32
++        Require(SetStdHandle(STD_ERROR_HANDLE, original) != 0, "restore SetStdHandle failed");
++#else
++        Require(::dup2(original, STDERR_FILENO) >= 0, "restore stderr failed");
++        ::close(original);
++#endif
++        restored = true;
++    }
++    std::string Read() {
++        Restore();
++        Require(std::fseek(file, 0, SEEK_END) == 0, "seek failed");
++        const auto length = std::ftell(file);
++        Require(length >= 0 && std::fseek(file, 0, SEEK_SET) == 0, "read seek failed");
++        std::string output(static_cast<std::size_t>(length), '\0');
++        Require(std::fread(output.data(), 1, output.size(), file) == output.size(), "readback failed");
++        return output;
++    }
++    ~StderrFile() {
++        if (!restored) {
++#ifdef _WIN32
++            SetStdHandle(STD_ERROR_HANDLE, original);
++#else
++            ::dup2(original, STDERR_FILENO); ::close(original);
++#endif
++        }
++        if (file) std::fclose(file);
++    }
++};
++
++void ActualHandleCases() {
++    const std::string request = "ShaderRecompiler::Recompile: synthetic error (pc=56)\nRecompileRequest:\n" +
++        std::string(15336, 'A') + "Qg==";
++    const std::string expected = "terminate called after throwing an instance of 'std::runtime_error'\n  what():  " + request + "\n";
++    {
++        StderrFile file;
++        StderrWriter writer;
++        forbidAllocation = true;
++        const auto result = WriteException(writer, "std::runtime_error", request.c_str());
++        forbidAllocation = false;
++        Require(result == Result::Complete, "long exception incomplete");
++        Require(file.Read() == expected, "actual stderr lost shader request suffix/delimiter");
++        Passed("actual_stderr_full_15340_byte_request_and_framing");
++    }
++    {
++        struct LimitedWriter {
++            StderrWriter writer;
++            std::size_t calls = 0;
++            std::ptrdiff_t operator()(const char* text, std::size_t requested) noexcept {
++                ++calls;
++                return writer(text, std::min(requested, std::size_t(7)));
++            }
++        } writer;
++        StderrFile file;
++        writer.writer = StderrWriter{};
++        forbidAllocation = true;
++        const auto result = WriteException(writer, "std::runtime_error", request.c_str());
++        forbidAllocation = false;
++        Require(result == Result::Complete && writer.calls > 2000,
++                "short OS writes not handled");
++        Require(file.Read() == expected, "short actual OS writes lost bytes");
++        Passed("actual_stderr_repeated_seven_byte_short_writes");
++    }
++    {
++        StderrFile file;
++        StderrWriter writer;
++        Require(WriteText(writer, "UTF-8: \xc3\xa4\xe2\x88\x92\nline two") == Result::Complete, "UTF8 output failed");
++        Require(file.Read() == "UTF-8: \xc3\xa4\xe2\x88\x92\nline two", "UTF8 bytes changed");
++        Passed("actual_stderr_utf8_newline_bytes_preserved");
++    }
++    {
++#ifdef _WIN32
++        const HANDLE previous = GetStdHandle(STD_ERROR_HANDLE);
++        Require(SetStdHandle(STD_ERROR_HANDLE, INVALID_HANDLE_VALUE) != 0, "invalid stderr setup failed");
++        StderrWriter writer;
++        const auto result = WriteText(writer, "test");
++        SetStdHandle(STD_ERROR_HANDLE, previous);
++#else
++        const int previous = ::dup(STDERR_FILENO);
++        Require(previous >= 0, "stderr error setup failed");
++        ::close(STDERR_FILENO);
++        StderrWriter writer;
++        const auto result = WriteText(writer, "test");
++        ::dup2(previous, STDERR_FILENO); ::close(previous);
++#endif
++        Require(result == Result::WriteFailed, "actual failed stderr must report failure");
++        Passed("actual_stderr_invalid_handle_stops");
++    }
++}
++
++void BoundedCases() {
++    std::vector<char> storage(MaximumTextBytes + sizeof(TruncationMarker) + 128);
++    for (const std::size_t size : {std::size_t(0), std::size_t(1023), std::size_t(1024), std::size_t(4096), std::size_t(8193)}) {
++        std::string input(size, 'X');
++        Recorder writer{storage.data(), storage.size()};
++        forbidAllocation = true;
++        const auto result = WriteText(writer, input.c_str());
++        forbidAllocation = false;
++        Require(result == Result::Complete && writer.size == size && std::memcmp(storage.data(), input.data(), size) == 0,
++                "chunk boundary/no-allocation case failed");
++    }
++    Passed("empty_1023_1024_4096_8193_boundaries_no_heap");
++    {
++        std::string input(MaximumTextBytes, 'Z');
++        Recorder writer{storage.data(), storage.size()};
++        forbidAllocation = true; const auto result = WriteText(writer, input.c_str()); forbidAllocation = false;
++        Require(result == Result::Complete && writer.size == input.size(), "exact limit incorrectly truncated");
++        Passed("exact_one_mib_terminator_complete_no_heap");
++    }
++    {
++        std::string input(MaximumTextBytes + 8192, 'Z');
++        Recorder writer{storage.data(), storage.size()};
++        forbidAllocation = true; const auto result = WriteText(writer, input.c_str()); forbidAllocation = false;
++        Require(result == Result::Truncated && writer.size == MaximumTextBytes + sizeof(TruncationMarker) - 1,
++                "explicit bounded truncation size/status failed");
++        Require(std::memcmp(storage.data(), input.data(), MaximumTextBytes) == 0 &&
++                std::memcmp(storage.data() + MaximumTextBytes, TruncationMarker, sizeof(TruncationMarker) - 1) == 0,
++                "explicit truncation marker/content missing");
++        Passed("oversized_one_mib_prefix_and_explicit_marker_no_heap");
++    }
++    for (int kind = 0; kind < 4; ++kind) {
++        Recorder writer{storage.data(), storage.size()};
++        writer.shortLimit = 7;
++        if (kind == 0) writer.failAt = 1;
++        if (kind == 1) writer.failAt = 2;
++        if (kind == 2) writer.zeroAt = 1;
++        if (kind == 3) writer.overAt = 1;
++        Require(WriteText(writer, "0123456789ABCDEF") == Result::WriteFailed, "invalid progress not rejected");
++        Require(writer.calls == (kind == 1 ? 2u : 1u) && writer.size == (kind == 1 ? 7u : 0u),
++                "failed output kept retrying or replayed bytes");
++    }
++    Passed("error_short_then_error_zero_and_overreported_progress_stop");
++    {
++        std::string input(MaximumTextBytes, 'B');
++        Recorder writer{storage.data(), storage.size()}; writer.shortLimit = 1;
++        Require(WriteText(writer, input.c_str()) == Result::WriteFailed && writer.calls == MaximumWriteCalls &&
++                writer.size == MaximumWriteCalls && writer.maximumRequest <= MaximumChunkBytes,
++                "write-call budget not enforced");
++        Passed("65536_call_budget_stops_pathological_short_writes");
++    }
++    {
++        const char text[] = "prefix\0excluded";
++        Recorder writer{storage.data(), storage.size()};
++        Require(WriteText(writer, text) == Result::Complete && writer.size == 6 && std::memcmp(storage.data(), "prefix", 6) == 0,
++                "what C string terminator not respected");
++        Passed("embedded_nul_ends_what_c_string");
++    }
++    {
++        Recorder writer{storage.data(), storage.size()};
++        Require(WriteException(writer, nullptr, nullptr) == Result::Complete, "null type/what framing failed");
++        const std::string expected = "terminate called after throwing an instance of '(null)'\n";
++        Require(writer.size == expected.size() && std::memcmp(storage.data(), expected.data(), writer.size) == 0,
++                "null what printed spurious what prefix");
++        Passed("missing_what_keeps_type_only_framing");
++    }
++    {
++#ifdef _WIN32
++        SYSTEM_INFO info; GetSystemInfo(&info);
++        const std::size_t page = info.dwPageSize;
++        auto* memory = static_cast<char*>(VirtualAlloc(nullptr, page * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
++        Require(memory != nullptr, "guard allocation failed");
++        DWORD previous; Require(VirtualProtect(memory + page, page, PAGE_NOACCESS, &previous) != 0, "guard setup failed");
++#else
++        const std::size_t page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
++        auto* memory = static_cast<char*>(::mmap(nullptr, page * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0));
++        Require(memory != MAP_FAILED && ::mprotect(memory + page, page, PROT_NONE) == 0, "guard setup failed");
++#endif
++        std::memset(memory + page - 32, 'G', 31); memory[page - 1] = '\0';
++        Recorder writer{storage.data(), storage.size()};
++        Require(WriteText(writer, memory + page - 32) == Result::Complete && writer.size == 31,
++                "CString guard-page boundary failed");
++#ifdef _WIN32
++        VirtualFree(memory, 0, MEM_RELEASE);
++#else
++        ::munmap(memory, page * 2);
++#endif
++        Passed("cstring_last_byte_before_guard_page_no_overread");
++    }
++}
++}
++
++void* operator new(std::size_t size) {
++    if (forbidAllocation) std::abort();
++    if (void* memory = std::malloc(size ? size : 1)) return memory;
++    throw std::bad_alloc();
++}
++void* operator new[](std::size_t size) { return ::operator new(size); }
++void operator delete(void* memory) noexcept { std::free(memory); }
++void operator delete[](void* memory) noexcept { std::free(memory); }
++void operator delete(void* memory, std::size_t) noexcept { std::free(memory); }
++void operator delete[](void* memory, std::size_t) noexcept { std::free(memory); }
++
++int main() {
++    try {
++        ActualHandleCases();
++        BoundedCases();
++        std::printf("ALL %d CASES PASSED\n", cases);
++        return 0;
++    } catch (const std::exception& error) {
++        forbidAllocation = false;
++        std::fprintf(stderr, "FAIL %s\n", error.what());
++        return 1;
++    }
++}

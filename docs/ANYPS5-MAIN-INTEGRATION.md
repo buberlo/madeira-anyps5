@@ -1,8 +1,19 @@
 # Full AnyPS5 main integration
 
-## Targeted Apple graphics integration, 2026-10-11
+## Complete merged main, 2026-10-12
 
-The pin remains `c963432d`; the active local series now has eleven patches.
+The current pin is `a11c8f7f`, adding all 1,721 commits after `c963432d`,
+including the merged Apple GPU changes #1776/#1831/#2015. Eleven reconciled
+patches match 2,130 source files and reverse exactly. All 95 native host/relinker
+tests and six freshly built shader suites pass. The fresh complete Windows HLE
+build is a separate ongoing qualification; earlier runtime results below retain
+their original source scope. Native59's actual synthetic device diagnostic finds
+an unhandled PC/LR=2 continuation fault before MiniGolf starts.
+[Current source, checks and device boundary](UPSTREAM-REFRESH-20261012.md).
+
+## Historical targeted Apple graphics integration, 2026-10-11
+
+This checkpoint used `c963432d` and eleven local patches.
 It adds merged #1776/#1831 and a reconciled local implementation of open #2015,
 plus the macOS cache-directory repair found by native testing. Actual device
 limits and native-null support remain distinguished from typed fallback images.
@@ -19,7 +30,7 @@ package. [Native host evidence](evidence/native58-host-20261011.json).
 
 The following six-patch build and gameplay records retain their original scope.
 
-## Current source refresh, 2026-10-10
+## Historical source refresh, 2026-10-10
 
 The canonical pin is now [`c963432d`](https://github.com/boykopovar/AnyPS5/commit/c963432db05f8b35c62e212b3a36494501522fe2), including all 424 subsequently merged commits. Six local patches reproduce 216 reviewed files and reverse exactly. Schema 22 retains descriptor/interpolation policy identities and rejects old caches. The updated exception/audio paths are reconciled with native CPU-state preservation and strict unsupported Audio3d behavior. Targeted null-pixel and MiniGolf sample-pattern regressions are included; source preparation is separate from actual materialization/GPU acceptance.
 

@@ -12,7 +12,16 @@ the existing `lib*` names. Every selected target must still have a matching sour
 directory. Manifest paths and shell characters are rejected before configuration.
 `--from-hle` reads a prior archive's manifest to select names, without reusing old
 binaries. `--source /absolute/path/to/patched/AnyPS5` selects a separate checkout
-for a pin upgrade; use its matching host tools when preparing the package. Only this invocation's selected PRXs enter the exported archive.
+for a pin upgrade; this must be its own Git checkout, not an exported folder
+inside the wrapper repository. Use its matching host tools when preparing the
+package. Only this invocation's selected PRXs enter the exported archive.
+
+The current complete-source refresh is `a11c8f7f`. After configuration, the
+helper reads its owned CMake codemodel query and checks all selected PRXs are
+actual shared-library targets, and all selected tools/tests are executable
+targets on this platform. Bundled dependencies are selected explicitly with
+`ANYPS5_USE_SYSTEM_DEPS=OFF`. The fresh 47-library runtime qualification is
+separate from the older results below. [Current checks](UPSTREAM-REFRESH-20261012.md).
 
 Use `--wine-prefix /absolute/project/build/owned-prefix` for an isolated local
 Wine session. Repeat `--additional-test existing_target_tests` to select further
@@ -55,7 +64,7 @@ producing 53 distinct cases. One internal AVX subcase remains skipped on local
 Wine; there are no CTest skips or failures. Before/after hashes cover actual test
 executables, PRXs and compiler runtime DLLs; changed inputs fail qualification.
 The final export seals the immutable qualification and verifies embedded/outer
-provenance without circular hashes. [Current build evidence](evidence/anyps5-combined-runtime-20261010.json).
+provenance without circular hashes. [Historical build evidence](evidence/anyps5-combined-runtime-20261010.json).
 
 The eleven-patch Apple graphics runtime built on 2026-10-11 contains 47 PRXs
 and three compiler DLLs. Its 42 standard plus eleven additional test executables

@@ -5,7 +5,28 @@ remains a complete offline single-player course with touch input, sound and
 save/load, without an initial FPS threshold. A rendered course and completed
 stroke are not established.
 
-The current source is complete AnyPS5 through `c963432d` with eleven local
+## Current full upstream refresh, 2026-10-12
+
+The current source is complete merged AnyPS5 main at `a11c8f7f`, including
+all 1,721 commits after `c963432d` and the merged Apple #1776/#1831/#2015
+implementations. The eleven reconciled patches apply and reverse exactly;
+95 host/relinker tests and six native shader suites pass. Fresh Windows HLE
+libraries and tools are building from this source; the existing prepared
+game package is not relabelled as a build of this update.
+[Refresh details](UPSTREAM-REFRESH-20261012.md).
+
+Native59 is installed. Its fresh 45-second CPU diagnostic captures an unhandled
+native read at address 2, with PC/LR=2 after context restoration. Both valid
+ownership samples have a free allocator lock and zero native critical depth;
+the earlier Native57 spin does not prove this failure's cause. No completed
+interruption delivery or normal guest exit is captured. Library restoration,
+protected metadata and closure of the owned process pass. Correct CPU delivery
+remains required before this iPad can qualify the new MiniGolf package.
+[Actual device observation](evidence/native59-owner-sampler-observation-20261012.json).
+
+## Preceding package and Windows results
+
+The preceding source was complete AnyPS5 through `c963432d` with eleven local
 patches, including LDS spill, complete descriptor-array snapshots and typed
 image fallback. Fresh native CPU tests pass. The new 47-library Windows runtime
 passes 54 host cases under local Wine; its actual production PRX passes 538
@@ -90,7 +111,8 @@ critical state. It rejects foreign, ambiguous or changing mappings and logs
 after resuming the sampled thread. The former watchdog and long RIP profiler
 are skipped only when this diagnostic is explicitly enabled. Equal repeated
 reads are observations, not an atomic snapshot or proof of the hang's cause.
-A fresh device observation and CPU qualification remain required before import.
+The subsequent device observation above captures a PC/LR=2 fault with free
+observed ownership state; CPU qualification remains required before import.
 [Signed diagnostic build](evidence/native59-host-20261011.json).
 
 An earlier installation preflight stopped before device operations because the
