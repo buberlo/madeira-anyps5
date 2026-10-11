@@ -120,7 +120,7 @@ proves the cause. The collector restores its library and protected metadata,
 closes its own process and releases the device.
 [Actual observation](evidence/native59-owner-sampler-observation-20261012.json).
 
-**Native60 is installed with CPU execution pending.** Its experimental
+**Native60 is installed, but its Original50 CPU attempt remains incomplete.** Its experimental
 EC continuation candidate compiles 187 ARM64EC objects, 50 fresh native objects
 and nine retained FEXCore members. The app uses matching FEXBridge headers and
 archives, verified translator bytes, signature, entitlements and dSYM identity.
@@ -134,6 +134,14 @@ Earlier preflight refusals remain preserved.
 [actual native build](evidence/native-ec-continuation-native-build-20261012.json),
 [signed app](evidence/native60-local-build-signature-20261012.json),
 [candidate source](../experimental/native-ec-continuation/README.md).
+
+The subsequent unchanged Original50 fixture begins after automatic JIT, but
+does not produce all 50 deliveries, PASS or a guest zero exit during the
+120-second observation. The collector finishes in 137.148 seconds, restores
+the library and protected metadata and closes only its own process, with no
+cleanup error. The quiet log does not prove a fault cause or recurrence of
+Native59's PC/LR=2 failure. Further CPU phases and game execution stay gated.
+[Actual CPU observation](evidence/native60-original50-observation-20261012.json).
 
 MiniGolf is **not yet demonstrated playable**. Next are complete linked-runtime
 and loaded-PRX qualification, fresh twelve-ELF preparation, the preserving host

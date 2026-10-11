@@ -48,10 +48,18 @@ matching FEXBridge/translator/native inputs. It retains the older HLE payload
 to isolate CPU behavior. The completed preserving update verifies accessible
 protected data, opaque metadata and the exact system-artifact policy; opaque
 contents are not claimed read back. Earlier preflight refusals remain retained.
-Original50 delivery, full CPU phases, GPU and MiniGolf execution remain separate
-pending checks.
+Original50 delivery remains incomplete; full CPU phases, GPU and MiniGolf
+execution remain separate pending checks.
 [Actual preserving installation](evidence/native60-preserving-installation-20261012.json),
 [candidate and build boundaries](../experimental/native-ec-continuation/README.md).
+
+The first Native60 Original50 run activates automatic JIT and starts the
+unchanged fixture, but all 50 deliveries and a guest zero exit remain absent
+at the end of the 120-second observation. Library/metadata restoration and
+owned-process closure pass; no cleanup errors occur. This rejects CPU
+qualification and does not identify the fault's cause. Later CPU phases, GPU
+and MiniGolf remain gated.
+[Actual CPU observation](evidence/native60-original50-observation-20261012.json).
 
 ## Preceding package and Windows results
 

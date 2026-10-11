@@ -176,3 +176,11 @@ observers join successfully. Opaque contents and independent installed-binary
 bytes remain outside this acceptance. Original50, full803, all eight CPU phases,
 GPU and MiniGolf gameplay remain pending.
 [Actual preserving installation](../../docs/evidence/native60-preserving-installation-20261012.json).
+
+The first subsequent Native60 Original50 test starts the unchanged fixture
+through automatic JIT but does not complete all50 deliveries or guest zero exit
+within120 seconds. Library/metadata restoration and own-process closure pass,
+with no cleanup errors. The candidate is not CPU-qualified; the quiet log does
+not establish a cause or prove recurrence of the earlier PC/LR=2 fault. Further
+CPU phases and game execution remain gated.
+[Actual CPU observation](../../docs/evidence/native60-original50-observation-20261012.json).
