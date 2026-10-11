@@ -9,13 +9,23 @@ stroke are not established.
 
 The current source is complete merged AnyPS5 main at `a11c8f7f`, including
 all 1,721 commits after `c963432d` and the merged Apple #1776/#1831/#2015
-implementations. The eleven reconciled patches apply and reverse exactly;
+implementations. The preceding eleven reconciled patches apply and reverse exactly;
 95 host/relinker tests and six native shader suites pass. All 47 Windows HLE libraries and their selected test targets compile.
 The twelve raw-log cases pass; linked-runtime qualification then stops at
 `windows_exception_tests` when `call_once` throws through runtime DLL frames.
 The existing prepared
 game package is not relabelled as a build of this update.
 [Refresh details](UPSTREAM-REFRESH-20261012.md).
+
+The twelve-patch source now adds a scoped compiler-once repair. Its isolated
+actual build preserves libc's existing exports, routes both owned direct and
+import-slot calls, and passes the unchanged original Windows exception fixture
+plus all eight focused cases. Every command and the owned Wine prefix closes;
+independent readback verifies the actual images and dependency records. A fresh
+complete 47-library build is running. This result repairs the observed once
+boundary; it does not qualify the full runtime, GPU or game.
+[Scoped execution result](../experimental/compiler-once-execution/direct-attempt-observation.json),
+[implementation](../patches/anyps5/0012-native-compiler-once.patch).
 
 Native59 is installed. Its fresh 45-second CPU diagnostic captures an unhandled
 native read at address 2, with PC/LR=2 after context restoration. Both valid

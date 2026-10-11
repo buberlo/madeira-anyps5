@@ -15,12 +15,17 @@ unchanged upstream head is not an omitted update. See [exact pins](UPSTREAMS.md)
 
 ## Reconciliation
 
-The eleven active patches now describe the remaining local runtime, exception,
+The first eleven patches describe the remaining local runtime, exception,
 shader, audio, resource, pipeline and relinker behavior. The preceding eleven
 patches are retained under `patches/anyps5/legacy-c963432d/` and are not applied
 to the new pin. Fresh application matches all **2,130 source files**, including
 the 227 files changed locally; complete reversal restores upstream bytes and
 executable modes. All eleven nested dependency pins remain exact.
+
+A twelfth patch integrates the scoped compiler-once repair described below.
+It changes seven files and passes its separate application/reversal controls.
+The fresh twelve-patch build source contains 2,136 files, all read back against
+the canonical patched source; the prior eleven-patch proof remains historical.
 
 - The merged Apple fixes, including #1776 LDS spill, #1831 descriptor arrays
   and the now-merged #2015 image handling, come from the complete upstream
@@ -74,8 +79,23 @@ walking past that frame would lose required cleanup. The isolated diagnostic
 compiles and links, preserves the original providers, captures exit 3 and joins
 its Wine prefix; it does not repair the failure.
 [First missing-frame observation](evidence/windows-compiler-once-first-miss-20261012.json).
-The fixture
-and cleanup assertions remain enabled. Full linked-runtime qualification, the
+
+The direct-and-IAT repair now passes an actual isolated build. It keeps the
+original 1,061 libc export names, ordinals and data classifications, adds one
+private NID-exempt provider and leaves guest once objects and native compiler
+DLL internals unchanged. Both direct calls and owned import slots use the same
+four-byte once state: exceptional callbacks reset and wake waiters before
+rethrowing; successful callbacks publish writes and wake waiters. The unchanged
+original Windows exception fixture and all eight focused cases pass, including
+cross-module identity, destructors/retry, concurrent publication and wait
+failures. All 17 commands close successfully, including the graceful Wine
+prefix wait. Independent readback verifies the 56 actual output files, all six
+dependency records and the PE export/import contracts.
+[Actual scoped execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
+[production integration](../patches/anyps5/0012-native-compiler-once.patch).
+
+The complete 47-library build is now running from that fresh twelve-patch
+source. The fixture and cleanup assertions remain enabled. Full linked-runtime qualification, the
 new prepared game package, Windows GPU run and iPad game run remain separate
 steps. The earlier 54-case runtime and 538-case
 production-driver results belong to the preceding source and are not reused as

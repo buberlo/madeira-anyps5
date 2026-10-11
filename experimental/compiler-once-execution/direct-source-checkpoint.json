@@ -1,0 +1,21 @@
+{
+  "actualCandidateResultRecorded": true,
+  "candidateSourceReviewSha256": "186dc6e6ed9b98009b7387f5c2a8fee0c652a672211ac54a2b8a18c404744fc3",
+  "changedFunctionNames": [
+    "run_commands",
+    "shape"
+  ],
+  "compiledOutputsIncluded": false,
+  "deviceExecuted": false,
+  "fullHleQualified": false,
+  "priorExecutorSourceReviewSha256": "90e7577cfbc7c7c4b5e18470ad96693de8fc134b8ff5d6091bebb113275d32c1",
+  "priorFailedReceiptSha256": "552e7ba1138a29703160e5e9ff61acffe5c6d233347822f4752814c7984d0c70",
+  "privateBindingsIncluded": false,
+  "pureInjectedControls": 14,
+  "rawLogsIncluded": false,
+  "runtimeQualified": false,
+  "schema": 1,
+  "sourceReviewSha256": "43a2cc24497f6f4430d5bfeb37eae31f11f71882a879b106582a034525a59c71",
+  "status": "direct_executor_source_successor_with_separate_scoped_actual_pass",
+  "unchangedResourceDependencyEnvironmentChildPrefixAndRuntimePolicy": true
+}

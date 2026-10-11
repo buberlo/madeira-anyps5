@@ -1,0 +1,1424 @@
+--- a/core/libs/prx/libc/CMakeLists.txt
++++ b/core/libs/prx/libc/CMakeLists.txt
+@@ -1,3 +1,21 @@
++# Own the native compiler-once boundary only for the pinned Windows GNU ABI.
++set(APS5_NATIVE_COMPILER_ONCE_ENABLED FALSE)
++if(MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
++    set(APS5_NATIVE_COMPILER_ONCE_ENABLED TRUE)
++    set(compilerOnceDir "${CMAKE_CURRENT_SOURCE_DIR}/src/specifics/windows")
++    target_sources(libc PRIVATE "${compilerOnceDir}/provider.cpp"
++        "${compilerOnceDir}/caller_bridge.cpp" "${compilerOnceDir}/compiler_once_exports.def")
++    target_compile_definitions(libc PRIVATE APS5_ONCE_PROVIDER_LOCAL=1)
++    target_link_libraries(libc PRIVATE synchronization)
++    target_link_options(libc PRIVATE "LINKER:--exclude-all-symbols")
++    # Final libc-linked images receive one bridge; dependent static archives do
++    # not receive a second definition of the direct function or its IAT slot.
++    target_sources(libc INTERFACE
++        "$<$<OR:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>,$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>,$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>>:$<BUILD_INTERFACE:${compilerOnceDir}/caller_bridge.cpp>>")
++    target_link_options(libc INTERFACE
++        "LINKER:--exclude-symbols,pthread_once:__imp_pthread_once:APS5CompilerOnceBridge:APS5CompilerOnceResolvedTarget")
++endif()
++
+ target_sources(libc PRIVATE
+         ${CMAKE_CURRENT_SOURCE_DIR}/Export.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/src/General.cpp
+@@ -584,3 +602,22 @@
+         set_tests_properties(windows_exceptions PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+     endif()
+ endif()
++
++if(APS5_NATIVE_COMPILER_ONCE_ENABLED AND BUILD_TESTING)
++    add_library(compiler_once_cross SHARED ${LIBS_INCLUDE_DIR}/tests/CompilerOnceCross.cpp)
++    set_target_properties(compiler_once_cross PROPERTIES PREFIX ""
++        RUNTIME_OUTPUT_DIRECTORY "$<1:${ANYPS5_TEST_OUTPUT_DIRECTORY}>")
++    target_link_libraries(compiler_once_cross PRIVATE libc)
++    configure_windows_unwind(compiler_once_cross)
++    add_test_executable(compiler_once_tests ${LIBS_INCLUDE_DIR}/tests/CompilerOnce.cpp)
++    target_include_directories(compiler_once_tests PRIVATE "${compilerOnceDir}")
++    target_link_libraries(compiler_once_tests PRIVATE libc)
++    configure_windows_unwind(compiler_once_tests)
++    add_dependencies(compiler_once_tests compiler_once_cross)
++    add_test(NAME windows_compiler_once COMMAND compiler_once_tests
++        $<TARGET_FILE:libc> $<TARGET_FILE:compiler_once_cross>)
++    set_tests_properties(windows_compiler_once PROPERTIES TIMEOUT 60
++        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
++    # Preserve the original complete exception fixture and its source.
++    set_tests_properties(windows_exceptions PROPERTIES TIMEOUT 60)
++endif()
+--- /dev/null
++++ b/core/libs/prx/libc/src/specifics/windows/caller_bridge.cpp
+@@ -0,0 +1,27 @@
++// Link this object only into newly qualified owned MinGW callers. It supplies
++// both the direct C ABI and exact dllimport variable requested by owned callers. No macro
++// or guest pthread_once export is changed, and native DLL IATs are untouched.
++using OnceFunction = int (*)(long*, void (*)());
++#ifdef APS5_ONCE_PROVIDER_LOCAL
++extern "C" int APS5NativeCompilerOnce_nid_no_patch(long*, void (*)());
++#else
++extern "C" __declspec(dllimport)
++int APS5NativeCompilerOnce_nid_no_patch(long*, void (*)());
++extern "C" OnceFunction __imp_APS5NativeCompilerOnce_nid_no_patch;
++#endif
++extern "C" int APS5CompilerOnceBridge(long* flag, void (*initialize)()) {
++    return APS5NativeCompilerOnce_nid_no_patch(flag, initialize);
++}
++extern "C" int pthread_once(long* flag, void (*initialize)()) {
++    return APS5CompilerOnceBridge(flag, initialize);
++}
++extern "C" {
++OnceFunction __imp_pthread_once = &pthread_once;
++}
++extern "C" OnceFunction APS5CompilerOnceResolvedTarget() noexcept {
++#ifdef APS5_ONCE_PROVIDER_LOCAL
++    return &APS5NativeCompilerOnce_nid_no_patch;
++#else
++    return __imp_APS5NativeCompilerOnce_nid_no_patch;
++#endif
++}
+--- /dev/null
++++ b/core/libs/prx/libc/src/specifics/windows/compiler_once.hpp
+@@ -0,0 +1,41 @@
++#pragma once
++#include <atomic>
++#include <cerrno>
++#include <cstdint>
++#include <type_traits>
++
++namespace aps5::compiler_once {
++// Native MinGW pthread_once_t is Windows long (four bytes), not GuestOnce.
++// 0 is PTHREAD_ONCE_INIT, 1 is the native completed value; 2 is ours alone.
++template<class Word, class Waiter, class Callback>
++int invoke(Word* storage, Callback&& callback, Waiter& waiter) {
++    static_assert(sizeof(Word) == 4 && std::is_integral_v<Word>);
++    static_assert(std::atomic_ref<Word>::is_always_lock_free);
++    static_assert(noexcept(waiter.wake(storage)));
++    if (!storage || reinterpret_cast<std::uintptr_t>(storage) %
++                        std::atomic_ref<Word>::required_alignment) return EINVAL;
++    std::atomic_ref<Word> state(*storage);
++    for (;;) {
++        Word observed = state.load(std::memory_order_acquire);
++        if (observed == 1) return 0;
++        if (observed == 0) {
++            if (!state.compare_exchange_weak(observed, Word{2},
++                    std::memory_order_acquire, std::memory_order_acquire)) continue;
++            // The callback runs without a registry, global mutex or TLS node.
++            try { callback(); }
++            catch (...) {
++                state.store(0, std::memory_order_release);
++                waiter.wake(storage);
++                throw;
++            }
++            state.store(1, std::memory_order_release);
++            waiter.wake(storage);
++            return 0;
++        }
++        if (observed != 2) return EINVAL;
++        // WaitOnAddress compares again before sleeping; an early wake needs
++        // another acquire load. Failure never clears a different owner's flag.
++        if (!waiter.wait(storage, Word{2})) return EAGAIN;
++    }
++}
++}
+--- /dev/null
++++ b/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def
+@@ -0,0 +1,1064 @@
++LIBRARY libc.prx
++EXPORTS
++  "AddPathAlias_nid_no_patch" @1
++  "AllocateFacetVector" @2
++  "ApplicationHeapAlign_nid_no_patch" @3
++  "ApplicationHeapAllocate_nid_no_patch" @4
++  "ApplicationHeapCalloc_nid_no_patch" @5
++  "ApplicationHeapFree_nid_no_patch" @6
++  "ApplicationHeapInitialize_nid_no_patch" @7
++  "ApplicationHeapPosixAlign_nid_no_patch" @8
++  "ApplicationHeapRealign_nid_no_patch" @9
++  "ApplicationHeapReallocate_nid_no_patch" @10
++  "ApplicationHeapRegister_nid_no_patch" @11
++  "ApplicationHeapStatsFast_nid_no_patch" @12
++  "ApplicationHeapUsableSize_nid_no_patch" @13
++  "ApplicationProcessParameters_nid_no_patch" @14
++  "BlockPathAlias_nid_no_patch" @15
++  "CxaFinalize_nid_no_patch" @16
++  "FinalPathComponentIsDot_nid_no_patch" @17
++  "GuestAllocationsAcquireAll_nid_postfix" @18
++  "GuestAllocationsAcquire_nid_postfix" @19
++  "GuestAllocationsAdd_nid_postfix" @20
++  "GuestAllocationsBegin_nid_postfix" @21
++  "GuestAllocationsCovers_nid_postfix" @22
++  "GuestAllocationsEnd_nid_postfix" @23
++  "GuestAllocationsFind_nid_postfix" @24
++  "GuestAllocationsGeneration_nid_postfix" @25
++  "GuestAllocationsInvalidate_nid_postfix" @26
++  "GuestAllocationsNoteGpuMapping_nid_postfix" @27
++  "GuestAllocationsOverlaps_nid_postfix" @28
++  "GuestAllocationsProtect_nid_postfix" @29
++  "GuestAllocationsRegisterImage_nid_postfix" @30
++  "GuestAllocationsRegisterMainImage_nid_postfix" @31
++  "GuestAllocationsRemove_nid_postfix" @32
++  "GuestAllocationsRequireAvailable_nid_postfix" @33
++  "GuestAllocationsRequireUnpinned_nid_postfix" @34
++  "GuestAllocationsSetGpuMapObserver_nid_postfix" @35
++  "GuestAllocationsSetInvalidator_nid_postfix" @36
++  "GuestAllocationsSetPinWaiter_nid_postfix" @37
++  "GuestAllocationsUnmap_nid_postfix" @38
++  "GuestAllocationsUnregisterImage_nid_postfix" @39
++  "GuestArenaAllocateAtOrAbove_nid_postfix" @40
++  "GuestArenaAllocate_nid_postfix" @41
++  "GuestArenaAvailable_nid_postfix" @42
++  "GuestArenaBeginHostWrite_nid_postfix" @43
++  "GuestArenaCollectWrites_nid_postfix" @44
++  "GuestArenaCommitGeneration_nid_postfix" @45
++  "GuestArenaCommit_nid_postfix" @46
++  "GuestArenaContains_nid_postfix" @47
++  "GuestArenaEndHostWrite_nid_postfix" @48
++  "GuestArenaHandleWrite_nid_postfix" @49
++  "GuestArenaHostRegionOverlaps_nid_postfix" @50
++  "GuestArenaMapAlias_nid_postfix" @51
++  "GuestArenaMap_nid_postfix" @52
++  "GuestArenaMarkUsed_nid_postfix" @53
++  "GuestArenaPinWritable_nid_postfix" @54
++  "GuestArenaProtection_nid_postfix" @55
++  "GuestArenaRange_nid_postfix" @56
++  "GuestArenaRelease_nid_postfix" @57
++  "GuestArenaReset_nid_postfix" @58
++  "GuestArenaSetPrivateMappingObserver_nid_postfix" @59
++  "GuestArenaSetProtection_nid_postfix" @60
++  "GuestArenaUnmapAlias_nid_postfix" @61
++  "GuestArenaUnpinWritable_nid_postfix" @62
++  "GuestArenaWriteWatched_nid_postfix" @63
++  "GuestHeapAlignForGpu_nid_postfix" @64
++  "GuestHeapAlign_nid_postfix" @65
++  "GuestHeapAllocate_nid_postfix" @66
++  "GuestHeapFree_nid_postfix" @67
++  "GuestHeapRealign_nid_postfix" @68
++  "GuestHeapReallocate_nid_postfix" @69
++  "GuestHeapUsableSize_nid_postfix" @70
++  "GuestStackRegister_nid_no_patch" @71
++  "GuestStackSwitch_nid_no_patch" @72
++  "GuestWriteWatchAvailable_nid_postfix" @73
++  "GuestWriteWatchBeginHostWrite_nid_postfix" @74
++  "GuestWriteWatchCollectArmed_nid_postfix" @75
++  "GuestWriteWatchCollectFresh_nid_postfix" @76
++  "GuestWriteWatchCollect_nid_postfix" @77
++  "GuestWriteWatchCovers_nid_postfix" @78
++  "GuestWriteWatchEndHostWrite_nid_postfix" @79
++  "GuestWriteWatchProtectionChanged_nid_postfix" @80
++  "GuestWriteWatchProtection_nid_postfix" @81
++  "GuestWriteWatchRegister_nid_postfix" @82
++  "GuestWriteWatchUnregister_nid_postfix" @83
++  "H+8UBOwfScI_nid_no_patch_cut" @84
++  "LibcAwaitExit_nid_postfix" @85
++  "LibcCaptureRegisters" @86
++  "LibcExit_nid_no_patch" @87
++  "LibcHeapGetTraceInfo_nid_postfix" @88
++  "LibcHeapTraceInfo_nid_no_patch" @89
++  "LibcInternalExtCxaThreadAtexit_nid_postfix" @90
++  "LibcRegisterShutdown_nid_postfix" @91
++  "LibcRequestExit_nid_postfix" @92
++  "LibcRequestShutdown_nid_postfix" @93
++  "LibcRestoreRegisters" @94
++  "LibcRunShutdown_nid_postfix" @95
++  "LibcRuntimeAssertion" @96
++  "LibcShutdownToken_nid_postfix" @97
++  "LibcTerminate_nid_no_patch" @98
++  "Need_sceLibc" @99 DATA
++  "NotImplemented_nid_no_patch" @100
++  "RecordWrittenPath_nid_no_patch" @101
++  "RemovePathAlias_nid_no_patch" @102
++  "ResolvePath_nid_no_patch" @103
++  "SetWorkingDirectory_nid_no_patch" @104
++  "StopAtPrefixLetter_nid_no_patch" @105
++  "SyncWrittenPaths_nid_no_patch" @106
++  "WrittenPaths_nid_no_patch" @107
++  "_Assert_nid_postfix" @108
++  "_Atomic_compare_exchange_weak_4_nid_postfix" @109
++  "_Atomic_fetch_add_4_nid_postfix" @110
++  "_Atomic_fetch_sub_4_nid_postfix" @111
++  "_Atomic_load_4_nid_postfix" @112
++  "_Cnd_broadcast_nid_postfix" @113
++  "_Cnd_destroy_nid_postfix" @114
++  "_Cnd_init_nid_postfix" @115
++  "_Cnd_wait_nid_postfix" @116
++  "_CurrentRuneLocale_nid_postfix" @117 DATA
++  "_DefaultRuneLocale_nid_postfix" @118 DATA
++  "_Exit_nid_postfix" @119
++  "_FCosh_nid_postfix" @120
++  "_FDtest_nid_postfix" @121
++  "_FInf_nid_postfix" @122 DATA
++  "_FNan_nid_postfix" @123 DATA
++  "_FSinh_nid_postfix" @124
++  "_Fltrounds_nid_postfix" @125
++  "_Getmbcurmax_nid_postfix" @126
++  "_Getpctype_nid_postfix" @127
++  "_Getpmbstate_nid_postfix" @128
++  "_Getptolower_nid_postfix" @129
++  "_Getptoupper_nid_postfix" @130
++  "_Getpwcstate_nid_postfix" @131
++  "_Iswctype_nid_postfix" @132
++  "_Lockfilelock_nid_postfix" @133
++  "_Locksyslock_nid_postfix" @134
++  "_Mbtowcx_nid_postfix" @135
++  "_Mtx_destroy_nid_postfix" @136
++  "_Mtx_init_nid_postfix" @137
++  "_Mtx_lock_nid_postfix" @138
++  "_Mtx_unlock_nid_postfix" @139
++  "_Sinh_nid_postfix" @140
++  "_Stderr_nid_postfix" @141 DATA
++  "_Stdin_nid_postfix" @142 DATA
++  "_Stdout_nid_postfix" @143 DATA
++  "_Stoul_nid_postfix" @144
++  "_Stoull_nid_postfix" @145
++  "_Towctrans_nid_postfix" @146
++  "_Unlockfilelock_nid_postfix" @147
++  "_Unlocksyslock_nid_postfix" @148
++  "_Unwind_Backtrace_nid_postfix" @149
++  "_Unwind_DeleteException_nid_postfix" @150
++  "_Unwind_ForcedUnwind_nid_postfix" @151
++  "_Unwind_GetCFA_nid_postfix" @152
++  "_Unwind_GetDataRelBase_nid_postfix" @153
++  "_Unwind_GetGR_nid_postfix" @154
++  "_Unwind_GetIPInfo_nid_postfix" @155
++  "_Unwind_GetIP_nid_postfix" @156
++  "_Unwind_GetLanguageSpecificData_nid_postfix" @157
++  "_Unwind_GetRegionStart_nid_postfix" @158
++  "_Unwind_GetTextRelBase_nid_postfix" @159
++  "_Unwind_RaiseException_nid_postfix" @160
++  "_Unwind_Resume" @161
++  "_Unwind_Resume_nid_postfix" @162
++  "_Unwind_Resume_or_Rethrow_nid_postfix" @163
++  "_Unwind_SetGR_nid_postfix" @164
++  "_Unwind_SetIP_nid_postfix" @165
++  "_WStoul_nid_postfix" @166
++  "_Wctombx_nid_postfix" @167
++  "_Xtime_get_ticks_nid_postfix" @168
++  "_Z15FilesystemErrorRKSt10error_code" @169
++  "_ZGVZN10GuestArena15WindowsMappings3GetEvE8mappings" @170 DATA
++  "_ZGVZNSt8__detail18__waiter_pool_base6_S_forEPKvE3__w" @171 DATA
++  "_ZN10FileStreamC1EP6_iobufb" @172
++  "_ZN10GuestArena15WindowsMappings13HostWriteViewD1Ev" @173
++  "_ZN10GuestArena15WindowsMappings14BeginHostWriteEyy" @174
++  "_ZN10GuestArena15WindowsMappings19invalidateHostWriteERNS0_10SharedPageE" @175
++  "_ZN10GuestArena15WindowsMappings3MapEPvyS1_ym" @176
++  "_ZN10GuestArena15WindowsMappings3PinEyy" @177
++  "_ZN10GuestArena15WindowsMappings4ViewD1Ev" @178
++  "_ZN10GuestArena15WindowsMappings4failEPKc" @179
++  "_ZN10GuestArena15WindowsMappings5resetEyy" @180
++  "_ZN10GuestArena15WindowsMappings6CommitEPvymyb" @181
++  "_ZN10GuestArena15WindowsMappings7CollectEyyPPvPyb" @182
++  "_ZN10GuestArena15WindowsMappings8MapAliasEyy" @183
++  "_ZN10LibcDetail10AppendUtf8ERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEDi" @184
++  "_ZN10LibcDetail12FormatOutput5ValueIPKcEEvRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEET_" @185
++  "_ZN10LibcDetail12FormatOutput5ValueIiEEvRKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEET_" @186
++  "_ZN10LibcDetail12FormatOutput6AppendEPKcy" @187
++  "_ZN10LibcDetail13FormatPointerERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEPKv" @188
++  "_ZN10LibcDetail13FormatWindowsEPcyPKcPKvPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE" @189
++  "_ZN10LibcDetail33ScanWindowsArguments_nid_no_patchIZNS_11ScanWindowsEPKcS2_PKvEUlS2_PcE_EEiS2_S4_T_" @190
++  "_ZN10LibcDetail33ScanWindowsArguments_nid_no_patchIZNS_28ScanFileWindows_nid_no_patchEP6_iobufPKcPKvEUlS4_PcE_EEiS4_S6_T_" @191
++  "_ZN10LibcUnwind10ExpressionEPKhRK15_Unwind_ContextyRy" @192
++  "_ZN10LibcUnwind11DecodeFrameER15_Unwind_ContextRNS_5FrameE" @193
++  "_ZN10LibcUnwind11DecodeRangeERNS_5FrameERKNS_6LookupERPKhRPKcRh" @194
++  "_ZN10LibcUnwind11IndexFramesERKSt5arrayIyLy6EEPKhS5_" @195
++  "_ZN10LibcUnwind12InstructionsEPKhS1_RKNS_5FrameEyRNS_5RulesERKS5_" @196
++  "_ZN10LibcUnwind15CallPersonalityEyiP17_Unwind_ExceptionP15_Unwind_Context" @197
++  "_ZN10LibcUnwind15DecodeCandidateER15_Unwind_ContextRNS_5FrameERKNS_6LookupE" @198
++  "_ZN10LibcUnwind4StepER15_Unwind_Context" @199
++  "_ZN10LibcUnwind8GetRulesER15_Unwind_ContextRNS_5FrameERNS_5RulesE" @200
++  "_ZN10LibcUnwind8PhaseTwoE15_Unwind_ContextP17_Unwind_Exception" @201
++  "_ZN12_GLOBAL__N_114quickExitMutexE" @202 DATA
++  "_ZN12_GLOBAL__N_118quickExitCallbacksE" @203 DATA
++  "_ZN13LibcException10DeleteTypeEPNS_10TypeRecordE" @204
++  "_ZN13LibcException10NotPointerEPKNS_10TypeRecordE" @205
++  "_ZN13LibcException10ThrowPlainERKNS_15ExceptionVtableE" @206
++  "_ZN13LibcException10TypeUpcastEPKNS_10TypeRecordES2_PPv" @207
++  "_ZN13LibcException11CopyMessageEPKc" @208
++  "_ZN13LibcException11DeletePlainEPNS_15ExceptionObjectE" @209
++  "_ZN13LibcException11DestroyTypeEPNS_10TypeRecordE" @210
++  "_ZN13LibcException11MessageWhatEPKNS_15ExceptionObjectE" @211
++  "_ZN13LibcException12DestroyPlainEPNS_15ExceptionObjectE" @212
++  "_ZN13LibcException12PointerMatchEPKN10__cxxabiv117__pbase_type_infoES3_RPvjb" @213
++  "_ZN13LibcException12ThrowMessageERKNS_15ExceptionVtableEPKc" @214
++  "_ZN13LibcException13ArrayAllocateEy" @215
++  "_ZN13LibcException13DeleteMessageEPNS_15ExceptionObjectE" @216
++  "_ZN13LibcException13RetainMessageEPKc" @217
++  "_ZN13LibcException14DestroyMessageEPNS_15ExceptionObjectE" @218
++  "_ZN13LibcException14ReleaseMessageEPKc" @219
++  "_ZN13LibcException15InvokeTerminateEPFvvE" @220
++  "_ZN13LibcException16terminateHandlerE" @221 DATA
++  "_ZN13LibcException19DeleteForeignHeaderEPNS_6HeaderE" @222
++  "_ZN13LibcException4CopyEPNS_15ExceptionObjectEPKS0_RKNS_15ExceptionVtableE" @223
++  "_ZN13LibcException4KindEPKSt9type_info" @224
++  "_ZN13LibcException5BasesEPKSt9type_infoPvRNS_6SearchE" @225
++  "_ZN13LibcException5EqualEPKSt9type_infoS2_" @226
++  "_ZN13LibcException5MatchEPKSt9type_infoS2_RPv" @227
++  "_ZN13LibcException6AssignEPNS_15ExceptionObjectEPKS0_" @228
++  "_ZN13LibcException7CleanupEiP17_Unwind_Exception" @229
++  "_ZN13LibcException7ReleaseEPv" @230
++  "_ZN13LibcException8UnwindOfEPNS_6HeaderE" @231
++  "_ZN13LibcException9ArraySizeEyyy" @232
++  "_ZN13LibcException9ConstructEPNS_15ExceptionObjectERKNS_15ExceptionVtableEPKc" @233
++  "_ZN13LibcException9PlainWhatEPKNS_15ExceptionObjectE" @234
++  "_ZN13LibcException9TerminateEv" @235
++  "_ZN13LibcException9TypeCatchEPKNS_10TypeRecordES2_PPvj" @236
++  "_ZN16GuestAllocations13PinnedFailureEyyPKc" @237
++  "_ZN9GuestRune2IsEjy" @238
++  "_ZNKSt10bad_typeid4whatEv_nid_postfix" @239
++  "_ZNKSt11logic_error4whatEv_nid_postfix" @240
++  "_ZNKSt11regex_error4whatEv_nid_postfix" @241
++  "_ZNKSt12bad_weak_ptr4whatEv_nid_postfix" @242
++  "_ZNKSt12domain_error4whatEv_nid_postfix" @243
++  "_ZNKSt12length_error4whatEv_nid_postfix" @244
++  "_ZNKSt12out_of_range4whatEv_nid_postfix" @245
++  "_ZNKSt12system_error4whatEv_nid_postfix" @246
++  "_ZNKSt13runtime_error4whatEv_nid_postfix" @247
++  "_ZNKSt15__exception_ptr13exception_ptr20__cxa_exception_typeEv" @248
++  "_ZNKSt15__exception_ptr13exception_ptr20__cxa_exception_typeEv_nid_postfix" @249
++  "_ZNKSt15__exception_ptr13exception_ptr6_M_getEv" @250
++  "_ZNKSt15__exception_ptr13exception_ptr6_M_getEv_nid_postfix" @251
++  "_ZNKSt16invalid_argument4whatEv_nid_postfix" @252
++  "_ZNKSt17bad_function_call4whatEv_nid_postfix" @253
++  "_ZNKSt20bad_array_new_length4whatEv_nid_postfix" @254
++  "_ZNKSt23__codecvt_abstract_baseIwc9_MbstatetE2inERS0_PKcS4_RS4_PwS6_RS6_" @255
++  "_ZNKSt23__codecvt_abstract_baseIwc9_MbstatetE3outERS0_PKwS4_RS4_PcS6_RS6_" @256
++  "_ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE6substrEyy" @257
++  "_ZNKSt8bad_cast4whatEv_nid_postfix" @258
++  "_ZNKSt8ios_base7failure4whatEv_nid_postfix" @259
++  "_ZNKSt9bad_alloc4whatEv_nid_postfix" @260
++  "_ZNKSt9exception4whatEv_nid_postfix" @261
++  "_ZNKSt9exception6_RaiseEv_nid_postfix" @262
++  "_ZNKSt9exception8_DoraiseEv_nid_postfix" @263
++  "_ZNSt10bad_typeidC1Ev_nid_postfix" @264
++  "_ZNSt10bad_typeidC2Ev_nid_postfix" @265
++  "_ZNSt10bad_typeidD0Ev_nid_postfix" @266
++  "_ZNSt10bad_typeidD1Ev_nid_postfix" @267
++  "_ZNSt10bad_typeidD2Ev_nid_postfix" @268
++  "_ZNSt10filesystem7__cxx114path10_S_convertIcEEDaPKT_S5_" @269
++  "_ZNSt10filesystem7__cxx114path8_CodecvtIwED0Ev" @270
++  "_ZNSt10filesystem7__cxx114path8_CodecvtIwED1Ev" @271
++  "_ZNSt10filesystem7__cxx114pathD1Ev" @272
++  "_ZNSt10filesystem7__cxx118__detail24__throw_conversion_errorEv" @273
++  "_ZNSt11logic_errorC1EPKc_nid_postfix" @274
++  "_ZNSt11logic_errorC1ERKS__nid_postfix" @275
++  "_ZNSt11logic_errorC2EPKc_nid_postfix" @276
++  "_ZNSt11logic_errorC2ERKS__nid_postfix" @277
++  "_ZNSt11logic_errorD0Ev_nid_postfix" @278
++  "_ZNSt11logic_errorD1Ev_nid_postfix" @279
++  "_ZNSt11logic_errorD2Ev_nid_postfix" @280
++  "_ZNSt11logic_erroraSERKS__nid_postfix" @281
++  "_ZNSt11range_errorD0Ev_nid_postfix" @282
++  "_ZNSt11range_errorD1Ev_nid_postfix" @283
++  "_ZNSt11range_errorD2Ev_nid_postfix" @284
++  "_ZNSt11regex_errorC1ERKS__nid_postfix" @285
++  "_ZNSt11regex_errorC2ERKS__nid_postfix" @286
++  "_ZNSt11regex_errorD0Ev_nid_postfix" @287
++  "_ZNSt11regex_errorD1Ev_nid_postfix" @288
++  "_ZNSt11regex_errorD2Ev_nid_postfix" @289
++  "_ZNSt11regex_erroraSERKS__nid_postfix" @290
++  "_ZNSt12bad_weak_ptrD0Ev_nid_postfix" @291
++  "_ZNSt12bad_weak_ptrD1Ev_nid_postfix" @292
++  "_ZNSt12bad_weak_ptrD2Ev_nid_postfix" @293
++  "_ZNSt12domain_errorC1EPKc_nid_postfix" @294
++  "_ZNSt12domain_errorC1ERKS__nid_postfix" @295
++  "_ZNSt12domain_errorC2EPKc_nid_postfix" @296
++  "_ZNSt12domain_errorC2ERKS__nid_postfix" @297
++  "_ZNSt12domain_errorD0Ev_nid_postfix" @298
++  "_ZNSt12domain_errorD1Ev_nid_postfix" @299
++  "_ZNSt12domain_errorD2Ev_nid_postfix" @300
++  "_ZNSt12domain_erroraSERKS__nid_postfix" @301
++  "_ZNSt12length_errorC1EPKc_nid_postfix" @302
++  "_ZNSt12length_errorC1ERKS__nid_postfix" @303
++  "_ZNSt12length_errorC2EPKc_nid_postfix" @304
++  "_ZNSt12length_errorC2ERKS__nid_postfix" @305
++  "_ZNSt12length_errorD0Ev_nid_postfix" @306
++  "_ZNSt12length_errorD1Ev_nid_postfix" @307
++  "_ZNSt12length_errorD2Ev_nid_postfix" @308
++  "_ZNSt12length_erroraSERKS__nid_postfix" @309
++  "_ZNSt12out_of_rangeC1EPKc_nid_postfix" @310
++  "_ZNSt12out_of_rangeC1ERKS__nid_postfix" @311
++  "_ZNSt12out_of_rangeC2EPKc_nid_postfix" @312
++  "_ZNSt12out_of_rangeC2ERKS__nid_postfix" @313
++  "_ZNSt12out_of_rangeD0Ev_nid_postfix" @314
++  "_ZNSt12out_of_rangeD1Ev_nid_postfix" @315
++  "_ZNSt12out_of_rangeD2Ev_nid_postfix" @316
++  "_ZNSt12out_of_rangeaSERKS__nid_postfix" @317
++  "_ZNSt12system_errorC1ERKS__nid_postfix" @318
++  "_ZNSt12system_errorC1ESt10error_codePKc" @319
++  "_ZNSt12system_errorC1EiRKNSt3_V214error_categoryERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE" @320
++  "_ZNSt12system_errorC2ERKS__nid_postfix" @321
++  "_ZNSt12system_errorD0Ev_nid_postfix" @322
++  "_ZNSt12system_errorD1Ev_nid_postfix" @323
++  "_ZNSt12system_errorD2Ev_nid_postfix" @324
++  "_ZNSt12system_erroraSERKS__nid_postfix" @325
++  "_ZNSt13__future_base12_Result_baseD2Ev" @326
++  "_ZNSt13__future_base12_Result_baseD2Ev_nid_postfix" @327
++  "_ZNSt13runtime_errorC1EPKc_nid_postfix" @328
++  "_ZNSt13runtime_errorC1ERKS__nid_postfix" @329
++  "_ZNSt13runtime_errorC2EPKc_nid_postfix" @330
++  "_ZNSt13runtime_errorC2ERKS__nid_postfix" @331
++  "_ZNSt13runtime_errorD0Ev_nid_postfix" @332
++  "_ZNSt13runtime_errorD1Ev_nid_postfix" @333
++  "_ZNSt13runtime_errorD2Ev_nid_postfix" @334
++  "_ZNSt13runtime_erroraSERKS__nid_postfix" @335
++  "_ZNSt15_Sp_counted_ptrIDnLN9__gnu_cxx12_Lock_policyE2EE10_M_disposeEv" @336
++  "_ZNSt15__exception_ptr13exception_ptr10_M_releaseEv" @337
++  "_ZNSt15__exception_ptr13exception_ptr10_M_releaseEv_nid_postfix" @338
++  "_ZNSt15__exception_ptr13exception_ptr9_M_addrefEv" @339
++  "_ZNSt15__exception_ptr13exception_ptr9_M_addrefEv_nid_postfix" @340
++  "_ZNSt15__exception_ptr13exception_ptrC1EPv" @341
++  "_ZNSt15__exception_ptr13exception_ptrC1EPv_nid_postfix" @342
++  "_ZNSt15__exception_ptr13exception_ptrC2EPv" @343
++  "_ZNSt15__exception_ptr13exception_ptrC2EPv_nid_postfix" @344
++  "_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_destroyEv" @345
++  "_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_releaseEv" @346
++  "_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE24_M_release_last_use_coldEv" @347
++  "_ZNSt16invalid_argumentC1EPKc_nid_postfix" @348
++  "_ZNSt16invalid_argumentC1ERKS__nid_postfix" @349
++  "_ZNSt16invalid_argumentC2EPKc_nid_postfix" @350
++  "_ZNSt16invalid_argumentC2ERKS__nid_postfix" @351
++  "_ZNSt16invalid_argumentD0Ev_nid_postfix" @352
++  "_ZNSt16invalid_argumentD1Ev_nid_postfix" @353
++  "_ZNSt16invalid_argumentD2Ev_nid_postfix" @354
++  "_ZNSt16invalid_argumentaSERKS__nid_postfix" @355
++  "_ZNSt17bad_function_callC1Ev_nid_postfix" @356
++  "_ZNSt17bad_function_callC2Ev_nid_postfix" @357
++  "_ZNSt17bad_function_callD0Ev_nid_postfix" @358
++  "_ZNSt17bad_function_callD1Ev_nid_postfix" @359
++  "_ZNSt17bad_function_callD2Ev_nid_postfix" @360
++  "_ZNSt18codecvt_utf8_utf16IwLm1114111ELSt12codecvt_mode0EED0Ev" @361
++  "_ZNSt18codecvt_utf8_utf16IwLm1114111ELSt12codecvt_mode0EED1Ev" @362
++  "_ZNSt20bad_array_new_lengthC1Ev_nid_postfix" @363
++  "_ZNSt20bad_array_new_lengthC2Ev_nid_postfix" @364
++  "_ZNSt20bad_array_new_lengthD0Ev_nid_postfix" @365
++  "_ZNSt20bad_array_new_lengthD1Ev_nid_postfix" @366
++  "_ZNSt20bad_array_new_lengthD2Ev_nid_postfix" @367
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_destroyEv" @368
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_disposeEv" @369
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE14_M_get_deleterERKSt9type_info" @370
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EED0Ev" @371
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EED1Ev" @372
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_destroyEv" @373
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_disposeEv" @374
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE14_M_get_deleterERKSt9type_info" @375
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EED0Ev" @376
++  "_ZNSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EED1Ev" @377
++  "_ZNSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_destroyEv" @378
++  "_ZNSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE10_M_disposeEv" @379
++  "_ZNSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE14_M_get_deleterERKSt9type_info" @380
++  "_ZNSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EED0Ev" @381
++  "_ZNSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EED1Ev" @382
++  "_ZNSt5ctypeIcE2idE_nid_postfix" @383 DATA
++  "_ZNSt5ctypeIwE2idE_nid_postfix" @384 DATA
++  "_ZNSt5mutex4lockEv" @385
++  "_ZNSt6locale16_GetgloballocaleEv_nid_postfix" @386
++  "_ZNSt6locale2id7_Id_cntE_nid_postfix" @387 DATA
++  "_ZNSt6locale5_InitEv_nid_postfix" @388
++  "_ZNSt6locale5facet9_RegisterEv_nid_postfix" @389
++  "_ZNSt6locale7_Locimp7_AddfacEPNS_5facetEm_nid_postfix" @390
++  "_ZNSt6locale7_LocimpC1ERKS0__nid_postfix" @391
++  "_ZNSt6thread24_M_thread_deps_never_runEv" @392
++  "_ZNSt6vectorIN10GuestArena15WindowsMappings13HostWriteViewESaIS2_EED1Ev" @393
++  "_ZNSt6vectorIN10GuestArena15WindowsMappings14HostWriteScopeESaIS2_EED1Ev" @394
++  "_ZNSt6vectorINSt10filesystem7__cxx114pathESaIS2_EED1Ev" @395
++  "_ZNSt6vectorISt10shared_ptrIKN16GuestAllocations5RangeEESaIS4_EED1Ev" @396
++  "_ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEE15_M_replace_coldEPDsyPKDsyy" @397
++  "_ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEE9_M_mutateEyyPKDsy" @398
++  "_ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEE9push_backEDs" @399
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE10_M_replaceEyyPKcy" @400
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_M_constructEyc" @401
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE6appendEPKc" @402
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE6appendEPKcy" @403
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE6insertEyPKc" @404
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9_M_mutateEyyPKcy" @405
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9push_backEc" @406
++  "_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1EOS4_" @407
++  "_ZNSt7__cxx119to_stringEi" @408
++  "_ZNSt7__cxx119to_stringEm" @409
++  "_ZNSt7__cxx119to_stringEy" @410
++  "_ZNSt7codecvtIcc9_MbstatetE2idE_nid_postfix" @411 DATA
++  "_ZNSt7codecvtIwc9_MbstatetE2idE_nid_postfix" @412 DATA
++  "_ZNSt7collateIcE2idE_nid_postfix" @413 DATA
++  "_ZNSt7collateIcE7_GetcatEPPKNSt6locale5facetEPKS1__nid_postfix" @414
++  "_ZNSt7collateIwE2idE_nid_postfix" @415 DATA
++  "_ZNSt7collateIwE7_GetcatEPPKNSt6locale5facetEPKS1__nid_postfix" @416
++  "_ZNSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE2idE_nid_postfix" @417 DATA
++  "_ZNSt8_LocinfoC1EPKc_nid_postfix" @418
++  "_ZNSt8_LocinfoD1Ev_nid_postfix" @419
++  "_ZNSt8_Rb_treeINSt10filesystem7__cxx114pathES2_St9_IdentityIS2_ESt4lessIS2_ESaIS2_EE16_M_insert_uniqueIRKS2_EESt4pairISt17_Rb_tree_iteratorIS2_EbEOT_" @420
++  "_ZNSt8_Rb_treeISt4pairIyyES0_IKS1_St8weak_ptrIN10GuestArena15WindowsMappings10SharedPageEEESt10_Select1stIS8_ESt4lessIS1_ESaIS8_EE24_M_get_insert_unique_posERS2_" @421
++  "_ZNSt8_Rb_treeISt4pairIyyES1_St9_IdentityIS1_ESt4lessIS1_ESaIS1_EE11equal_rangeERKS1_" @422
++  "_ZNSt8_Rb_treeISt5arrayIyLy6EESt4pairIKS1_St6vectorIS2_IyPKhESaIS7_EEESt10_Select1stISA_ESt4lessIS1_ESaISA_EE24_M_get_insert_unique_posERS3_" @423
++  "_ZNSt8_Rb_treeISt5arrayIyLy6EESt4pairIKS1_St6vectorIS2_IyPKhESaIS7_EEESt10_Select1stISA_ESt4lessIS1_ESaISA_EE29_M_get_insert_hint_unique_posESt23_Rb_tree_const_iteratorISA_ERS3_" @424
++  "_ZNSt8_Rb_treeIySt4pairIKyyESt10_Select1stIS2_ESt4lessIyESaIS2_EE12_M_erase_auxESt23_Rb_tree_const_iteratorIS2_E" @425
++  "_ZNSt8__sce_v219_Xbad_function_callEv_nid_postfix" @426
++  "_ZNSt8bad_castC1Ev_nid_postfix" @427
++  "_ZNSt8bad_castC2Ev_nid_postfix" @428
++  "_ZNSt8bad_castD0Ev_nid_postfix" @429
++  "_ZNSt8bad_castD1Ev_nid_postfix" @430
++  "_ZNSt8bad_castD2Ev_nid_postfix" @431
++  "_ZNSt8ios_base7failureD0Ev_nid_postfix" @432
++  "_ZNSt8ios_base7failureD1Ev_nid_postfix" @433
++  "_ZNSt8ios_base7failureD2Ev_nid_postfix" @434
++  "_ZNSt8ios_baseD2Ev_nid_postfix" @435
++  "_ZNSt9bad_allocC1Ev_nid_postfix" @436
++  "_ZNSt9bad_allocC2Ev_nid_postfix" @437
++  "_ZNSt9bad_allocD0Ev_nid_postfix" @438
++  "_ZNSt9bad_allocD1Ev_nid_postfix" @439
++  "_ZNSt9bad_allocD2Ev_nid_postfix" @440
++  "_ZNSt9exceptionC1Ev_nid_postfix" @441
++  "_ZNSt9exceptionC2Ev_nid_postfix" @442
++  "_ZNSt9exceptionD0Ev_nid_postfix" @443
++  "_ZNSt9exceptionD1Ev_nid_postfix" @444
++  "_ZNSt9exceptionD2Ev_nid_postfix" @445
++  "_ZSt11_Xbad_allocv_nid_postfix" @446
++  "_ZSt13_Execute_onceRSt9once_flagPFiPvS1_PS1_ES1__nid_postfix" @447
++  "_ZSt13_Xrange_errorPKc_nid_postfix" @448
++  "_ZSt13_Xregex_errorNSt15regex_constants10error_typeE_nid_postfix" @449
++  "_ZSt13get_terminatev_nid_postfix" @450
++  "_ZSt13set_terminatePFvvE_nid_postfix" @451
++  "_ZSt14_Atomic_assertPKcS0__nid_postfix" @452
++  "_ZSt14_Random_devicev_nid_postfix" @453
++  "_ZSt14_Throw_C_errori_nid_postfix" @454
++  "_ZSt14_Xlength_errorPKc_nid_postfix" @455
++  "_ZSt14_Xout_of_rangePKc_nid_postfix" @456
++  "_ZSt15get_new_handlerv_nid_postfix" @457
++  "_ZSt15set_new_handlerPFvvE_nid_postfix" @458
++  "_ZSt17current_exceptionv" @459
++  "_ZSt17current_exceptionv_nid_postfix" @460
++  "_ZSt17iostream_categoryv_nid_postfix" @461
++  "_ZSt17rethrow_exceptionNSt15__exception_ptr13exception_ptrE" @462
++  "_ZSt17rethrow_exceptionNSt15__exception_ptr13exception_ptrE_nid_postfix" @463
++  "_ZSt18_Xinvalid_argumentPKc_nid_postfix" @464
++  "_ZSt18uncaught_exceptionv" @465
++  "_ZSt18uncaught_exceptionv_nid_postfix" @466
++  "_ZSt19_Throw_bad_weak_ptrv_nid_postfix" @467
++  "_ZSt19_Xbad_function_callv_nid_postfix" @468
++  "_ZSt19uncaught_exceptionsv" @469
++  "_ZSt19uncaught_exceptionsv_nid_postfix" @470
++  "_ZSt21_sceLibcClassicLocale_nid_postfix" @471 DATA
++  "_ZSt3cin_nid_postfix" @472 DATA
++  "_ZSt4_Fpz_nid_postfix" @473 DATA
++  "_ZSt4cerr_nid_postfix" @474 DATA
++  "_ZSt4cout_nid_postfix" @475 DATA
++  "_ZSt4wcin_nid_postfix" @476 DATA
++  "_ZSt5wcerr_nid_postfix" @477 DATA
++  "_ZSt5wcout_nid_postfix" @478 DATA
++  "_ZSt7_BADOFF_nid_postfix" @479 DATA
++  "_ZSt7_FiopenPKcNSt5_IosbIiE9_OpenmodeEi_nid_postfix" @480
++  "_ZSt7nothrow_nid_postfix" @481 DATA
++  "_ZSt9terminatev" @482
++  "_ZSt9terminatev_nid_postfix" @483
++  "_ZSteqIcSt11char_traitsIcESaIcEEbRKNSt7__cxx1112basic_stringIT_T0_T1_EEPKS5_" @484
++  "_ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_S5_" @485
++  "_ZStplIcSt11char_traitsIcESaIcEENSt7__cxx1112basic_stringIT_T0_T1_EEOS8_S9_" @486
++  "_ZTI15ProcessShutdown" @487 DATA
++  "_ZTIN10__cxxabiv117__class_type_infoE" @488 DATA
++  "_ZTIN10__cxxabiv120__si_class_type_infoE" @489 DATA
++  "_ZTIN10__cxxabiv121__vmi_class_type_infoE" @490 DATA
++  "_ZTINSt10filesystem7__cxx1116filesystem_errorE" @491 DATA
++  "_ZTINSt10filesystem7__cxx114path8_CodecvtIwEE" @492 DATA
++  "_ZTINSt6locale5facetE" @493 DATA
++  "_ZTINSt6thread6_StateE" @494 DATA
++  "_ZTINSt8ios_base7failureE_nid_postfix" @495 DATA
++  "_ZTISt10bad_typeid_nid_postfix" @496 DATA
++  "_ZTISt11_Mutex_baseILN9__gnu_cxx12_Lock_policyE2EE" @497 DATA
++  "_ZTISt11logic_error" @498 DATA
++  "_ZTISt11logic_error_nid_postfix" @499 DATA
++  "_ZTISt11range_error_nid_postfix" @500 DATA
++  "_ZTISt11regex_error_nid_postfix" @501 DATA
++  "_ZTISt12bad_weak_ptr_nid_postfix" @502 DATA
++  "_ZTISt12codecvt_base" @503 DATA
++  "_ZTISt12domain_error_nid_postfix" @504 DATA
++  "_ZTISt12length_error" @505 DATA
++  "_ZTISt12length_error_nid_postfix" @506 DATA
++  "_ZTISt12out_of_range_nid_postfix" @507 DATA
++  "_ZTISt12system_error" @508 DATA
++  "_ZTISt12system_error_nid_postfix" @509 DATA
++  "_ZTISt13runtime_error" @510 DATA
++  "_ZTISt13runtime_error_nid_postfix" @511 DATA
++  "_ZTISt14overflow_error" @512 DATA
++  "_ZTISt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE" @513 DATA
++  "_ZTISt16invalid_argument" @514 DATA
++  "_ZTISt16invalid_argument_nid_postfix" @515 DATA
++  "_ZTISt17bad_function_call_nid_postfix" @516 DATA
++  "_ZTISt18codecvt_utf8_utf16IwLm1114111ELSt12codecvt_mode0EE" @517 DATA
++  "_ZTISt19_Sp_make_shared_tag" @518 DATA
++  "_ZTISt20bad_array_new_length_nid_postfix" @519 DATA
++  "_ZTISt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE" @520 DATA
++  "_ZTISt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE" @521 DATA
++  "_ZTISt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE" @522 DATA
++  "_ZTISt23__codecvt_abstract_baseIwc9_MbstatetE" @523 DATA
++  "_ZTISt25__codecvt_utf8_utf16_baseIwE" @524 DATA
++  "_ZTISt7codecvtIwc9_MbstatetE" @525 DATA
++  "_ZTISt8bad_cast_nid_postfix" @526 DATA
++  "_ZTISt8ios_base_nid_postfix" @527 DATA
++  "_ZTISt9bad_alloc" @528 DATA
++  "_ZTISt9bad_alloc_nid_postfix" @529 DATA
++  "_ZTISt9exception" @530 DATA
++  "_ZTISt9exception_nid_postfix" @531 DATA
++  "_ZTISt9type_info" @532 DATA
++  "_ZTS15ProcessShutdown" @533 DATA
++  "_ZTSN10__cxxabiv117__class_type_infoE" @534 DATA
++  "_ZTSN10__cxxabiv120__si_class_type_infoE" @535 DATA
++  "_ZTSN10__cxxabiv121__vmi_class_type_infoE" @536 DATA
++  "_ZTSNSt10filesystem7__cxx1116filesystem_errorE" @537 DATA
++  "_ZTSNSt10filesystem7__cxx114path8_CodecvtIwEE" @538 DATA
++  "_ZTSNSt6locale5facetE" @539 DATA
++  "_ZTSNSt6thread6_StateE" @540 DATA
++  "_ZTSSt11_Mutex_baseILN9__gnu_cxx12_Lock_policyE2EE" @541 DATA
++  "_ZTSSt11logic_error" @542 DATA
++  "_ZTSSt12codecvt_base" @543 DATA
++  "_ZTSSt12length_error" @544 DATA
++  "_ZTSSt12system_error" @545 DATA
++  "_ZTSSt13runtime_error" @546 DATA
++  "_ZTSSt14overflow_error" @547 DATA
++  "_ZTSSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE" @548 DATA
++  "_ZTSSt16invalid_argument" @549 DATA
++  "_ZTSSt18codecvt_utf8_utf16IwLm1114111ELSt12codecvt_mode0EE" @550 DATA
++  "_ZTSSt19_Sp_make_shared_tag" @551 DATA
++  "_ZTSSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE" @552 DATA
++  "_ZTSSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE" @553 DATA
++  "_ZTSSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE" @554 DATA
++  "_ZTSSt23__codecvt_abstract_baseIwc9_MbstatetE" @555 DATA
++  "_ZTSSt25__codecvt_utf8_utf16_baseIwE" @556 DATA
++  "_ZTSSt7codecvtIwc9_MbstatetE" @557 DATA
++  "_ZTSSt9bad_alloc" @558 DATA
++  "_ZTSSt9exception" @559 DATA
++  "_ZTSSt9type_info" @560 DATA
++  "_ZTVN10__cxxabiv117__class_type_infoE_nid_postfix" @561 DATA
++  "_ZTVN10__cxxabiv120__si_class_type_infoE_nid_postfix" @562 DATA
++  "_ZTVN10__cxxabiv121__vmi_class_type_infoE_nid_postfix" @563 DATA
++  "_ZTVNSt10filesystem7__cxx114path8_CodecvtIwEE" @564 DATA
++  "_ZTVNSt8ios_base7failureE_nid_postfix" @565 DATA
++  "_ZTVSt10bad_typeid_nid_postfix" @566 DATA
++  "_ZTVSt11logic_error_nid_postfix" @567 DATA
++  "_ZTVSt11range_error_nid_postfix" @568 DATA
++  "_ZTVSt11regex_error_nid_postfix" @569 DATA
++  "_ZTVSt12bad_weak_ptr_nid_postfix" @570 DATA
++  "_ZTVSt12domain_error_nid_postfix" @571 DATA
++  "_ZTVSt12length_error_nid_postfix" @572 DATA
++  "_ZTVSt12out_of_range_nid_postfix" @573 DATA
++  "_ZTVSt12system_error_nid_postfix" @574 DATA
++  "_ZTVSt13runtime_error_nid_postfix" @575 DATA
++  "_ZTVSt16invalid_argument_nid_postfix" @576 DATA
++  "_ZTVSt17bad_function_call_nid_postfix" @577 DATA
++  "_ZTVSt18codecvt_utf8_utf16IwLm1114111ELSt12codecvt_mode0EE" @578 DATA
++  "_ZTVSt20bad_array_new_length_nid_postfix" @579 DATA
++  "_ZTVSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings10SharedPageESaIvELN9__gnu_cxx12_Lock_policyE2EE" @580 DATA
++  "_ZTVSt23_Sp_counted_ptr_inplaceIN10GuestArena15WindowsMappings7SectionESaIvELN9__gnu_cxx12_Lock_policyE2EE" @581 DATA
++  "_ZTVSt23_Sp_counted_ptr_inplaceIN16GuestAllocations5RangeESaIvELN9__gnu_cxx12_Lock_policyE2EE" @582 DATA
++  "_ZTVSt7codecvtIcc9_MbstatetE_nid_postfix" @583 DATA
++  "_ZTVSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE_nid_postfix" @584 DATA
++  "_ZTVSt8bad_cast_nid_postfix" @585 DATA
++  "_ZTVSt9bad_alloc_nid_postfix" @586 DATA
++  "_ZTVSt9exception_nid_postfix" @587 DATA
++  "_ZZN10GuestArena15WindowsMappings3GetEvE8mappings" @588 DATA
++  "_ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag" @589 DATA
++  "_ZZNSt8__detail18__waiter_pool_base6_S_forEPKvE3__w" @590 DATA
++  "_ZdaPv_nid_postfix" @591
++  "_ZdaPvm_nid_postfix" @592
++  "_ZdlPvSt11align_val_t_nid_postfix" @593
++  "_ZdlPv_nid_postfix" @594
++  "_ZdlPvmSt11align_val_t_nid_postfix" @595
++  "_ZdlPvm_nid_postfix" @596
++  "_ZnamRKSt9nothrow_t_nid_postfix" @597
++  "_Znam_nid_postfix" @598
++  "_ZnwmRKSt9nothrow_t_nid_postfix" @599
++  "_Znwm_nid_postfix" @600
++  "___mb_cur_max_nid_postfix" @601
++  "__cxa_allocate_dependent_exception_nid_postfix" @602
++  "__cxa_allocate_exception" @603
++  "__cxa_allocate_exception_nid_postfix" @604
++  "__cxa_atexit_nid_postfix" @605
++  "__cxa_bad_cast_nid_postfix" @606
++  "__cxa_bad_typeid_nid_postfix" @607
++  "__cxa_begin_catch" @608
++  "__cxa_begin_catch_nid_postfix" @609
++  "__cxa_call_terminate" @610
++  "__cxa_call_terminate_nid_postfix" @611
++  "__cxa_current_exception_type_nid_postfix" @612
++  "__cxa_current_primary_exception_nid_postfix" @613
++  "__cxa_decrement_exception_refcount_nid_postfix" @614
++  "__cxa_deleted_virtual_nid_postfix" @615
++  "__cxa_demangle_nid_postfix" @616
++  "__cxa_end_catch" @617
++  "__cxa_end_catch_nid_postfix" @618
++  "__cxa_free_dependent_exception_nid_postfix" @619
++  "__cxa_free_exception" @620
++  "__cxa_free_exception_nid_postfix" @621
++  "__cxa_get_exception_ptr" @622
++  "__cxa_get_exception_ptr_nid_postfix" @623
++  "__cxa_get_globals" @624
++  "__cxa_get_globals_fast" @625
++  "__cxa_get_globals_fast_nid_postfix" @626
++  "__cxa_get_globals_nid_postfix" @627
++  "__cxa_guard_abort_nid_postfix" @628
++  "__cxa_guard_acquire_nid_postfix" @629
++  "__cxa_guard_release_nid_postfix" @630
++  "__cxa_increment_exception_refcount_nid_postfix" @631
++  "__cxa_init_primary_exception" @632
++  "__cxa_init_primary_exception_nid_postfix" @633
++  "__cxa_pure_virtual_nid_postfix" @634
++  "__cxa_rethrow" @635
++  "__cxa_rethrow_nid_postfix" @636
++  "__cxa_rethrow_primary_exception_nid_postfix" @637
++  "__cxa_thread_atexit_impl_nid_postfix" @638
++  "__cxa_throw" @639
++  "__cxa_throw_bad_array_new_length_nid_postfix" @640
++  "__cxa_throw_nid_postfix" @641
++  "__cxa_uncaught_exception" @642
++  "__cxa_uncaught_exception_nid_postfix" @643
++  "__cxa_uncaught_exceptions" @644
++  "__cxa_uncaught_exceptions_nid_postfix" @645
++  "__cxa_vec_cctor_nid_postfix" @646
++  "__cxa_vec_cleanup_nid_postfix" @647
++  "__cxa_vec_ctor_nid_postfix" @648
++  "__cxa_vec_delete2_nid_postfix" @649
++  "__cxa_vec_delete3_nid_postfix" @650
++  "__cxa_vec_delete_nid_postfix" @651
++  "__cxa_vec_dtor_nid_postfix" @652
++  "__cxa_vec_new2_nid_postfix" @653
++  "__cxa_vec_new3_nid_postfix" @654
++  "__cxa_vec_new_nid_postfix" @655
++  "__dynamic_cast_nid_postfix" @656
++  "__emutls_t._ZN13LibcException7globalsE" @657 DATA
++  "__emutls_t._ZZN10GuestArena15WindowsMappings15hostWriteScopesEvE6scopes" @658 DATA
++  "__emutls_v._ZGVZN10GuestArena15WindowsMappings15hostWriteScopesEvE6scopes" @659 DATA
++  "__emutls_v._ZN13LibcException7globalsE" @660 DATA
++  "__emutls_v._ZN9LibcGuard5depthE" @661 DATA
++  "__emutls_v._ZN9LibcGuard6activeE" @662 DATA
++  "__emutls_v._ZZN10GuestArena15WindowsMappings15hostWriteScopesEvE6scopes" @663 DATA
++  "__error_nid_postfix" @664
++  "__fpclassifyd_nid_postfix" @665
++  "__fpclassifyf_nid_postfix" @666
++  "__gcc_personality_v0" @667
++  "__gcc_personality_v0_nid_postfix" @668
++  "__gxx_personality_v0" @669
++  "__gxx_personality_v0_nid_postfix" @670
++  "__inet_addr_nid_postfix" @671
++  "__inet_aton_nid_postfix" @672
++  "__inet_ntoa_nid_postfix" @673
++  "__isfinite_nid_postfix" @674
++  "__isfinitef_nid_postfix" @675
++  "__isinf_nid_postfix" @676
++  "__isinff_nid_postfix" @677
++  "__isnan_nid_postfix" @678
++  "__isnanf_nid_postfix" @679
++  "__isnormal_nid_postfix" @680
++  "__isnormalf_nid_postfix" @681
++  "__isthreaded_nid_postfix" @682 DATA
++  "__mb_cur_max_nid_postfix" @683 DATA
++  "__mb_sb_limit_nid_postfix" @684 DATA
++  "__signbit_nid_postfix" @685
++  "__signbitf_nid_postfix" @686
++  "__srget_nid_postfix" @687
++  "__stack_chk_fail_nid_postfix" @688
++  "__stack_chk_guard" @689 DATA
++  "__stderrp_nid_postfix" @690 DATA
++  "__stdinp_nid_postfix" @691 DATA
++  "__stdoutp_nid_postfix" @692 DATA
++  "__swbuf_nid_postfix" @693
++  "__udivti3_nid_postfix" @694
++  "_init_env_nid_postfix" @695
++  "abort_nid_postfix" @696
++  "abs_nid_postfix" @697
++  "access_nid_postfix" @698
++  "acos_nid_postfix" @699
++  "acosf_nid_postfix" @700
++  "acosh_nid_postfix" @701
++  "acoshf_nid_postfix" @702
++  "acosl_nid_postfix" @703
++  "aligned_alloc_nid_postfix" @704
++  "asctime_nid_postfix" @705
++  "asctime_s_nid_postfix" @706
++  "asin_nid_postfix" @707
++  "asinf_nid_postfix" @708
++  "asinh_nid_postfix" @709
++  "asinhf_nid_postfix" @710
++  "asprintf_nid_postfix" @711
++  "at_quick_exit_nid_postfix" @712
++  "atan2_nid_postfix" @713
++  "atan2f_nid_postfix" @714
++  "atan_nid_postfix" @715
++  "atanf_nid_postfix" @716
++  "atanh_nid_postfix" @717
++  "atexit_nid_postfix" @718
++  "atof_nid_postfix" @719
++  "atoi_nid_postfix" @720
++  "atol_nid_postfix" @721
++  "atoll_nid_postfix" @722
++  "basename_nid_postfix" @723
++  "bcmp_nid_postfix" @724
++  "bsearch_nid_postfix" @725
++  "btowc_nid_postfix" @726
++  "bzero_nid_postfix" @727
++  "calloc_nid_postfix" @728
++  "catchReturnFromMain_nid_postfix" @729
++  "cbrt_nid_postfix" @730
++  "cbrtf_nid_postfix" @731
++  "chdir_nid_postfix" @732
++  "clearerr_nid_postfix" @733
++  "clock_nid_postfix" @734
++  "closedir_nid_postfix" @735
++  "cos_nid_postfix" @736
++  "cosf_nid_postfix" @737
++  "cosh_nid_postfix" @738
++  "coshf_nid_postfix" @739
++  "ctime_nid_postfix" @740
++  "ctime_s_nid_postfix" @741
++  "cxa_atexit_nid_postfix" @742
++  "cxa_finalize_nid_postfix" @743
++  "daemon_nid_postfix" @744
++  "difftime_nid_postfix" @745
++  "dirname_nid_postfix" @746
++  "div_nid_postfix" @747
++  "dl_iterate_phdr_nid_postfix" @748
++  "erand48_nid_postfix" @749
++  "exit_nid_postfix" @750
++  "exp2_nid_postfix" @751
++  "exp2f_nid_postfix" @752
++  "exp_nid_postfix" @753
++  "expf_nid_postfix" @754
++  "expm1_nid_postfix" @755
++  "fabs_nid_postfix" @756
++  "fclose_nid_postfix" @757
++  "fdopen_nid_postfix" @758
++  "feof_nid_postfix" @759
++  "ferror_nid_postfix" @760
++  "fflush_nid_postfix" @761
++  "fgetc_nid_postfix" @762
++  "fgetpos_nid_postfix" @763
++  "fgets_nid_postfix" @764
++  "fgetwc_nid_postfix" @765
++  "fileno_nid_postfix" @766
++  "flockfile_nid_postfix" @767
++  "fma_nid_postfix" @768
++  "fmod_nid_postfix" @769
++  "fmodf_nid_postfix" @770
++  "fopen_nid_postfix" @771
++  "fopen_s_nid_postfix" @772
++  "fprintf_nid_postfix" @773
++  "fputc_nid_postfix" @774
++  "fputs_nid_postfix" @775
++  "fputwc_nid_postfix" @776
++  "fputws_nid_postfix" @777
++  "fread_nid_postfix" @778
++  "free_nid_postfix" @779
++  "freeifaddrs_nid_postfix" @780
++  "freopen_nid_postfix" @781
++  "frexp_nid_postfix" @782
++  "frexpf_nid_postfix" @783
++  "frexpl_nid_postfix" @784
++  "fscanf_nid_postfix" @785
++  "fseek_nid_postfix" @786
++  "fseeko_nid_postfix" @787
++  "fsetpos_nid_postfix" @788
++  "ftell_nid_postfix" @789
++  "ftello_nid_postfix" @790
++  "funlockfile_nid_postfix" @791
++  "fwrite_nid_postfix" @792
++  "getc_nid_postfix" @793
++  "getc_unlocked_nid_postfix" @794
++  "getchar_nid_postfix" @795
++  "getcwd_nid_postfix" @796
++  "getenv_nid_postfix" @797
++  "gethostname_nid_postfix" @798
++  "getifaddrs_nid_postfix" @799
++  "gmtime_nid_postfix" @800
++  "gmtime_s_nid_postfix" @801
++  "hypot_nid_postfix" @802
++  "hypotf_nid_postfix" @803
++  "ignore_handler_s_nid_postfix" @804
++  "init_env_nid_postfix" @805
++  "initstate_nid_postfix" @806
++  "isalnum_nid_postfix" @807
++  "isalpha_nid_postfix" @808
++  "isblank_nid_postfix" @809
++  "iscntrl_nid_postfix" @810
++  "isdigit_nid_postfix" @811
++  "isgraph_nid_postfix" @812
++  "islower_nid_postfix" @813
++  "isprint_nid_postfix" @814
++  "ispunct_nid_postfix" @815
++  "isspace_nid_postfix" @816
++  "isupper_nid_postfix" @817
++  "iswalnum_nid_postfix" @818
++  "iswalpha_nid_postfix" @819
++  "iswblank_nid_postfix" @820
++  "iswcntrl_nid_postfix" @821
++  "iswctype_nid_postfix" @822
++  "iswdigit_nid_postfix" @823
++  "iswgraph_nid_postfix" @824
++  "iswlower_nid_postfix" @825
++  "iswprint_nid_postfix" @826
++  "iswpunct_nid_postfix" @827
++  "iswspace_nid_postfix" @828
++  "iswupper_nid_postfix" @829
++  "iswxdigit_nid_postfix" @830
++  "isxdigit_nid_postfix" @831
++  "jrand48_nid_postfix" @832
++  "ldexp_nid_postfix" @833
++  "ldexpf_nid_postfix" @834
++  "ldiv_nid_postfix" @835
++  "libcCyberUnknown08" @836
++  "libc_difftime_nid_postfix" @837
++  "libc_error_nid_postfix" @838
++  "libc_gmtime_nid_postfix" @839
++  "libc_localtime_nid_postfix" @840
++  "libc_mktime_nid_postfix" @841
++  "libc_printf_nid_postfix" @842
++  "libc_strftime_nid_postfix" @843
++  "libc_time_nid_postfix" @844
++  "lldiv_nid_postfix" @845
++  "llround_nid_postfix" @846
++  "llroundf_nid_postfix" @847
++  "localeconv_nid_postfix" @848
++  "localtime_nid_postfix" @849
++  "localtime_s_nid_postfix" @850
++  "log10_nid_postfix" @851
++  "log10f_nid_postfix" @852
++  "log1p_nid_postfix" @853
++  "log1pf_nid_postfix" @854
++  "log2_nid_postfix" @855
++  "log2f_nid_postfix" @856
++  "log_nid_postfix" @857
++  "logbf_nid_postfix" @858
++  "logf_nid_postfix" @859
++  "longjmp_nid_postfix" @860
++  "lround_nid_postfix" @861
++  "lroundf_nid_postfix" @862
++  "malloc_nid_postfix" @863
++  "malloc_stats_fast_nid_postfix" @864
++  "malloc_usable_size_nid_postfix" @865
++  "mbrlen_nid_postfix" @866
++  "mbrtowc_nid_postfix" @867
++  "mbsinit_nid_postfix" @868
++  "mbsrtowcs_nid_postfix" @869
++  "mbstowcs_nid_postfix" @870
++  "mbtowc_nid_postfix" @871
++  "memalign_nid_postfix" @872
++  "memchr_nid_postfix" @873
++  "memcmp_nid_postfix" @874
++  "memcpy_nid_postfix" @875
++  "memcpy_s_nid_postfix" @876
++  "memmove_nid_postfix" @877
++  "memmove_s_nid_postfix" @878
++  "memrchr_nid_postfix" @879
++  "memset_nid_postfix" @880
++  "memset_s_nid_postfix" @881
++  "mktime_nid_postfix" @882
++  "modf_nid_postfix" @883
++  "modff_nid_postfix" @884
++  "nan_nid_postfix" @885
++  "nanf_nid_postfix" @886
++  "nextafterf_nid_postfix" @887
++  "nrand48_nid_postfix" @888
++  "opendir_nid_postfix" @889
++  "perror_nid_postfix" @890
++  "posix_memalign_nid_postfix" @891
++  "pow_nid_postfix" @892
++  "powf_nid_postfix" @893
++  "printf_nid_postfix" @894
++  "printf_s_nid_postfix" @895
++  "putc_nid_postfix" @896
++  "putc_unlocked_nid_postfix" @897
++  "putchar_nid_postfix" @898
++  "putenv_nid_postfix" @899
++  "puts_nid_postfix" @900
++  "qsort_nid_postfix" @901
++  "quick_exit_nid_postfix" @902
++  "rand_nid_postfix" @903
++  "rand_r_nid_postfix" @904
++  "random_nid_postfix" @905
++  "readdir_nid_postfix" @906
++  "realloc_nid_postfix" @907
++  "reallocalign_nid_postfix" @908
++  "realpath_nid_postfix" @909
++  "remainderf_nid_postfix" @910
++  "remove_nid_postfix" @911
++  "rename_nid_postfix" @912
++  "rewind_nid_postfix" @913
++  "rewinddir_nid_postfix" @914
++  "round_nid_postfix" @915
++  "roundf_nid_postfix" @916
++  "scalbn_nid_postfix" @917
++  "scalbnf_nid_postfix" @918
++  "sceLibcInternalBacktraceForGame_nid_postfix" @919
++  "sceLibcInternalHeapErrorReportForGame_nid_postfix" @920
++  "sceLibcMspaceCalloc_nid_postfix" @921
++  "sceLibcMspaceCreate_nid_postfix" @922
++  "sceLibcMspaceDestroy_nid_postfix" @923
++  "sceLibcMspaceFree_nid_postfix" @924
++  "sceLibcMspaceMallocStatsFast_nid_postfix" @925
++  "sceLibcMspaceMallocStats_nid_postfix" @926
++  "sceLibcMspaceMallocUsableSize_nid_postfix" @927
++  "sceLibcMspaceMalloc_nid_postfix" @928
++  "sceLibcMspaceMemalign_nid_postfix" @929
++  "sceLibcMspacePosixMemalign_nid_postfix" @930
++  "sceLibcMspaceRealloc_nid_postfix" @931
++  "sceLibcMspaceReallocalign_nid_postfix" @932
++  "set_constraint_handler_s_nid_postfix" @933
++  "setbuf_nid_postfix" @934
++  "setenv_nid_postfix" @935
++  "setjmp_nid_postfix" @936
++  "setlocale_nid_postfix" @937
++  "setstate_nid_postfix" @938
++  "setvbuf_nid_postfix" @939
++  "sin_nid_postfix" @940
++  "sincos_nid_postfix" @941
++  "sincosf_nid_postfix" @942
++  "sinf_nid_postfix" @943
++  "sinh_nid_postfix" @944
++  "snprintf_nid_postfix" @945
++  "snprintf_s_nid_postfix" @946
++  "snwprintf_s_nid_postfix" @947
++  "sprintf_nid_postfix" @948
++  "sprintf_s_nid_postfix" @949
++  "sqrt_nid_postfix" @950
++  "sqrtf_nid_postfix" @951
++  "srand_nid_postfix" @952
++  "srandom_nid_postfix" @953
++  "sscanf_nid_postfix" @954
++  "sscanf_s_nid_postfix" @955
++  "std_execute_once_nid_postfix" @956
++  "stpcpy_nid_postfix" @957
++  "strcasecmp_nid_postfix" @958
++  "strcat_nid_postfix" @959
++  "strcat_s_nid_postfix" @960
++  "strchr_nid_postfix" @961
++  "strcmp_nid_postfix" @962
++  "strcoll_nid_postfix" @963
++  "strcpy_nid_postfix" @964
++  "strcpy_s_nid_postfix" @965
++  "strcspn_nid_postfix" @966
++  "strdup_nid_postfix" @967
++  "strerror_nid_postfix" @968
++  "strerror_r_nid_postfix" @969
++  "strftime_nid_postfix" @970
++  "strlcat_nid_postfix" @971
++  "strlcpy_nid_postfix" @972
++  "strlen_nid_postfix" @973
++  "strncasecmp_nid_postfix" @974
++  "strncat_nid_postfix" @975
++  "strncat_s_nid_postfix" @976
++  "strncmp_nid_postfix" @977
++  "strncpy_nid_postfix" @978
++  "strncpy_s_nid_postfix" @979
++  "strndup_nid_postfix" @980
++  "strnlen_nid_postfix" @981
++  "strnlen_s_nid_postfix" @982
++  "strnstr_nid_postfix" @983
++  "strpbrk_nid_postfix" @984
++  "strrchr_nid_postfix" @985
++  "strsep_nid_postfix" @986
++  "strspn_nid_postfix" @987
++  "strstr_nid_postfix" @988
++  "strtod_nid_postfix" @989
++  "strtof_nid_postfix" @990
++  "strtoimax_nid_postfix" @991
++  "strtok_nid_postfix" @992
++  "strtok_r_nid_postfix" @993
++  "strtok_s_nid_postfix" @994
++  "strtol_nid_postfix" @995
++  "strtold_nid_postfix" @996
++  "strtoll_nid_postfix" @997
++  "strtoul_nid_postfix" @998
++  "strtoull_nid_postfix" @999
++  "strtoumax_nid_postfix" @1000
++  "strxfrm_nid_postfix" @1001
++  "swprintf_nid_postfix" @1002
++  "swscanf_s_nid_postfix" @1003
++  "syslog_nid_postfix" @1004
++  "tan_nid_postfix" @1005
++  "tanf_nid_postfix" @1006
++  "tanh_nid_postfix" @1007
++  "tanhf_nid_postfix" @1008
++  "time_nid_postfix" @1009
++  "tolower_nid_postfix" @1010
++  "toupper_nid_postfix" @1011
++  "towlower_nid_postfix" @1012
++  "towupper_nid_postfix" @1013
++  "trunc_nid_postfix" @1014
++  "tzset_nid_postfix" @1015
++  "ungetc_nid_postfix" @1016
++  "ungetwc_nid_postfix" @1017
++  "unsetenv_nid_postfix" @1018
++  "vasprintf_nid_postfix" @1019
++  "vfprintf_nid_postfix" @1020
++  "vprintf_nid_postfix" @1021
++  "vsnprintf_nid_postfix" @1022
++  "vsnprintf_s_nid_postfix" @1023
++  "vsprintf_nid_postfix" @1024
++  "vsprintf_s_nid_postfix" @1025
++  "vsscanf_nid_postfix" @1026
++  "vsscanf_s_nid_postfix" @1027
++  "vswprintf_nid_postfix" @1028
++  "vsyslog_nid_postfix" @1029
++  "wcrtomb_nid_postfix" @1030
++  "wcschr_nid_postfix" @1031
++  "wcscmp_nid_postfix" @1032
++  "wcscoll_nid_postfix" @1033
++  "wcscpy_nid_postfix" @1034
++  "wcscpy_s_nid_postfix" @1035
++  "wcslen_nid_postfix" @1036
++  "wcsncmp_nid_postfix" @1037
++  "wcsncpy_nid_postfix" @1038
++  "wcspbrk_nid_postfix" @1039
++  "wcsrchr_nid_postfix" @1040
++  "wcsrtombs_nid_postfix" @1041
++  "wcsrtombs_s_nid_postfix" @1042
++  "wcsspn_nid_postfix" @1043
++  "wcsstr_nid_postfix" @1044
++  "wcstod_nid_postfix" @1045
++  "wcstof_nid_postfix" @1046
++  "wcstol_nid_postfix" @1047
++  "wcstold_nid_postfix" @1048
++  "wcstoll_nid_postfix" @1049
++  "wcstombs_nid_postfix" @1050
++  "wcstoul_nid_postfix" @1051
++  "wcstoull_nid_postfix" @1052
++  "wcsxfrm_nid_postfix" @1053
++  "wctob_nid_postfix" @1054
++  "wctype_nid_postfix" @1055
++  "wmemchr_nid_postfix" @1056
++  "wmemcmp_nid_postfix" @1057
++  "wmemcpy_nid_postfix" @1058
++  "wmemmove_nid_postfix" @1059
++  "wmemset_nid_postfix" @1060
++  "wprintf_nid_postfix" @1061
++  APS5NativeCompilerOnce_nid_no_patch @1062
+--- /dev/null
++++ b/core/libs/prx/libc/src/specifics/windows/provider.cpp
+@@ -0,0 +1,19 @@
++#include "compiler_once.hpp"
++#include <windows.h>
++#include <pthread.h>
++
++static_assert(sizeof(pthread_once_t) == 4);
++static_assert(std::is_same_v<pthread_once_t, long>);
++static_assert(PTHREAD_ONCE_INIT == 0);
++struct AddressWaiter {
++    bool wait(long* value, long expected) noexcept {
++        return WaitOnAddress(value, &expected, sizeof(expected), INFINITE) != FALSE;
++    }
++    void wake(long* value) noexcept { WakeByAddressAll(value); }
++};
++extern "C" __declspec(dllexport)
++int APS5NativeCompilerOnce_nid_no_patch(long* flag, void (*initialize)()) {
++    if (!initialize) return EINVAL;
++    AddressWaiter waiter;
++    return aps5::compiler_once::invoke(flag, initialize, waiter);
++}
+--- /dev/null
++++ b/core/libs/tests/CompilerOnce.cpp
+@@ -0,0 +1,194 @@
++#include "compiler_once.hpp"
++#include <windows.h>
++#include <pthread.h>
++#include <array>
++#include <atomic>
++#include <cstdio>
++#include <cstring>
++#include <mutex>
++#include <stdexcept>
++#include <thread>
++
++using OnceFunction = int (*)(long*, void (*)());
++extern "C" __declspec(dllimport)
++int APS5NativeCompilerOnce_nid_no_patch(long*, void (*)());
++extern "C" OnceFunction APS5CompilerOnceResolvedTarget() noexcept;
++extern "C" OnceFunction __imp_pthread_once;
++// Different C identifier avoids pthread.h dllimport, forcing an actual direct
++// pthread_once COFF relocation in this freshly compiled fixture.
++extern "C" int APS5CompilerDirectOnce(long*, void (*)()) __asm__("pthread_once");
++static_assert(sizeof(pthread_once_t) == 4 && PTHREAD_ONCE_INIT == 0);
++static_assert(sizeof(std::once_flag) == sizeof(pthread_once_t));
++static void require(bool value, const char* reason) {
++    if (!value) throw std::runtime_error(reason);
++}
++static void pass(const char* name) { std::printf("COMPILER_ONCE_PASS %s\n", name); }
++struct Destruct { int& count; ~Destruct() { ++count; } };
++static void retry() {
++    std::once_flag flag;
++    int calls=0, destroyed=0, caught=0, published=0;
++    for (int n=0; n<4; ++n) {
++        try { std::call_once(flag, [&] {
++            Destruct guard{destroyed};
++            if (++calls < 4) throw std::runtime_error("retry identity");
++            published=37;
++        }); }
++        catch (const std::runtime_error& e) {
++            require(std::strcmp(e.what(), "retry identity")==0, "exception identity"); ++caught;
++        }
++    }
++    std::call_once(flag, [&]{ ++calls; });
++    require(calls==4 && caught==3 && destroyed==4 && published==37, "retry/destructor/passive");
++    pass("retry_destructors_passive");
++}
++static void nested() {
++    std::once_flag outer, inner;
++    int outside=0, inside=0, destroyed=0;
++    for (int n=0; n<2; ++n) {
++        try { std::call_once(outer, [&] {
++            Destruct guard{destroyed}; ++outside;
++            std::call_once(inner, [&] {
++                Destruct second{destroyed}; if (++inside==1) throw std::runtime_error("inner");
++            });
++        }); }
++        catch (const std::runtime_error& e) { require(!n && !std::strcmp(e.what(),"inner"), "nested identity"); }
++    }
++    std::call_once(outer,[&]{ ++outside; });
++    std::call_once(inner,[&]{ ++inside; });
++    require(outside==2 && inside==2 && destroyed==4, "nested reset and TLS closures");
++    pass("nested_distinct_flags");
++}
++static void contention(bool failFirst) {
++    std::once_flag flag;
++    std::atomic<int> ready{0}, calls{0}, caught{0}, completed{0}, bad{0};
++    std::atomic<bool> start{false};
++    int published=0;
++    std::array<std::thread,16> workers;
++    for (auto& worker: workers) worker=std::thread([&] {
++        ready.fetch_add(1); while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
++        try {
++            std::call_once(flag,[&] {
++                int attempt=calls.fetch_add(1);
++                // Give competing callers an opportunity to enter the wait.
++                Sleep(20);
++                if (failFirst && !attempt) throw std::runtime_error("contended retry");
++                published=91;
++            });
++            if (published!=91) bad.fetch_add(1);
++            completed.fetch_add(1);
++        } catch (const std::runtime_error& e) {
++            if (std::strcmp(e.what(),"contended retry")) bad.fetch_add(1);
++            caught.fetch_add(1);
++        } catch (...) { bad.fetch_add(1); }
++    });
++    while (ready.load()!=16) std::this_thread::yield();
++    start.store(true,std::memory_order_release);
++    for (auto& worker: workers) worker.join();
++    require(!bad.load() && calls==(failFirst?2:1) && caught==(failFirst?1:0)
++        && completed==(failFirst?15:16), "waiter progress and publication");
++    pass(failFirst?"concurrent_exception_retry":"concurrent_single_success");
++}
++static void independent() {
++    std::once_flag first, second;
++    std::atomic<int> entered{0}; std::atomic<bool> release{false};
++    auto body=[&] { entered.fetch_add(1); while (!release.load()) std::this_thread::yield(); };
++    std::thread a([&]{std::call_once(first,body);});
++    std::thread b([&]{std::call_once(second,body);});
++    // If a global callback lock is introduced, root's finite fixture timeout
++    // fails this case rather than claiming independent progress.
++    while (entered.load()!=2) std::this_thread::yield();
++    release=true; a.join(); b.join(); pass("independent_flag_overlap");
++}
++struct ScriptedWaiter {
++    int waits=0, wakes=0; bool fail=false;
++    bool wait(long* value,long) noexcept {
++        ++waits;
++        if (fail) return false;
++        if (waits==2) std::atomic_ref<long>(*value).store(0,std::memory_order_release);
++        return true;
++    }
++    void wake(long*) noexcept { ++wakes; }
++};
++static void backend_contract() {
++    long flag=2; int calls=0; ScriptedWaiter wait;
++    int r=aps5::compiler_once::invoke(&flag,[&]{++calls;},wait);
++    require(!r && calls==1 && flag==1 && wait.waits==2 && wait.wakes==1,"spurious waits");
++    flag=2; wait={}; wait.fail=true;
++    require(aps5::compiler_once::invoke(&flag,[&]{++calls;},wait)==EAGAIN
++        && flag==2 && wait.wakes==0 && calls==1,"wait failure preserves owner");
++    flag=0; wait={};
++    try { aps5::compiler_once::invoke(&flag,[]{throw std::runtime_error("core");},wait); }
++    catch (const std::runtime_error& e) { require(!std::strcmp(e.what(),"core"),"core rethrow"); }
++    require(flag==0 && wait.wakes==1,"exception reset wake");
++    require(aps5::compiler_once::invoke(&flag,[&]{++calls;},wait)==0 && flag==1 && calls==2,"core retry");
++    pass("actual_core_spurious_failure_reset");
++}
++static void invalid() {
++    long flag=0;
++    require(APS5NativeCompilerOnce_nid_no_patch(nullptr,+[]{})==EINVAL,"null flag");
++    require(APS5NativeCompilerOnce_nid_no_patch(&flag,nullptr)==EINVAL && flag==0,"null callback");
++    alignas(long) unsigned char bytes[sizeof(long)+1]{};
++    require(APS5NativeCompilerOnce_nid_no_patch(reinterpret_cast<long*>(bytes+1),+[]{})==EINVAL,"alignment");
++    flag=3; require(APS5NativeCompilerOnce_nid_no_patch(&flag,+[]{})==EINVAL && flag==3,"invalid state");
++    flag=1; require(!APS5NativeCompilerOnce_nid_no_patch(&flag,+[]{throw 7;}),"native done value");
++    pass("four_byte_abi_invalid_done");
++}
++static int directCalls=0, directDestroyed=0;
++static void direct_initializer() {
++    Destruct guard{directDestroyed};
++    if (++directCalls==1) throw std::runtime_error("direct once retry");
++}
++static void direct_native_abi() {
++    long flag=PTHREAD_ONCE_INIT; int caught=0;
++    try { APS5CompilerDirectOnce(&flag,direct_initializer); }
++    catch (const std::runtime_error& e) {
++        require(!std::strcmp(e.what(),"direct once retry"),"direct exception identity"); ++caught;
++    }
++    require(flag==0 && caught==1 && directCalls==1 && directDestroyed==1,"direct throw reset/destructor");
++    require(!APS5CompilerDirectOnce(&flag,direct_initializer) && flag==1,"direct retry success");
++    require(!__imp_pthread_once(&flag,direct_initializer) && directCalls==2 && directDestroyed==2,
++        "direct/IAT same flag passive");
++}
++static bool exact_path(HMODULE module, const char* expected) {
++    wchar_t actual[32768], input[32768], full[32768];
++    DWORD length=GetModuleFileNameW(module,actual,32768);
++    int converted=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,expected,-1,input,32768);
++    if (!length || length>=32768 || !converted) return false;
++    DWORD expanded=GetFullPathNameW(input,32768,full,nullptr);
++    return expanded && expanded<32768 &&
++        CompareStringOrdinal(actual,-1,full,-1,TRUE)==CSTR_EQUAL;
++}
++static void binding_and_cross_module(const char* libcPath, const char* helperPath) {
++    HMODULE libc=GetModuleHandleW(L"libc.prx");
++    require(libc!=nullptr && exact_path(libc,libcPath),"loaded exact libc path");
++    auto expected=reinterpret_cast<OnceFunction>(GetProcAddress(libc,"APS5NativeCompilerOnce_nid_no_patch"));
++    require(expected && APS5CompilerOnceResolvedTarget()==expected
++        && __imp_pthread_once==&APS5CompilerDirectOnce,"EXE exact private IAT route");
++    wchar_t wideHelper[32768];
++    require(MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,helperPath,-1,wideHelper,32768)>0,"helper path UTF8");
++    HMODULE helper=LoadLibraryW(wideHelper);
++    require(helper!=nullptr && exact_path(helper,helperPath),"cross helper exact path");
++    using Target=OnceFunction (*)();
++    using Call=void (*)(std::once_flag*,int*,bool);
++    auto target=reinterpret_cast<Target>(GetProcAddress(helper,"HelperOnceTarget"));
++    auto call=reinterpret_cast<Call>(GetProcAddress(helper,"HelperCallOnce"));
++    require(target && call && target()==expected,"DLL same provider");
++    std::once_flag flag; int calls=0, caught=0;
++    try { call(&flag,&calls,true); }
++    catch (const std::runtime_error& e) { require(!std::strcmp(e.what(),"cross-module once"),"cross throw"); ++caught; }
++    std::call_once(flag,[&]{++calls;}); call(&flag,&calls,false);
++    require(calls==2 && caught==1,"cross-module flag retry/passive");
++    require(FreeLibrary(helper)!=FALSE,"cross helper close");
++    direct_native_abi();
++    pass("private_iat_cross_module_identity");
++}
++int main(int argc, char** argv) {
++    try {
++        require(argc==3,"expected exact libc and helper paths");
++        binding_and_cross_module(argv[1],argv[2]); retry(); nested(); contention(false);
++        contention(true); independent(); backend_contract(); invalid();
++        std::puts("COMPILER_ONCE_COMPLETE cases=8 errors=0"); return 0;
++    } catch (const std::exception& e) {
++        std::fprintf(stderr,"COMPILER_ONCE_FAILED %s\n",e.what()); return 1;
++    } catch (...) { std::fputs("COMPILER_ONCE_FAILED unknown\n",stderr); return 1; }
++}
+--- /dev/null
++++ b/core/libs/tests/CompilerOnceCross.cpp
+@@ -0,0 +1,14 @@
++#include <mutex>
++#include <stdexcept>
++using OnceFunction = int (*)(long*, void (*)());
++extern "C" OnceFunction APS5CompilerOnceResolvedTarget() noexcept;
++extern "C" __declspec(dllexport) OnceFunction HelperOnceTarget() noexcept {
++    return APS5CompilerOnceResolvedTarget();
++}
++extern "C" __declspec(dllexport)
++void HelperCallOnce(std::once_flag* flag, int* calls, bool fail) {
++    std::call_once(*flag, [=] {
++        ++*calls;
++        if (fail) throw std::runtime_error("cross-module once");
++    });
++}

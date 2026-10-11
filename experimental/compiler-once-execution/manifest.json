@@ -2,14 +2,31 @@
   "capturedLogsIncluded": false,
   "compiledOutputsIncluded": false,
   "deviceExecuted": false,
+  "directExecutorControls": 14,
   "files": {
     "README.md": {
-      "bytes": 4067,
-      "sha256": "f6cb98297560b972afee0e785a607514ce6783b5d9cdd8fb71671e637cae478b"
+      "bytes": 5658,
+      "sha256": "240602b4288dc4b4361ac48fd7d15176e0b34b121205cc1361f39e3fab4b67e9"
+    },
+    "direct-attempt-observation.json": {
+      "bytes": 1899,
+      "sha256": "24422feedde4c348b88e42ce9576ac02e36d124fefdf7f225d8b4e4070a2c14e"
+    },
+    "direct-source-checkpoint.json": {
+      "bytes": 893,
+      "sha256": "408501df99d0d805041230a41c1ae4e421020ae1a4d1e7598033ab9ab2d7001f"
     },
     "first-attempt-observation.json": {
       "bytes": 1377,
       "sha256": "2a3a3a6018c9b5987b9b9c353b2a9dda99c5618cd6959daaaf2b81b82fb8d26c"
+    },
+    "snapshot/direct/run.py": {
+      "bytes": 14773,
+      "sha256": "bcf1e68faa8b2f54f736de42614c87861c4af62a46625309654f635e5645373d"
+    },
+    "snapshot/direct/test_runner.py": {
+      "bytes": 6620,
+      "sha256": "a2c5828fb1e454ccd90ea64166da8dff7b3ed2873f0f3705b7b1e9b23e724ab8"
     },
     "snapshot/lifetime/bounded_local_process.py": {
       "bytes": 7486,
@@ -32,15 +49,17 @@
       "sha256": "90ff4379d81dda410a5ef1f66e19d76644d3724386c0fc063b530136e2436077"
     },
     "test_checkpoint.py": {
-      "bytes": 2002,
-      "sha256": "8013bac762526f77eb91c4af9585d5eb2c170d0c9b5aad788feedc2663755617"
+      "bytes": 2831,
+      "sha256": "9b954b0536fd45c3bf13c55726a1cc9525e4f42869303a9f64341f5fd41f7110"
     }
   },
+  "fullHleQualified": false,
   "lifetimePosixControls": 9,
-  "preservationControls": 3,
+  "preservationControls": 4,
   "privateBindingsIncluded": false,
   "runtimeQualified": false,
   "schema": 1,
+  "scopedDirectCandidatePassed": true,
   "sourceExecutorControls": 12,
-  "status": "experimental_source_preservation_with_sanitized_actual_failed_link"
+  "status": "experimental_source_preservation_with_scoped_actual_direct_pass_and_retained_first_failure"
 }

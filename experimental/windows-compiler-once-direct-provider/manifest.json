@@ -1,0 +1,20 @@
+{
+  "files": {
+    "CHECKPOINT.md": "d3e8c106b1222a9c501a300783c402a35f03c6dc3cf24c9c2c90aa4943bc045c",
+    "CompilerOnceTests.cpp": "10f9380bde14cae7f654cda077ad0d6877ad911d226625b7f90f9851c549d2e4",
+    "README.md": "7a170c7c32ce35c6589c0b30d66df1e17f69bdd8f939d12db9aa0a4408065875",
+    "caller_bridge.cpp": "fab4cc6fb91408d14cc9beb474382db9b7363ed3f9229f1baf67e004f46b95a7",
+    "compiler_once.hpp": "84567369a9255d8e072d5d58f5b89d3c00609077d062c19be785f1c2dc23e5ae",
+    "cross_module.cpp": "e08eedd9eddc3c1fc2cd007d9dd64e41809f94f946b39224e22242f31f48a687",
+    "provider.cpp": "2fe22fb38f6282613dffaaa1be94b2e296c261ebcb6d2b0124257ad2cd248e04",
+    "recipe.py": "ff77342a2a3dacd4e5ea4dfec35ad7558d2f58b9bee5a47efc9fd6e100a833b6",
+    "test_direct.py": "afe2b92da185d3f437bf0d520b33894b5bbaeb810671bceca97c21a33862a96c",
+    "test_recipe.py": "ff002feafab85a8e26cfc734e93054212f0c89d103e46312bc456c7f09043588"
+  },
+  "fullHleQualified": false,
+  "nativeRuntimeQualified": false,
+  "originSourceReviewSha256": "186dc6e6ed9b98009b7387f5c2a8fee0c652a672211ac54a2b8a18c404744fc3",
+  "privateInputsIncluded": false,
+  "schema": 1,
+  "status": "public_source_snapshot_not_runtime_qualified"
+}

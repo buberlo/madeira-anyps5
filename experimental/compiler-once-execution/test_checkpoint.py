@@ -35,7 +35,20 @@ class Checkpoint(unittest.TestCase):
             data=(HERE/name).read_bytes()
             self.assertNotRegex(data,rb'[/]Users[/][A-Za-z0-9_. -]+[/]',name)
             self.assertNotRegex(data,rb'PPSA[0-9]{5}',name)
-            self.assertTrue(Path(name).suffix in {'.py','.md'} or name=='first-attempt-observation.json')
+            self.assertTrue(Path(name).suffix in {'.py','.md'} or name in {
+                'first-attempt-observation.json','direct-source-checkpoint.json','direct-attempt-observation.json'})
+
+    def test_direct_successor_bodies_and_source_identity(self):
+        source=HERE/'snapshot/direct/run.py'
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),
+                         'bcf1e68faa8b2f54f736de42614c87861c4af62a46625309654f635e5645373d')
+        def functions(path):
+            return {node.name:ast.dump(node,include_attributes=False)
+                    for node in ast.parse(path.read_text()).body if isinstance(node,ast.FunctionDef)}
+        before=functions(HERE/'snapshot/run.py');after=functions(source)
+        self.assertEqual(before.keys(),after.keys())
+        self.assertEqual(sorted(name for name in before if before[name]!=after[name]),
+                         ['run_commands','shape'])
 
 
 if __name__=='__main__':unittest.main()
