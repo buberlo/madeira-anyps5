@@ -115,7 +115,15 @@ build: 187 ARM64EC objects, 50 fresh native objects and nine retained FEXCore
 members. All 104 native continuation commands join successfully; the old frame
 size/offsets, 30 exports, 12-DLL import symbols and native public symbol contract
 remain unchanged. The original failed import postcondition and terminal capture
-are retained separately. These artifacts still require a fresh app consumer,
-signing and the actual iPad continuation test; they do not establish the cause
-of Native59's fault or repair MiniGolf's startup.
-[Actual native build](evidence/native-ec-continuation-native-build-20261012.json).
+are retained separately. A fresh Native60 app now compiles and passes local
+signature/provenance verification with its new FEXBridge object and 47 actual
+FEX headers, all nine native archives, retained Native59 helpers/profiles and
+matching dSYM UUID. The same-app parser successor fixes Swift's four-record
+Make dependency readback without rebuilding or resigning. Independent readback
+checks all 382 app files and 13 completed verifier command outputs. Native60 is
+built and signed, but not installed or CPU-qualified. It retains the older
+installed Native59 HLE bytes rather than substituting the new a11c runtime.
+These results do not establish the cause of Native59's fault or repair
+MiniGolf's startup.
+[Actual native build](evidence/native-ec-continuation-native-build-20261012.json),
+[signed Native60 observation](evidence/native60-local-build-signature-20261012.json).

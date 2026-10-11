@@ -26,6 +26,14 @@ protected metadata and closure of the owned process pass. Correct CPU delivery
 remains required before this iPad can qualify the new MiniGolf package.
 [Actual device observation](evidence/native59-owner-sampler-observation-20261012.json).
 
+Native60 is now built and signed, with its current FEXBridge dependencies,
+native archive inputs, embedded translator and signing entitlements verified.
+It isolates an EC continuation candidate; its HLE payload remains the older
+installed package. It has not yet been installed or executed, and does not
+establish a repair of Native59's fault. The current 47-library HLE update still
+requires its independent exception and shader qualification.
+[Candidate implementation and local build](../experimental/native-ec-continuation/README.md).
+
 ## Preceding package and Windows results
 
 The preceding source was complete AnyPS5 through `c963432d` with eleven local

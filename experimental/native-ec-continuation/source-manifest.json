@@ -1,5 +1,6 @@
 {
-  "applicationBuiltOrSigned": false,
+  "applicationBuiltOrSigned": true,
+  "applicationSignedVerified": true,
   "baselineSources": {
     "FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp": "a830784558ee0d6e3ba9f3a27ba6364ec516e7ef29947516dbc883d281248328",
     "FEXCore/include/FEXCore/Core/CoreState.h": "286a1a930b395a45af776c542959fb78956cc552f04ed654e8881f1add50cf70",
@@ -57,6 +58,11 @@
       "sanitization": "none",
       "sourceSha256": "ef359ac5c0dbe2ffe354032d6f5a7d4dc5e084723960863de2c4b51e51d28e16"
     },
+    "local-rebuild-source-snapshot/finish60.py-same-app-verifier-attempt2.snapshot": {
+      "byteIdentical": true,
+      "kind": "same_app_local_final_verifier_source_snapshot_not_runnable_without_local_proofs",
+      "sourceSha256": "3baea84b40df2a646701f287880cb370cc3cbc33b032305a18db8d7b133daef4"
+    },
     "local-rebuild-source-snapshot/make_recipe.py.snapshot": {
       "byteIdentical": true,
       "sourceSha256": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49"
@@ -70,6 +76,11 @@
       "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
       "sanitization": "none",
       "sourceSha256": "65500abe2264775ee63bcc4bb30c124383247d018ab4666495fed6c0b06576da"
+    },
+    "local-rebuild-source-snapshot/make_review.py-same-app-verifier-attempt2.snapshot": {
+      "byteIdentical": true,
+      "kind": "same_app_local_final_verifier_source_snapshot_not_runnable_without_local_proofs",
+      "sourceSha256": "0dbaf270207d705ecfbdaf3271cfe290b5b93940c749670f1ab9d0a9380df1d5"
     },
     "local-rebuild-source-snapshot/make_review.py-terminal-capture.snapshot": {
       "byteIdentical": true,
@@ -128,6 +139,11 @@
       "byteIdentical": true,
       "sourceSha256": "5cc09debe1eac73f7459fd3486bc7ca5088c624ab2be9045d04c5be082334426"
     },
+    "local-rebuild-source-snapshot/test_finish.py-same-app-verifier-attempt2.snapshot": {
+      "byteIdentical": true,
+      "kind": "same_app_local_final_verifier_source_snapshot_not_runnable_without_local_proofs",
+      "sourceSha256": "ff9688048df227a43c10b2b545e9d4ccdb5dbddc7d9b30fd293df23a688c4290"
+    },
     "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": {
       "byteIdentical": true,
       "sourceSha256": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f"
@@ -173,7 +189,7 @@
   "faultCauseEstablished": false,
   "fexUpstreamCommit": "14c92681f4d62cf84d901460e0358de09c8847a7",
   "files": {
-    "README.md": "d69e569e9f0c7f7b94bd72f1f1ab0fb96fa6d6840c39b0ec73c45402de8eb7da",
+    "README.md": "bb5cfc846cfad6ba74ed09dc352e29f6bf808e90a9577dc9e0469d048a3d95be",
     "candidate.patch": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6",
     "emitter-probe.cpp": "48d0c610ff3c2d87c3443a2e6f140bcaae51ad1536e63ff5c4edd9844a6d2048",
     "extract_harness.py": "85d86b0654ddfb99effd7aad561cfdd1108492b60a0a7e45a99a3e9d86c33580",
@@ -183,9 +199,11 @@
     "local-rebuild-source-snapshot/build_production.py.snapshot": "df8c55020afd2be8125ab7cb71b097318b678ca68d87166ba5530f803307d75f",
     "local-rebuild-source-snapshot/common60.py-native60.snapshot": "045c8fd608ab882d0dabcbce5fc787a75f976a2818a387a12ae214441c220fe4",
     "local-rebuild-source-snapshot/finish60.py-native60.snapshot": "ef359ac5c0dbe2ffe354032d6f5a7d4dc5e084723960863de2c4b51e51d28e16",
+    "local-rebuild-source-snapshot/finish60.py-same-app-verifier-attempt2.snapshot": "3baea84b40df2a646701f287880cb370cc3cbc33b032305a18db8d7b133daef4",
     "local-rebuild-source-snapshot/make_recipe.py.snapshot": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49",
     "local-rebuild-source-snapshot/make_review.py-attempt2.snapshot": "f976613600d6a76c0208c61359d9331631c241c8dce21c61e8b1a8ab15bdaf7c",
     "local-rebuild-source-snapshot/make_review.py-native60.snapshot": "65500abe2264775ee63bcc4bb30c124383247d018ab4666495fed6c0b06576da",
+    "local-rebuild-source-snapshot/make_review.py-same-app-verifier-attempt2.snapshot": "0dbaf270207d705ecfbdaf3271cfe290b5b93940c749670f1ab9d0a9380df1d5",
     "local-rebuild-source-snapshot/make_review.py-terminal-capture.snapshot": "57c2b48318afd7a1a1110ee0044faeed41e50e1cbf2e10977c624dd44280b26d",
     "local-rebuild-source-snapshot/make_review.py.snapshot": "abc51143a415420dadd28fd2f6c7561871fa03859aafefcd739bf889db15a194",
     "local-rebuild-source-snapshot/native_tail.py.inc.snapshot": "0d6f958aefaa5cb5dacaa351a4cf04a4a3f3be2ffb80c7489ad6f80ce21ea48c",
@@ -198,6 +216,7 @@
     "local-rebuild-source-snapshot/terminal_log.py.snapshot": "0c64ba47db1b48a0dd93b285f75a9c391d40ea305e65e0303e7782d4dac7ebb0",
     "local-rebuild-source-snapshot/test_build.py.snapshot": "3b7b0648a0bb3c61ab3c017922a2da8fbbb060a65d9266dd63dc87362b830f93",
     "local-rebuild-source-snapshot/test_extract.py.snapshot": "5cc09debe1eac73f7459fd3486bc7ca5088c624ab2be9045d04c5be082334426",
+    "local-rebuild-source-snapshot/test_finish.py-same-app-verifier-attempt2.snapshot": "ff9688048df227a43c10b2b545e9d4ccdb5dbddc7d9b30fd293df23a688c4290",
     "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f",
     "local-rebuild-source-snapshot/test_native60.py-native60.snapshot": "e81611769a5e43c9027e0c00b48afde65f33a4939713173d8c14c413bdf065e3",
     "local-rebuild-source-snapshot/test_resume.py.snapshot": "f3f37cb2db012ed6d847c9e9c8a3ec0c0da960dc4f63022f5d622267abead35a",
@@ -242,6 +261,68 @@
     "terminalCaptureResumeReviewSha256": "351e4aad9abedced35d31f85be32cdee9db21f614e0ce12637ff8e52a39f8dc8"
   },
   "localRecipeSnapshotsRunnableFromFreshClone": false,
+  "native60LocalBuildSignatureObservation": {
+    "actualFrameOffsetRecords": [
+      [
+        3904,
+        0,
+        1520,
+        3840
+      ],
+      [
+        3904,
+        0,
+        1520,
+        3840,
+        3848,
+        3856,
+        3864
+      ]
+    ],
+    "appBuild": "60",
+    "appFileMapSha256": "abd386c1110d7dc80765215de619665ba6b5dc10b39d9f969f4acca8420cd510",
+    "appMachOSha256": "54b5d87843785ea69212982f53018b6120f6d4dc0a5370d16728a1864f37c574",
+    "boundary": "Local Native60 app compile/link/signature provenance only. No Native60 installation, runtime delivery, MiniGolf rendering or gameplay acceptance.",
+    "cpuEightQualified": false,
+    "currentA11cHlePackaged": false,
+    "deepStrictCodesignVerified": true,
+    "deviceExecuted": false,
+    "dsymUuidMatches": true,
+    "faultCauseEstablished": false,
+    "fexRuntimeSha256": "e47acaff7211fc1d2dde26b22c5fb7fb0c23f8f14a8ec945e761ef035c8630f5",
+    "full803Qualified": false,
+    "gamePlayable": false,
+    "gpuQualified": false,
+    "independentArtifactReadback": {
+      "actualFexBridgeHeaders": 47,
+      "actualNativeArchiveCount": 9,
+      "appBytes": 362084989,
+      "appFileCount": 382,
+      "freshFexBridgeObjectAndDependencyReplayed": true,
+      "fullLocalAppMapReplayed": true,
+      "joinedVerificationCommands": 13,
+      "localSignatureCommandOutputsReplayed": true,
+      "passed": true,
+      "signatureToolsInvokedByIndependentReader": false,
+      "sourceReviewInputs": 264
+    },
+    "installed": false,
+    "launched": false,
+    "native59RollbackPreserved": true,
+    "nativeCoreArchiveSha256": "9a0dc89c24c586afa635843b16f9095a18dd22a272d27d7ea710843f0826066f",
+    "nativeProducerReceiptSha256": "fdbd160c776a110172ecd9dfddc3a50be4c7e65e22bf71b9ded70567ed2e0ae2",
+    "olderInstalledNative59HlePreserved": true,
+    "original50Qualified": false,
+    "originalFailedFinishPreserved": true,
+    "preparedBuildInputsSha256": "7517c47921464bf6a41252ac7c1e5e725360b5d07c405c8cb8cfa298d20f5f46",
+    "sameAppVerifierRebuiltApplication": false,
+    "sameAppVerifierResignedApplication": false,
+    "schemaVersion": 1,
+    "signedReceiptSha256": "2358ba4baeaa2450770d0e578ceb29ca81ba69d5343c8b36aafb399e3f7936e5",
+    "sourceInventoriesOrDeviceIdentifiersPublished": false,
+    "sourceReviewSha256": "6cd3d04f95158953219848914b5454bd84439cecbbac5bea3e9782e2836ec707",
+    "status": "native60_locally_built_signed_verified_not_installed"
+  },
   "native60PackagingSourcePreservation": {
     "actualPreparedInputsSha256": "7517c47921464bf6a41252ac7c1e5e725360b5d07c405c8cb8cfa298d20f5f46",
     "physicalLayoutPreparedByRoot": true,
@@ -250,6 +331,18 @@
     "sourceReviewSha256": "e773d385f524e81cb3b16346a2006fd562f18f215892c7d940a83141cefbd237",
     "sourceTempControls": 16,
     "updatedAnyPS5HlePackaged": false
+  },
+  "native60SameAppFinalVerifierSourcePreservation": {
+    "actualFreshFexBridgeReadbackPassed": true,
+    "actualSignatureVerified": true,
+    "actualXcodeBuildPassed": true,
+    "allHostDependencyFilesRead": 77,
+    "cpuAccepted": false,
+    "installed": false,
+    "rebuildOrResignInSuccessor": false,
+    "sameAppSignatureVerifierExecuted": true,
+    "sourceControls": 12,
+    "sourceReviewSha256": "6cd3d04f95158953219848914b5454bd84439cecbbac5bea3e9782e2836ec707"
   },
   "nativeContinuationEvidence": {
     "freshNativeArchives": 1,

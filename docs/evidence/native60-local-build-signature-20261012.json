@@ -1,0 +1,62 @@
+{
+  "actualFrameOffsetRecords": [
+    [
+      3904,
+      0,
+      1520,
+      3840
+    ],
+    [
+      3904,
+      0,
+      1520,
+      3840,
+      3848,
+      3856,
+      3864
+    ]
+  ],
+  "appBuild": "60",
+  "appFileMapSha256": "abd386c1110d7dc80765215de619665ba6b5dc10b39d9f969f4acca8420cd510",
+  "appMachOSha256": "54b5d87843785ea69212982f53018b6120f6d4dc0a5370d16728a1864f37c574",
+  "boundary": "Local Native60 app compile/link/signature provenance only. No Native60 installation, runtime delivery, MiniGolf rendering or gameplay acceptance.",
+  "cpuEightQualified": false,
+  "currentA11cHlePackaged": false,
+  "deepStrictCodesignVerified": true,
+  "deviceExecuted": false,
+  "dsymUuidMatches": true,
+  "faultCauseEstablished": false,
+  "fexRuntimeSha256": "e47acaff7211fc1d2dde26b22c5fb7fb0c23f8f14a8ec945e761ef035c8630f5",
+  "full803Qualified": false,
+  "gamePlayable": false,
+  "gpuQualified": false,
+  "independentArtifactReadback": {
+    "actualFexBridgeHeaders": 47,
+    "actualNativeArchiveCount": 9,
+    "appBytes": 362084989,
+    "appFileCount": 382,
+    "freshFexBridgeObjectAndDependencyReplayed": true,
+    "fullLocalAppMapReplayed": true,
+    "joinedVerificationCommands": 13,
+    "localSignatureCommandOutputsReplayed": true,
+    "passed": true,
+    "signatureToolsInvokedByIndependentReader": false,
+    "sourceReviewInputs": 264
+  },
+  "installed": false,
+  "launched": false,
+  "native59RollbackPreserved": true,
+  "nativeCoreArchiveSha256": "9a0dc89c24c586afa635843b16f9095a18dd22a272d27d7ea710843f0826066f",
+  "nativeProducerReceiptSha256": "fdbd160c776a110172ecd9dfddc3a50be4c7e65e22bf71b9ded70567ed2e0ae2",
+  "olderInstalledNative59HlePreserved": true,
+  "original50Qualified": false,
+  "originalFailedFinishPreserved": true,
+  "preparedBuildInputsSha256": "7517c47921464bf6a41252ac7c1e5e725360b5d07c405c8cb8cfa298d20f5f46",
+  "sameAppVerifierRebuiltApplication": false,
+  "sameAppVerifierResignedApplication": false,
+  "schemaVersion": 1,
+  "signedReceiptSha256": "2358ba4baeaa2450770d0e578ceb29ca81ba69d5343c8b36aafb399e3f7936e5",
+  "sourceInventoriesOrDeviceIdentifiersPublished": false,
+  "sourceReviewSha256": "6cd3d04f95158953219848914b5454bd84439cecbbac5bea3e9782e2836ec707",
+  "status": "native60_locally_built_signed_verified_not_installed"
+}

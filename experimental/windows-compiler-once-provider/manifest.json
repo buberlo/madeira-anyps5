@@ -1,0 +1,21 @@
+{
+  "candidateRuntimePassed": false,
+  "files": {
+    "CHECKPOINT.md": "b1174a9ce9ece8379b47a3226d2a8632a7ec43ae310ccc6542444a6bd3f5ae5b",
+    "CompilerOnceTests.cpp": "e710df163d03514443cb17b65d3ab836906f683082ca63402f2618652dbff165",
+    "README.md": "8829f64e4d7f8b699fbdb4a0f690673e6d780748018d81850b8290987c12c2bc",
+    "caller_bridge.cpp": "7002b5161071bc4e626a19a2d369dc0d6ff925211062a42834a2c55a42ad1bab",
+    "compiler_once.hpp": "84567369a9255d8e072d5d58f5b89d3c00609077d062c19be785f1c2dc23e5ae",
+    "cross_module.cpp": "e08eedd9eddc3c1fc2cd007d9dd64e41809f94f946b39224e22242f31f48a687",
+    "provider.cpp": "2fe22fb38f6282613dffaaa1be94b2e296c261ebcb6d2b0124257ad2cd248e04",
+    "recipe.py": "0608c9017e2e405476cc05a6edbaf5cbf6e73a1c35c3e00156be508c648e6db8",
+    "test_recipe.py": "ff002feafab85a8e26cfc734e93054212f0c89d103e46312bc456c7f09043588"
+  },
+  "fullHleQualified": false,
+  "localRecipeDependentSnapshot": true,
+  "privateInputMapsIncluded": false,
+  "runtimeOutputsIncluded": false,
+  "schema": 1,
+  "sourceReviewSha256": "099251aacbf51b4e05a687bfbce2bb0db68f330c29e1ca8d8566757545dca4b7",
+  "status": "source_snapshot_compiler_once_candidate_not_runtime_qualified"
+}

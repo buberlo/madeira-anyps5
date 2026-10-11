@@ -134,3 +134,27 @@ the actual new FEXBridge object/dependencies and complete header byte route, all
 nine archive resolutions, retained PE helpers/profiles and Native59 rollback.
 No source-review maps, Apple profile inventory, device state or private data is
 published. These remain preservation snapshots, not fresh-clone build commands.
+
+The fresh Native60 Xcode build subsequently completed. Its original final
+verifier stopped at the dependency parser: Swift emitted four logical Make
+records, while the parser read one RHS and rejected the later separator tokens.
+The additive `*-same-app-verifier-attempt2.snapshot` sources preserve the narrow
+parser successor and 12 source/local-readback controls. It parses every host
+dependency record and retains the actual FEXBridge membership/header/object
+checks. It verifies the same completed app and emits a separate signature
+appendix; it contains no rebuild or resign operation. The original compiled
+recipe and failed finish remain preserved. These snapshots are source-qualified
+only; final signature verification, installation and CPU acceptance are pending
+at this observation. Local source/input inventories remain unpublished.
+
+The same-app final verifier subsequently passed on the completed Native60
+application. Its actual signed receipt records the fresh FEXBridge object and
+47 headers, all nine native archive resolutions, unchanged retained runtime
+helpers/profiles/entitlements, strict signature checks and matching dSYM UUID.
+An independent filesystem readback checked all 382 app files, 264 verifier
+source records and 13 completed verification command outputs. The parser
+successor neither rebuilt nor resigned the app; the earlier failed finish
+remains retained. Native60 is now locally built and signed, and has not been
+installed or CPU-qualified at this observation. The older installed Native59
+HLE bytes remain packaged; the new a11c HLE runtime is not substituted.
+[Signed local build observation](../../docs/evidence/native60-local-build-signature-20261012.json).

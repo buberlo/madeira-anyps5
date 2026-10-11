@@ -1,0 +1,64 @@
+"""Seal the narrow verifier and current small build evidence; no signing/build."""
+from pathlib import Path
+import importlib.util
+import json
+import stat
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('native60_review_finish', HERE/'finish60.py')
+f = importlib.util.module_from_spec(spec); spec.loader.exec_module(f)
+c = f.c
+
+def stamp(path):
+    z = Path(path).lstat()
+    c.need(stat.S_ISREG(z.st_mode), 'Regular source/evidence record')
+    return [z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns]
+
+def make():
+    output = HERE/'source-review-freeze.json'
+    c.need(not output.exists(), 'Exclusive verifier source review')
+    c.need(c.sha(f.OLD/'source-review-freeze.json') == f.OLD_REVIEW and
+           c.sha(c.DEFAULT_OUT/'inputs.json') == f.ACTUAL_INPUT and
+           c.sha(c.DEFAULT_OUT/'finish-receipt.json') == f.FAILED_FINISH,
+           'Exact retained build and failed verifier history')
+    run = subprocess.run([sys.executable,'-I','-B','-m','unittest','discover','-s',str(HERE),
+                          '-p','test_finish.py','-v'],capture_output=True,timeout=30)
+    (HERE/'offline-tests.log').write_bytes(run.stdout+run.stderr)
+    c.need(run.returncode == 0 and b'Ran 12 tests' in run.stderr, 'Twelve narrow verifier controls')
+    paths = {Path(name) for name in c.read(f.OLD/'source-review-freeze.json')['inputHashes']}
+    paths.add(f.OLD/'source-review-freeze.json')
+    paths.add(Path(sys.executable))
+    paths.update(p for p in HERE.iterdir() if p.is_file() and p != output)
+    paths.update(c.DEFAULT_OUT/name for name in ('inputs.json','preparation-receipt.json',
+        'xcodebuild-command.json','xcodebuild-result.json','xcodebuild.stdout','xcodebuild.stderr',
+        'finish-receipt.json','native-link-input-readback.json'))
+    objects = c.DEFAULT_OUT/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/Madeira.build/Objects-normal/arm64'
+    paths.update(objects.glob('*.d'))
+    paths.add(objects/'FEXBridge.o')
+    helper_objects = c.DEFAULT_OUT/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/MadeiraJITHelper.build/Objects-normal/arm64'
+    paths.update(helper_objects.glob('*primary-emit-module.d'))
+    inputs = c.read(c.DEFAULT_OUT/'inputs.json')
+    readback = f.app_core_state_readback(c.DEFAULT_OUT, inputs)
+    paths.update(Path(name) for name in readback['FEXBridge']['actualFexHeaders'])
+    before = {str(path):stamp(path) for path in sorted(paths)}
+    hashes = {name:c.sha(name) for name in before}
+    c.need(all(stamp(name) == before[name] for name in before), 'Stable current source/build records')
+    old_map = c.read(f.OLD/'source-review-freeze.json')['inputHashes']
+    c.need(all(hashes[name] == digest for name,digest in old_map.items()), 'Original reviewed providers unchanged')
+    result = {'status':'native60_same_app_final_verifier_source_only_not_executed',
+        'inputHashes':hashes,'inputFingerprints':before,'pureControlsPassed':12,
+        'originalPackagingSourceReviewSha256':f.OLD_REVIEW,
+        'preservedFailedFinishSha256':f.FAILED_FINISH,'actualBuildInputsSha256':f.ACTUAL_INPUT,
+        'actualHostDependencyFilesRead':len(list(objects.glob('*.d'))),
+        'actualSwiftLogicalRecordCount':4,'actualFreshFexBridgeReadbackPassed':True,
+        'originalCompiledRecipeInputsPreserved':True,
+        'newOutputAppendix':'signature-verification-attempt2',
+        'xcodeExecuted':False,'resigned':False,'signatureCommandsExecuted':False,
+        'installed':False,'deviceActions':False,'cpuAccepted':False,'runtimeAccepted':False}
+    output.write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps({'path':str(output),'sha256':c.sha(output),'inputs':len(hashes),
+                      'bytes':sum(row[4] for row in before.values())}))
+
+if __name__ == '__main__': make()

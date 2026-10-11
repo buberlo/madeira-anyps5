@@ -1,0 +1,46 @@
+{
+  "capturedLogsIncluded": false,
+  "compiledOutputsIncluded": false,
+  "deviceExecuted": false,
+  "files": {
+    "README.md": {
+      "bytes": 4067,
+      "sha256": "f6cb98297560b972afee0e785a607514ce6783b5d9cdd8fb71671e637cae478b"
+    },
+    "first-attempt-observation.json": {
+      "bytes": 1377,
+      "sha256": "2a3a3a6018c9b5987b9b9c353b2a9dda99c5618cd6959daaaf2b81b82fb8d26c"
+    },
+    "snapshot/lifetime/bounded_local_process.py": {
+      "bytes": 7486,
+      "sha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6"
+    },
+    "snapshot/lifetime/run.py": {
+      "bytes": 12141,
+      "sha256": "717fb9edf65a428eb70dd78cb2bd10d0a78148819de104d769cfe5ae6a1ed410"
+    },
+    "snapshot/lifetime/test_bounded_local_process.py": {
+      "bytes": 5654,
+      "sha256": "fcd4aa3e9cec0459f0afc1405c7a277081f2618b542f9142089533b167969399"
+    },
+    "snapshot/run.py": {
+      "bytes": 14440,
+      "sha256": "c021da05547232856e6336eac0796f2669640ecdc622352e9b163da012c28a7a"
+    },
+    "snapshot/test_runner.py": {
+      "bytes": 5783,
+      "sha256": "90ff4379d81dda410a5ef1f66e19d76644d3724386c0fc063b530136e2436077"
+    },
+    "test_checkpoint.py": {
+      "bytes": 2002,
+      "sha256": "8013bac762526f77eb91c4af9585d5eb2c170d0c9b5aad788feedc2663755617"
+    }
+  },
+  "lifetimePosixControls": 9,
+  "preservationControls": 3,
+  "privateBindingsIncluded": false,
+  "runtimeQualified": false,
+  "schema": 1,
+  "sourceExecutorControls": 12,
+  "status": "experimental_source_preservation_with_sanitized_actual_failed_link"
+}
