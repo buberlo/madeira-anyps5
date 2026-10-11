@@ -1,0 +1,355 @@
+// Isolated host harness. Inserts exact candidate C bridge / RAII declarations.
+// The native query is a stub; this is not Wine/server/context/runtime proof.
+#include <FEXCore/Utils/NativeCriticalSection.h>
+#include <atomic>
+#include <string>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
+#include <type_traits>
+#include <utility>
+
+using ULONG = uint32_t;
+using NTSTATUS = int32_t;
+using THREADINFOCLASS = uint32_t;
+using HANDLE = uintptr_t;
+static constexpr HANDLE NtCurrentThread() { return 2; }
+static constexpr HANDLE NtCurrentProcess() { return 1; }
+static void Check(bool Value, const char* Message) {
+  if (!Value) {
+    std::fprintf(stderr, "FAIL %s\n", Message);
+    std::exit(90);
+  }
+}
+static char Events[1024];
+static size_t EventCount;
+static unsigned Depth, Locks, RpmDepth;
+static bool Mask, Inactive, RefuseEnter, RefuseLeave, MutateLeave;
+static bool LockThrows;
+static unsigned CorruptEnter;
+static uint64_t Token = 0x554411, Teb = 0x112200;
+static unsigned ExpectedFatalLocks, DelayCalls;
+static bool ClearTableOnDelay, RefuseDelay, ForeignTableOwner;
+struct LARGE_INTEGER { int64_t QuadPart; };
+static constexpr bool FALSE = false;
+static NTSTATUS NtDelayExecution(bool, LARGE_INTEGER*);
+static void CheckTableUnlocked();
+static void Event(char Value) {
+  Check(EventCount < sizeof(Events)-1, "finite event bound");
+  Events[EventCount++] = Value;
+}
+static void Reset() {
+  Depth = Locks = RpmDepth = 0;
+  Mask = Inactive = RefuseEnter = RefuseLeave = MutateLeave = LockThrows = false;
+  CorruptEnter = 0;
+  ExpectedFatalLocks = DelayCalls = 0; ClearTableOnDelay = RefuseDelay = ForeignTableOwner = false;
+  Token = 0x554411; Teb = 0x112200;
+  EventCount = 0;
+  std::memset(Events, 0, sizeof(Events));
+}
+
+static NTSTATUS NtQueryInformationThread(HANDLE Self, THREADINFOCLASS Class, void* Buffer,
+                                         ULONG Size, ULONG* Length) {
+  CheckTableUnlocked();
+  Check(Self == NtCurrentThread() && Class == IOS_FEX_CRITICAL_QUERY_CLASS &&
+        Size == sizeof(ios_fex_critical_request), "self-only exact ABI query");
+  auto& Request = *static_cast<ios_fex_critical_request*>(Buffer);
+  Check(Request.magic == IOS_FEX_CRITICAL_MAGIC && Request.version == IOS_FEX_CRITICAL_VERSION &&
+        Request.reserved == 0, "ABI magic/version/reserved");
+  *Length = sizeof(Request);
+  if (Request.operation == IOS_FEX_CRITICAL_ENTER) {
+    Check(Request.depth == 0 && Request.token == 0 && Request.teb == 0 && Request.flags == 0,
+          "ENTER must not supply native identity");
+    Event('E');
+    // Refused native registration must roll back before the C bridge returns.
+    if (RefuseEnter) {
+      Check(Depth == 0 && Locks == 0, "refusal precedes protected acquisition");
+      Mask = false;
+      return static_cast<NTSTATUS>(0xc0000022U);
+    }
+    ++Depth;
+    Mask = !Inactive;
+    Request.depth = Depth;
+    Request.token = Inactive ? 0 : Token;
+    Request.teb = Teb;
+    Request.flags = Inactive ? IOS_FEX_CRITICAL_INACTIVE : 0;
+    switch (CorruptEnter) {
+      case 1: --*Length; break;
+      case 2: Request.magic ^= 1; break;
+      case 3: Request.version += 1; break;
+      case 4: Request.operation = IOS_FEX_CRITICAL_LEAVE; break;
+      case 5: Request.depth = 0; break;
+      case 6: Request.teb = 0; break;
+      case 7: Request.reserved = 1; break;
+      case 8: Request.flags = 2; break;
+      case 9: Request.token = Inactive ? Token : 0; break;
+    }
+    return 0;
+  }
+  if (Request.operation != IOS_FEX_CRITICAL_LEAVE || Depth == 0 ||
+      Request.depth != Depth || Request.token != (Inactive ? 0 : Token) ||
+      Request.teb != Teb || Request.flags != (Inactive ? IOS_FEX_CRITICAL_INACTIVE : 0)) {
+    return static_cast<NTSTATUS>(0xc000000dU);
+  }
+  Event('V');
+  if (RefuseLeave) {
+    Check(Depth == 1 && Locks == 0 && RpmDepth == 0 && (Mask || Inactive),
+          "LEAVE failure retains registration after unlock");
+    return static_cast<NTSTATUS>(0xc0000022U);
+  }
+  if (Depth == 1) {
+    Check(Locks == 0 && RpmDepth == 0, "last LEAVE must follow all protected unlocks");
+  }
+  --Depth;
+  Request.depth = Depth;
+  Request.token = Depth == 0 ? 0 : (Inactive ? 0 : Token);
+  if (Depth == 0) Mask = false;
+  if (MutateLeave) ++Request.depth;
+  return 0;
+}
+
+static NTSTATUS NtTerminateProcess(HANDLE Self, NTSTATUS Status) {
+  Check(Self == NtCurrentProcess() && Status != 0, "fatal is process-only, nonzero");
+  CheckTableUnlocked();
+  Check(Locks == ExpectedFatalLocks && RpmDepth == 0, "fatal before any forbidden unlock / acquisition");
+  if (RefuseEnter) Check(!Mask && Depth == 0, "refused ENTER rolled native mask back");
+  if (RefuseLeave) Check(Mask && Depth == 1, "refused LEAVE remains stopped / registered");
+  if (ForeignTableOwner) Check(DelayCalls==1023,"finite exact backoff batches");
+  std::puts("EXPECTED_NATIVE_CRITICAL_FATAL");
+  std::exit(73);
+}
+
+@BRIDGE@
+@PAIRS@
+static void CheckTableUnlocked() {
+  Check(ForeignTableOwner || !NativePairLock.test(std::memory_order_relaxed), "no owned table lock over IPC / termination");
+}
+static NTSTATUS NtDelayExecution(bool Alertable, LARGE_INTEGER* Delay) {
+  Check(!Alertable && Delay->QuadPart == -10000, "exact bounded existing native delay ABI");
+  ++DelayCalls;
+  if (ClearTableOnDelay || RefuseDelay) NativePairLock.clear(std::memory_order_release);
+  if (RefuseDelay) return static_cast<NTSTATUS>(0xc0000022U);
+  return 0;
+}
+
+struct FakeMutex {
+  void lock() {
+    Check(Depth > 0, "native guard precedes lock");
+    Event('L');
+    if (LockThrows) throw 17;
+    ++Locks;
+  }
+  void unlock() {
+    Check(Locks > 0 && Depth > 0, "native guard survives until unlock");
+    Event('U');
+    --Locks;
+  }
+  void lock_shared() { lock(); }
+  void unlock_shared() { unlock(); }
+};
+namespace FEXCore {
+namespace Core { struct InternalThreadState {}; }
+namespace Utils::WritePriorityMutex { using Mutex = FakeMutex; }
+@WINDOWS_TEMPLATES@
+@LOOKUP_TOKENS@
+struct GuestToHostMap {
+  FakeMutex Lock;
+  auto AcquireWriteLock() { return LookupCacheWriteLockToken {Lock}; }
+  auto AcquireReadLock() { return LookupCacheReadLockToken {Lock}; }
+};
+} // namespace FEXCore
+
+extern "C" void fex_ios_rpm_lock() {
+  Check(Depth > 0, "native critical precedes unchanged RPM lock");
+  ++RpmDepth;
+  Event('R');
+}
+extern "C" void fex_ios_rpm_unlock() {
+  Check(Depth > 0 && RpmDepth > 0, "RPM unlock precedes native leave");
+  --RpmDepth;
+  Event('r');
+}
+namespace ActualRpm {
+@RPM_GUARD@
+}
+
+using BOOL = bool;
+using SIZE_T = size_t;
+static constexpr NTSTATUS STATUS_SUCCESS = 0;
+struct Frontend { bool InLockedRWXRead {}; };
+static Frontend Front;
+static FEXCore::Core::InternalThreadState Thread;
+static bool HaveThread = true, CallbackThrows = false, BeginWrites = true, ReadHeld = false;
+struct FakeArea { auto* ThreadState() { return HaveThread ? &Thread : nullptr; } };
+static FakeArea GetCPUArea() { return {}; }
+static Frontend* GetFrontendThreadData(FEXCore::Core::InternalThreadState*) { return &Front; }
+static bool* IosInLockedRWXReadSlot() { return &ReadHeld; }
+static FakeMutex ThreadCreationMutex, CodeMutex;
+struct FakeContext { FakeMutex& GetCodeInvalidationMutex() { return CodeMutex; } };
+static FakeContext Context;
+static FakeContext* CTX = &Context;
+struct Tracker {
+  std::pair<uint64_t,uint64_t> InvalidateContainingSection(uint64_t A, bool) {
+    CheckTableUnlocked(); if (CallbackThrows) throw 21; return {A,1};
+  }
+  bool BeginUntrackedWriteLocked(uint64_t, uint64_t) {
+    CheckTableUnlocked(); if (CallbackThrows) throw 22; return BeginWrites;
+  }
+  void InvalidateAlignedInterval(uint64_t, uint64_t, bool) { CheckTableUnlocked(); }
+};
+static Tracker Track;
+static Tracker* InvalidationTracker = &Track;
+static std::string AppConfigName = "P5R.exe";
+static void HandleImageUnmap(uint64_t, uint64_t) { CheckTableUnlocked(); }
+@UNMAP_CALLBACK@
+@READ_CALLBACK@
+
+static void ResetCallbacks() {
+  Reset(); HaveThread = BeginWrites = true; CallbackThrows = ReadHeld = false;
+  Front.InLockedRWXRead = false; InvalidationTracker = &Track;
+  CheckTableUnlocked();
+  for (const auto& Entry : NativePairs) Check(!Entry.Active, "previous pair retired");
+}
+static void CheckComplete(const char* Sequence);
+static unsigned RunPairs() {
+  unsigned Cases = 0;
+  void* A = reinterpret_cast<void*>(0x1000);
+  ResetCallbacks(); InvalidationTracker = nullptr;
+  NotifyUnmapViewOfSection(A,false,0); NotifyUnmapViewOfSection(A,true,0);
+  CheckComplete("EV"); ++Cases;
+  ResetCallbacks(); NotifyUnmapViewOfSection(A,false,0); NotifyUnmapViewOfSection(A,true,0);
+  CheckComplete("ELEUVV"); ++Cases;
+  ResetCallbacks(); NotifyUnmapViewOfSection(A,false,0); HaveThread=false; InvalidationTracker=nullptr;
+  NotifyUnmapViewOfSection(A,true,0); CheckComplete("ELEUVV"); ++Cases;
+  ResetCallbacks(); CallbackThrows=true;
+  try { NotifyUnmapViewOfSection(A,false,0); Check(false,"unmap throw"); }
+  catch(int C) { Check(C==21,"unmap exception preserved"); }
+  CheckComplete("ELEUVV"); ++Cases;
+  ResetCallbacks(); BeginWrites=false; BTCpu64NotifyReadFile(0,A,16,false,0);
+  CheckComplete("ELLEUUVV"); ++Cases;
+  ResetCallbacks(); BTCpu64NotifyReadFile(0,A,16,false,0); HaveThread=false; InvalidationTracker=nullptr;
+  BTCpu64NotifyReadFile(0,A,16,true,0); CheckComplete("ELLEUUVV"); ++Cases;
+  ResetCallbacks(); CallbackThrows=true;
+  try { BTCpu64NotifyReadFile(0,A,16,false,0); Check(false,"read throw"); }
+  catch(int C) { Check(C==22,"read exception preserved"); }
+  CheckComplete("ELLEUUVV"); ++Cases;
+  ResetCallbacks(); NotifyUnmapViewOfSection(A,false,0);
+  NotifyUnmapViewOfSection(reinterpret_cast<void*>(0x2000),false,0);
+  NotifyUnmapViewOfSection(reinterpret_cast<void*>(0x2000),true,0); NotifyUnmapViewOfSection(A,true,0);
+  CheckComplete("ELELEUVVEUVV"); ++Cases;
+  ResetCallbacks(); NativePairEnter(NativePairUnmap,0x1000,0);
+  NativePairRetireOnThreadExit(Teb+1);
+  Check(NativePairs[0].Active,"foreign teardown retains row");
+  NativePairRetireOnThreadExit(Teb);
+  Check(!NativePairs[0].Active && Depth==1 && Mask,"thread teardown never fakes native leave");
+  // Native teardown is modeled separately; the production FEX retire body
+  // does not restore masks or unwind abandoned callback locks.
+  Depth=0; Mask=false; Token+=1;
+  NativePairEnter(NativePairUnmap,0x1000,0);
+  auto End=NativePairPrepareEnd(NativePairUnmap,0x1000,0,true); NativePairFinish(End);
+  CheckComplete("EEEVV"); ++Cases;
+  ResetCallbacks(); Inactive=true; NativePairEnter(NativePairUnmap,0x1000,0);
+  auto InactiveEnd=NativePairPrepareEnd(NativePairUnmap,0x1000,0,true); NativePairFinish(InactiveEnd);
+  CheckComplete("EEVV"); ++Cases;
+  ResetCallbacks(); NativePairLock.test_and_set(std::memory_order_relaxed); ClearTableOnDelay=true;
+  { NativePairTableGuard Table; Check(DelayCalls==1,"preempted owner backoff"); }
+  CheckTableUnlocked(); CheckComplete(""); ++Cases;
+  return Cases;
+}
+
+static void CheckComplete(const char* Sequence) {
+  Check(Depth == 0 && Locks == 0 && RpmDepth == 0 && !Mask, "all registrations and locks released");
+  Check(std::strcmp(Events, Sequence) == 0, "exact construction / destruction order");
+}
+static void RunHappy() {
+  unsigned Cases = 0;
+  FakeMutex M;
+  Reset(); { auto Scope = FEXCore::MaskSignalsAndLockMutex(M); } CheckComplete("ELUV"); ++Cases;
+  Reset(); { auto Scope = FEXCore::GuardSignalDeferringSection(M, nullptr); } CheckComplete("ELUV"); ++Cases;
+  Reset(); { auto Scope = FEXCore::GuardSignalDeferringSectionWithFallback(M, nullptr); } CheckComplete("ELUV"); ++Cases;
+  Reset(); { auto Scope = FEXCore::GuardSignalDeferringSection<std::shared_lock>(M, nullptr); } CheckComplete("ELUV"); ++Cases;
+  Reset(); { auto Outer = FEXCore::MaskSignalsAndLockMutex(M); { auto Inner = FEXCore::MaskSignalsAndLockMutex(M); } }
+  CheckComplete("ELELUVUV"); ++Cases;
+  Reset(); { ActualRpm::IosRpmGuard Outer; { ActualRpm::IosRpmGuard Inner; } } CheckComplete("ERERrVrV"); ++Cases;
+  Reset(); LockThrows = true; try { auto Scope = FEXCore::MaskSignalsAndLockMutex(M); Check(false, "lock must throw"); }
+  catch (int Code) { Check(Code == 17, "original lock exception preserved"); }
+  CheckComplete("ELV"); ++Cases;
+  Reset(); Inactive = true; { auto Scope = FEXCore::MaskSignalsAndLockMutex(M); } CheckComplete("ELUV"); ++Cases;
+  Reset(); Inactive = true; { FEXCore::NativeCriticalSection A; { FEXCore::NativeCriticalSection B; } }
+  CheckComplete("EEVV"); ++Cases;
+  Reset(); { FEXCore::NativeCriticalSection A; auto B = std::move(A); } CheckComplete("EV"); ++Cases;
+  Reset(); { FEX_NATIVE_CRITICAL_SCOPE(); FEX_NATIVE_CRITICAL_SCOPE(); } CheckComplete("EEVV"); ++Cases;
+  Reset(); { FEXCore::GuestToHostMap Map; auto Scope = Map.AcquireWriteLock(); } CheckComplete("ELUV"); ++Cases;
+  Reset(); { FEXCore::GuestToHostMap Map; auto Scope = Map.AcquireReadLock(); } CheckComplete("ELUV"); ++Cases;
+  static_assert(!std::is_copy_constructible_v<FEXCore::NativeCriticalSection>);
+  static_assert(!std::is_move_assignable_v<FEXCore::NativeCriticalSection>);
+  static_assert(sizeof(ios_fex_critical_request) == 40);
+  Cases += RunPairs();
+  std::printf("NATIVE_CRITICAL_RAII_PASS cases=%u\n", Cases);
+}
+
+int main(int argc, char** argv) {
+  const char* Mode = argc > 1 ? argv[1] : "happy";
+  Reset();
+  if (!std::strcmp(Mode, "happy")) { RunHappy(); return 0; }
+  if (!std::strcmp(Mode, "refused-enter")) RefuseEnter = true;
+  else if (!std::strcmp(Mode, "refused-leave")) RefuseLeave = true;
+  else if (!std::strcmp(Mode, "malformed-leave")) MutateLeave = true;
+  else if (!std::strncmp(Mode, "malformed-enter-", 16)) CorruptEnter = std::strtoul(Mode+16, nullptr, 10);
+  else if (!std::strcmp(Mode, "malformed-inactive")) { Inactive = true; CorruptEnter = 9; }
+  else if (!std::strcmp(Mode, "out-of-order")) {
+    std::optional<FEXCore::NativeCriticalSection> Outer {std::in_place};
+    FEXCore::NativeCriticalSection Inner;
+    Outer.reset();
+    Check(false, "out-of-order token must not silently continue");
+  }
+  else if (!std::strcmp(Mode,"pair-backoff-exhausted")) {
+    NativePairLock.test_and_set(std::memory_order_relaxed); ForeignTableOwner=true;
+    NativePairTableGuard Table;
+    Check(false,"finite backoff exhausted must refuse");
+  }
+  else if (!std::strcmp(Mode,"pair-delay-refused")) {
+    NativePairLock.test_and_set(std::memory_order_relaxed); RefuseDelay=true;
+    NativePairTableGuard Table;
+    Check(false,"native delay refusal visible");
+  }
+  else if (!std::strcmp(Mode, "pair-capacity")) {
+    for (unsigned i=0; i<NativePairCapacity+1; ++i) {
+      Depth=0; Mask=false; Teb=0x112200+i*0x1000; Token=0x554411+i;
+      NativePairEnter(NativePairUnmap,0x1000,0);
+    }
+    Check(false,"capacity refusal before any protected acquisition");
+  }
+  else if (!std::strcmp(Mode,"pair-wrong-address") || !std::strcmp(Mode,"pair-wrong-size") ||
+           !std::strcmp(Mode,"pair-wrong-kind") || !std::strcmp(Mode,"pair-nest-mismatch") ||
+           !std::strcmp(Mode,"pair-reused-teb") || !std::strcmp(Mode,"pair-duplicate")) {
+    if (!std::strcmp(Mode,"pair-reused-teb")) {
+      NativePairEnter(NativePairUnmap,0x1000,0); Depth=0; Mask=false; ++Token;
+      NativePairEnter(NativePairUnmap,0x1000,0);
+      auto End=NativePairPrepareEnd(NativePairUnmap,0x1000,0,true);
+      Check(false,"stale reused TEB never binds");
+    }
+    if (!std::strcmp(Mode,"pair-duplicate")) {
+      NativePairEnter(NativePairUnmap,0x1000,0); Depth=0; Mask=false;
+      NativePairEnter(NativePairUnmap,0x1000,0);
+      Check(false,"duplicate authoritative tuple refused");
+    }
+    BTCpu64NotifyReadFile(0,reinterpret_cast<void*>(0x1000),16,false,0);
+    ExpectedFatalLocks=2;
+    if (!std::strcmp(Mode,"pair-nest-mismatch")) {
+      NativePairEnter(NativePairUnmap,0x2000,0);
+    }
+    auto End=NativePairPrepareEnd(!std::strcmp(Mode,"pair-wrong-kind") ? NativePairUnmap : NativePairRead,
+      !std::strcmp(Mode,"pair-wrong-address") ? 0x2000 : 0x1000,
+      !std::strcmp(Mode,"pair-wrong-size") ? 17 : 16,true);
+    Check(false,"mismatched AFTER must not unlock");
+  }
+  else { Check(false, "known mode only"); }
+  FakeMutex M;
+  { auto Scope = FEXCore::MaskSignalsAndLockMutex(M); }
+  Check(false, "failure must not resume guest / continue normally");
+}

@@ -1,0 +1,105 @@
+diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -13278,6 +13278,7 @@
+ }
+ 
+ int ios_x64_signal_suspend_enabled;
++int ios_x64_signal_suspend_mode_ready;
+ static int ios_x64_signal_trace;
+ static __thread int ios_x64_signal_reconstruct;
+ static __thread struct {
+@@ -13763,6 +13764,7 @@
+     {
+         const char *e = getenv( "APS5_X64_SIGNAL_SUSPEND" );
+         ios_x64_signal_suspend_enabled = e && e[0] == '1';
++        __atomic_store_n(&ios_x64_signal_suspend_mode_ready, 1, __ATOMIC_RELEASE);
+         e = getenv( "APS5_VEH_CONTEXT_BRIDGE" );
+         ios_veh_state_enabled = e && e[0] == '1' && !e[1];
+         e = getenv( "APS5_VEH_CONTEXT_TRACE" );
+diff --git a/build/ntdll-unix/thread_ios.c b/build/ntdll-unix/thread_ios.c
+--- a/build/ntdll-unix/thread_ios.c
++++ b/build/ntdll-unix/thread_ios.c
+@@ -1186,7 +1186,7 @@
+ 
+         /* ml614: gate on actually holding something. ml613 ran this block on EVERY
+          * thread exit once the export resolved, even with pre_stamp == 0. */
+-        if (pre_stamp || rwx_read)
++        if (pre_stamp || rwx_read || ntdll_get_thread_data()->ios_fex_critical.depth)
+         {
+             /* ml618: RELEASE IT. The callback is the arm64ec_redirect_ptr()-resolved
+              * ARM64 alias registered by the PE side and self-tested there, so this
+@@ -1218,6 +1218,10 @@
+         }
+     }
+     {
++        /* The exiting native thread discards its own critical state, without
++         * synthetic LEAVE/unmask. The server independently clears its registration
++         * in cleanup_thread; reused TEBs are zeroed by virtual_alloc_teb. */
++        ios_fex_critical_native_discard(&ntdll_get_thread_data()->ios_fex_critical);
+         /* Drop our own TEB reference through the key that owns the slot.
+          * We used to poke raw slot 275 here, which we never owned. */
+         extern pthread_key_t ios_teb_tls_key;
+@@ -2587,6 +2591,52 @@
+     return ret;
+ }
+ 
++
++/* Native-only critical-suspend query. It must run before TRACE/CRT lookup. */
++static uint32_t ios_fex_critical_exchange(uint32_t operation, uint64_t teb, uint64_t token,
++                                      uint64_t *result_token, uint32_t *result_depth, uint64_t *result_teb)
++{
++    unsigned int status;
++    SERVER_START_REQ(ios_fex_critical_scope)
++    {
++        req->magic = IOS_FEX_CRITICAL_MAGIC;
++        req->version = IOS_FEX_CRITICAL_VERSION;
++        req->operation = operation;
++        req->reserved = 0;
++        req->teb = teb;
++        req->token = token;
++        if (!(status = wine_server_call(req)))
++        {
++            *result_token = reply->token;
++            *result_depth = reply->depth;
++            *result_teb = reply->teb;
++        }
++    }
++    SERVER_END_REQ;
++    return status;
++}
++
++static NTSTATUS ios_fex_critical_query(HANDLE handle, void *data, ULONG length, ULONG *ret_len)
++{
++    extern int ios_x64_signal_suspend_enabled, ios_x64_signal_suspend_mode_ready;
++    static const struct ios_fex_critical_native_ops ops =
++        { pthread_sigmask, ios_fex_critical_exchange };
++    TEB *teb;
++    struct ntdll_thread_data *thread_data;
++
++    if (ret_len) *ret_len = 0;
++    if (handle != NtCurrentThread()) return IOS_CRITICAL_ACCESS;
++    if (length != sizeof(struct ios_fex_critical_request)) return IOS_CRITICAL_LENGTH;
++    if (!data) return IOS_CRITICAL_PARAMETER;
++    /* This is native NtCurrentTeb's registered pthread key. A guest/FEX-provided
++     * raw x18 is never accepted as authority for registration or state storage. */
++    if (!(teb = NtCurrentTeb())) return IOS_CRITICAL_PARAMETER;
++    thread_data = (struct ntdll_thread_data *)&teb->GdiTebBatch;
++    return ios_fex_critical_native_query(&thread_data->ios_fex_critical, &ops,
++            (uint64_t)(uintptr_t)teb, __atomic_load_n(&ios_x64_signal_suspend_mode_ready, __ATOMIC_ACQUIRE) ?
++            !!ios_x64_signal_suspend_enabled : -1, 1, data, length, ret_len);
++}
++
+ /******************************************************************************
+  *              NtQueryInformationThread  (NTDLL.@)
+  */
+@@ -2594,6 +2644,9 @@
+                                           void *data, ULONG length, ULONG *ret_len )
+ {
+     unsigned int status;
++
++    if ((unsigned)class == IOS_FEX_CRITICAL_QUERY_CLASS)
++        return ios_fex_critical_query(handle, data, length, ret_len);
+ 
+     TRACE("(%p,%d,%p,%x,%p)\n", handle, class, data, length, ret_len);
+ 

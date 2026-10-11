@@ -1,0 +1,330 @@
+{
+  "archivedRecipeWarning": "Historical SDK/source-proof recipes require separately supplied exact evidence and are not ready build/capture entrypoints from this checkpoint.",
+  "cpuQualified": false,
+  "defaultPatchSeriesChanged": false,
+  "derivation": {
+    "README.md": {
+      "byteIdentical": false,
+      "source": "new_public_checkpoint_adaptation"
+    },
+    "check-sources.py": {
+      "byteIdentical": false,
+      "source": "new_public_checkpoint_adaptation"
+    },
+    "controls/fex/test-native-critical.cpp.in": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/test-native-critical.cpp.in",
+      "sourceSha256": "17da5c0a0c768ec50b823ea227dbafbae06a641e5db2da94e34c6f5f45033a68"
+    },
+    "controls/fex/test-nonios.cpp.in": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/test-nonios.cpp.in",
+      "sourceSha256": "ddba1cc03791c8ae907bc95a86caf60c56163c05235d8213e4fcac2b39655e7c"
+    },
+    "controls/loop-top/scripts/check-fex-loop-top.py": {
+      "byteIdentical": true,
+      "source": "build/minigolf-upstream-20261010/fex-loop-top-canonical-promotion-proposal/scripts/check-fex-loop-top.py",
+      "sourceSha256": "f97279c9dce1562bfc833a35d7d8362c18d9f65efae999de528cc12bd8c9f8a8"
+    },
+    "controls/loop-top/tools/checks/fex_loop_top/native-adapter.hpp": {
+      "byteIdentical": true,
+      "source": "build/minigolf-upstream-20261010/fex-loop-top-canonical-promotion-proposal/tools/checks/fex_loop_top/native-adapter.hpp",
+      "sourceSha256": "8e585c150985db5a9ebb49aaa3da6425dee9408cd238efcd0d2a69ca6e0268dc"
+    },
+    "controls/loop-top/tools/checks/fex_loop_top/native-cases.cpp": {
+      "byteIdentical": true,
+      "source": "build/minigolf-upstream-20261010/fex-loop-top-canonical-promotion-proposal/tools/checks/fex_loop_top/native-cases.cpp",
+      "sourceSha256": "db5b5c9cc1e1b506458c84043a33248714fc960d3ecdddcd5607c0d634ebdd3d"
+    },
+    "controls/loop-top/tools/checks/fex_loop_top/native-entry.S": {
+      "byteIdentical": true,
+      "source": "build/minigolf-upstream-20261010/fex-loop-top-canonical-promotion-proposal/tools/checks/fex_loop_top/native-entry.S",
+      "sourceSha256": "6400bdc5a5e2e3bab2f73cfae2891a0bedd5a8b9c6f702a90e83986fe31c9aea"
+    },
+    "controls/owner/image-fixture.h": {
+      "byteIdentical": true,
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/image-fixture.h",
+      "sourceSha256": "13a11d69fa57bb4e4b52078fd404ac7861e8a6c892619fd6aa9c6df00cebdc30"
+    },
+    "controls/owner/madeira_cfg.h": {
+      "byteIdentical": true,
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/madeira_cfg.h",
+      "sourceSha256": "4ed1e27e3fe8ed47d0faeaef6da611c0961f41932482abd3211d8799eae22006"
+    },
+    "controls/owner/native-harness.c": {
+      "byteIdentical": true,
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/native-harness.c",
+      "sourceSha256": "9e94d0b27bd8776d32c2e206b3ea4421ef0aa062375a692efa9464b177e51af8"
+    },
+    "controls/owner/source/ios_critical_owner_mapping.h": {
+      "byteIdentical": true,
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/source/ios_critical_owner_mapping.h",
+      "sourceSha256": "184e2e59c5150c0ea7112a2ded02ecfb06b038f75d452a8382a4237e652f0737"
+    },
+    "controls/owner/source/ios_critical_owner_sample.h": {
+      "byteIdentical": true,
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/source/ios_critical_owner_sample.h",
+      "sourceSha256": "c482c1a49e915da80c1b6e079375caf4b148b5ad3035773bc794aa56ceb40f0b"
+    },
+    "controls/wine/ios_fex_critical_abi.h": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/wine/ios_fex_critical_abi.h",
+      "sourceSha256": "a20556ccacd42dbab05e0bb3149a7277f10740382deb29459ef24b2acb264afd"
+    },
+    "controls/wine/ios_fex_critical_native.h": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/wine/ios_fex_critical_native.h",
+      "sourceSha256": "a3d0475eb446a13cded8ab988b07c9d61a837e72f299f39021a49e7f55029fde"
+    },
+    "controls/wine/ios_fex_critical_server.h": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/wine/ios_fex_critical_server.h",
+      "sourceSha256": "6da2ad942fa59065e3cf147e50f54d802d2fbd22f5fa7c1548618ea363378932"
+    },
+    "controls/wine/native-harness.c": {
+      "byteIdentical": true,
+      "source": "build/minigolf-native-critical-suspend-candidate-20261011/wine/native-harness.c",
+      "sourceSha256": "c81fc8f2d20610289efa738f0186c867eae3e3ed29fd4e9ce93a99e772588c10"
+    },
+    "extract-controls.py": {
+      "byteIdentical": false,
+      "source": "new_public_checkpoint_adaptation"
+    },
+    "own-window/OwnWindowStill.xcodeproj/project.pbxproj": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/OwnWindowStill.xcodeproj/project.pbxproj",
+      "sourceSha256": "c7b60f6840b362a697b1a58c774a1a15cdecd272d877bb5f3c36184d5036f754"
+    },
+    "own-window/OwnWindowStill.xcodeproj/xcshareddata/xcschemes/OwnWindowStill.xcscheme": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/OwnWindowStill.xcodeproj/xcshareddata/xcschemes/OwnWindowStill.xcscheme",
+      "sourceSha256": "84e4c4ec373c2871b4a182b8e8d77137971a3f65d2ac3df0d1f6e77f8fd9a3ab"
+    },
+    "own-window/OwnWindowStillTests/OwnWindowStillTests.swift": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/OwnWindowStillTests/OwnWindowStillTests.swift",
+      "sourceSha256": "35b1e506627440ba4a1bae6524a6b9eaa7724df88b861d1ab08533bc55235721"
+    },
+    "own-window/archive-tests/make-source-review.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/make-source-review.py",
+      "sourceSha256": "f3bd381ef5f17e66db269b187d34d3a905bba5ccbc22610c0971bc31ab8aeae3"
+    },
+    "own-window/archive-tests/test_compiler_locks.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_compiler_locks.py",
+      "sourceSha256": "bc370dabfc89f7df6af2f02fbd134b34880be2a59b7c2070d0f85f04f280d65c"
+    },
+    "own-window/archive-tests/test_diagnostic.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_diagnostic.py",
+      "sourceSha256": "c134abbf9f5c7fe54afedd7c062681eb24ae9a0a67f9d2641a0f8e8e0ba97703"
+    },
+    "own-window/archive-tests/test_direct.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_direct.py",
+      "sourceSha256": "c18f20a2a6612f4706f4400e502f64582951faea170e37feacc6f7e2c0370e1a"
+    },
+    "own-window/archive-tests/test_runner.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_runner.py",
+      "sourceSha256": "63987060053624a9d2385f91f856a02f97da2ed1a7049756da7c5bac20364991"
+    },
+    "own-window/archive-tests/test_swift_modulecache.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_swift_modulecache.py",
+      "sourceSha256": "0d1bb602e54aea813fda81f4489fa3b1931756d91195372873dfea077c79be8d"
+    },
+    "own-window/archive-tests/test_xctest_overlay.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_xctest_overlay.py",
+      "sourceSha256": "d2b6de7ef39ca328165c67533111b74f60348d8f3d9357696dc79973746a082d"
+    },
+    "own-window/assemble_retained.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-assembly-only-proposal/assemble.py",
+      "sourceSha256": "ae79e04aa1da58f3247b59d8d56e3f20834660e55586006d5262f728a1d7a4f3"
+    },
+    "own-window/bounded_child.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/bounded_child.py",
+      "sourceSha256": "9dc373d18356d55a6af92ec7d242a80b27ec8d83eab81b5b866109f92fa85e29"
+    },
+    "own-window/capture.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/capture.py",
+      "sourceSha256": "ab55fca78c7b9cae0cdc666b479c2838261c7011d660d133043cfc1ec067d449"
+    },
+    "own-window/compiler_locks.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/compiler_locks.py",
+      "sourceSha256": "5cd95b0353255bdf6f9b8a8ee9e45ad39b3ccb337f087258a236dee609e5a871"
+    },
+    "own-window/direct_build.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/direct_build.py",
+      "sourceSha256": "b73007dbfab9f8f8ead00854239e2a3a1465262de533c99a87b61d40ac1ae140"
+    },
+    "own-window/linked_artifact.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-linked-artifact-revalidation-proposal/finish.py",
+      "sourceSha256": "428b1edb51c2b01726e2afd17d023d0c8c0eca91aaa9d8adad8c3d2d8457bce0"
+    },
+    "own-window/local_build.py": {
+      "byteIdentical": true,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/local_build.py",
+      "sourceSha256": "7d88d16d152a68a7ca1e055826366f167d3e18216f5820c80cf7f2ccb300317e"
+    },
+    "own-window/protocol.py": {
+      "byteIdentical": false,
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/protocol.py",
+      "sourceSha256": "01cce466339b9aa93dad17098a848c0bf9cc282f375d2188fa05b659bd0821d5"
+    },
+    "own-window/test_compiler_locks.py": {
+      "byteIdentical": false,
+      "derivation": "Original temporary/fake cases retained; only historical sibling-tree comparison omitted, fake helper import made local.",
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_compiler_locks.py",
+      "sourceSha256": "bc370dabfc89f7df6af2f02fbd134b34880be2a59b7c2070d0f85f04f280d65c"
+    },
+    "own-window/test_support.py": {
+      "byteIdentical": false,
+      "derivation": "Exact FakeChild and kill_fake bodies extracted; no runtime source contract or private fixtures.",
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_runner.py",
+      "sourceSha256": "63987060053624a9d2385f91f856a02f97da2ed1a7049756da7c5bac20364991"
+    },
+    "own-window/test_swift_modulecache.py": {
+      "byteIdentical": false,
+      "derivation": "Original temporary/fake cases retained; only historical sibling-tree comparison omitted, fake helper import made local.",
+      "source": "build/apple-gpu-20261011/native58-own-window-direct-swift-xctest-overlay-proposal/test_swift_modulecache.py",
+      "sourceSha256": "0d1bb602e54aea813fda81f4489fa3b1931756d91195372873dfea077c79be8d"
+    },
+    "patches/fex/0004-ios-loop-top-register-reconstruction.patch": {
+      "byteIdentical": true,
+      "source": "build/native58-critical-source-promotion-proposal-20261011/fex/0004-ios-loop-top-register-reconstruction.patch",
+      "sourceSha256": "d29d0b1ecd50be13211e38f97e406075fe4cae181e5e19b6b7957d15ca2904c9"
+    },
+    "patches/fex/0005-ios-native-critical-suspend.patch": {
+      "byteIdentical": true,
+      "source": "build/native58-critical-source-promotion-proposal-20261011/fex/0005-ios-native-critical-suspend.patch",
+      "sourceSha256": "17d9be94d19e0c0bed7204a52e0e5005099927475e8a4d0289f81f589d0b3bde"
+    },
+    "patches/madeira/0052-ios-native-critical-suspend.patch": {
+      "byteIdentical": true,
+      "source": "build/native58-critical-source-promotion-proposal-20261011/madeira/0052-ios-native-critical-suspend.patch",
+      "sourceSha256": "8fa23f413a8163b44b25fe5569c3fc23b8158e781125bd153530a8a15c583899"
+    },
+    "patches/madeira/0053-bounded-critical-owner-sampler.patch": {
+      "byteIdentical": false,
+      "derivation": "Exact four source bytes; unified patch paths changed to Madeira repository paths; no source-body changes.",
+      "source": "build/native58-rpm-critical-ownership-sampler-proposal-20261012/source"
+    },
+    "patches/wine/0005-ios-native-critical-suspend.patch": {
+      "byteIdentical": true,
+      "source": "build/native58-critical-source-promotion-proposal-20261011/wine/0005-ios-native-critical-suspend.patch",
+      "sourceSha256": "18c5b931ab186acf5a025779b27d982fb7e0a7b8bba43f53ab9be6cc80d9afb5"
+    },
+    "test_checkpoint.py": {
+      "byteIdentical": false,
+      "source": "new_public_checkpoint_adaptation"
+    }
+  },
+  "deviceIdRedacted": true,
+  "diagnosticOnly": true,
+  "expectedPatchedSources": {
+    "upstreams/FEX/FEXCore/Source/Interface/Core/CPUBackend.cpp": "7d985820d4814213d88bfc49b25cb4bf91453ccdf2ea96f3385d51c09cd8aca4",
+    "upstreams/FEX/FEXCore/Source/Interface/Core/CodeCache.cpp": "cc5f5129e61b9e4f9e363b0dddd9ac9e24fd539dcfea52829b04f16ec82d473e",
+    "upstreams/FEX/FEXCore/Source/Interface/Core/Core.cpp": "8def04cf49efae65faaefb70862c3db09c23db4146e5a23b53676264580437ce",
+    "upstreams/FEX/FEXCore/Source/Interface/Core/DiskCache.cpp": "8cffca7b545d1e0b609fa80863314fe8900746d83a421d14a05efaade8436489",
+    "upstreams/FEX/FEXCore/Source/Interface/Core/LookupCache.h": "0160f74705ef216c79e750d169affb4109121a30a47c7195a3c70ad23af452d3",
+    "upstreams/FEX/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp": "81c02adfa250d72971bd327b7cef16263818c43ca1864509000f70917542b324",
+    "upstreams/FEX/FEXCore/Source/Utils/AllocatorHooks.cpp": "bd10dcf6a5ad0b642ba75c7831d3f2852cee3f8f508d3a190ee6ba3a08a43d3d",
+    "upstreams/FEX/FEXCore/include/FEXCore/Utils/NativeCriticalSection.h": "6f7ffd3a67f136f2fd8dc579a74249a36cd9d7323de3315f380e8abae31b27c2",
+    "upstreams/FEX/FEXCore/include/FEXCore/Utils/NativeCriticalSectionABI.h": "a20556ccacd42dbab05e0bb3149a7277f10740382deb29459ef24b2acb264afd",
+    "upstreams/FEX/FEXCore/include/FEXCore/Utils/SignalScopeGuards.h": "0c2a254afbadc7ba6072c69a149e0769394878d4e7f223493595eb3c6391fb82",
+    "upstreams/FEX/Source/Windows/ARM64EC/Module.cpp": "e6704ee2aae0962cddf2e4d9c8348bda9690da364eb696203637cb4a245fa499",
+    "upstreams/FEX/Source/Windows/Common/ArenaManager.cpp": "81465a718c874b34b31903fe65bca7fc4fe64a9e1908218c6f93e483a8529339",
+    "upstreams/FEX/Source/Windows/Common/CRT/Alloc.cpp": "694af4fa0c34c6db56a94d5c43d803f6389a5cc00f298f410899d854b3de0828",
+    "upstreams/FEX/Source/Windows/Common/CRT/CRT_iOS.cpp": "e986161c4d0cd394e775976ff88c1373477591c609e2b925e9e8e6769d4b3d3a",
+    "upstreams/FEX/Source/Windows/Common/ImageTracker.cpp": "8b0774f96c021a7324f9ad0b53b00a6f6c633154c52498569a90a9dbcb4a45a9",
+    "upstreams/FEX/Source/Windows/Common/InvalidationTracker.cpp": "b8f9e9973b9809daf052874efc8a1ccc508a21309e4e6eb3135e1e8b49291830",
+    "upstreams/Madeira/build/ntdll-unix/ios_critical_owner_mapping.h": "184e2e59c5150c0ea7112a2ded02ecfb06b038f75d452a8382a4237e652f0737",
+    "upstreams/Madeira/build/ntdll-unix/ios_critical_owner_sample.h": "c482c1a49e915da80c1b6e079375caf4b148b5ad3035773bc794aa56ceb40f0b",
+    "upstreams/Madeira/build/ntdll-unix/server_ios.c": "3c610e440040f9e5970b41371bf3ffd7ce03d66d735d0a11b8c8eb9ee1350ea8",
+    "upstreams/Madeira/build/ntdll-unix/signal_arm64_ios.c": "665ea6fd93e7d8d81db2b57b90143e9bc60be120cd3febd71fe34aab351d80eb",
+    "upstreams/Madeira/build/ntdll-unix/thread_ios.c": "ae054985ab257ac38441951e4a40176f0d1a816d03b4c1b99b547ba3721c9aed",
+    "upstreams/Madeira/build/ntdll-unix/virtual_ios.c": "d56e8140792cc6d4c8b5da8459200cfb72a9958757b642abc1478fbcc1c0dd58",
+    "upstreams/wine/dlls/ntdll/unix/unix_private.h": "fc9d607be00f4e76cc3b66d5b01d3f81c9800f86c6d691a12b14a56f43a87ed6",
+    "upstreams/wine/include/wine/ios_fex_critical_abi.h": "a20556ccacd42dbab05e0bb3149a7277f10740382deb29459ef24b2acb264afd",
+    "upstreams/wine/include/wine/ios_fex_critical_native.h": "a3d0475eb446a13cded8ab988b07c9d61a837e72f299f39021a49e7f55029fde",
+    "upstreams/wine/include/wine/server_protocol.h": "f3d805b686728d43418fa9e5c33237b54785a695ab3cfe9673b0740fa5b31c7c",
+    "upstreams/wine/server/ios_fex_critical_abi.h": "a20556ccacd42dbab05e0bb3149a7277f10740382deb29459ef24b2acb264afd",
+    "upstreams/wine/server/ios_fex_critical_server.h": "6da2ad942fa59065e3cf147e50f54d802d2fbd22f5fa7c1548618ea363378932",
+    "upstreams/wine/server/protocol.def": "bbd84a183643dff3c2f1e763af5dc3f9b2fa4c3e384e810baa2885f4b50d0b86",
+    "upstreams/wine/server/request_handlers.h": "9ed580e4981708323e39018038e5a097115487f452c2bac73fffc0aea5c05fc4",
+    "upstreams/wine/server/request_trace.h": "4e793dd51b81eda1cfcf4808039afc71044c4803fa8f8819f49ce8eb9750cce1",
+    "upstreams/wine/server/thread.c": "d94800de9d1da0112c5b6ea254b10214fe28504f595c6e098c927390b5ae3af0",
+    "upstreams/wine/server/thread.h": "0132c7ab3afc23c8dd230e21848df43c7d4020c2543b76eedd7938997b346157"
+  },
+  "files": {
+    "README.md": "a923a0777d294046367f86830bacd5732e87bf35ee3865e4646b0fbd9c557fbe",
+    "check-sources.py": "6f472bc397256a736ea8266e389a528a46153f1d53d2d4959fbf23c43e37b4b7",
+    "controls/fex/test-native-critical.cpp.in": "17da5c0a0c768ec50b823ea227dbafbae06a641e5db2da94e34c6f5f45033a68",
+    "controls/fex/test-nonios.cpp.in": "ddba1cc03791c8ae907bc95a86caf60c56163c05235d8213e4fcac2b39655e7c",
+    "controls/loop-top/scripts/check-fex-loop-top.py": "f97279c9dce1562bfc833a35d7d8362c18d9f65efae999de528cc12bd8c9f8a8",
+    "controls/loop-top/tools/checks/fex_loop_top/native-adapter.hpp": "8e585c150985db5a9ebb49aaa3da6425dee9408cd238efcd0d2a69ca6e0268dc",
+    "controls/loop-top/tools/checks/fex_loop_top/native-cases.cpp": "db5b5c9cc1e1b506458c84043a33248714fc960d3ecdddcd5607c0d634ebdd3d",
+    "controls/loop-top/tools/checks/fex_loop_top/native-entry.S": "6400bdc5a5e2e3bab2f73cfae2891a0bedd5a8b9c6f702a90e83986fe31c9aea",
+    "controls/owner/image-fixture.h": "13a11d69fa57bb4e4b52078fd404ac7861e8a6c892619fd6aa9c6df00cebdc30",
+    "controls/owner/madeira_cfg.h": "4ed1e27e3fe8ed47d0faeaef6da611c0961f41932482abd3211d8799eae22006",
+    "controls/owner/native-harness.c": "9e94d0b27bd8776d32c2e206b3ea4421ef0aa062375a692efa9464b177e51af8",
+    "controls/owner/source/ios_critical_owner_mapping.h": "184e2e59c5150c0ea7112a2ded02ecfb06b038f75d452a8382a4237e652f0737",
+    "controls/owner/source/ios_critical_owner_sample.h": "c482c1a49e915da80c1b6e079375caf4b148b5ad3035773bc794aa56ceb40f0b",
+    "controls/wine/ios_fex_critical_abi.h": "a20556ccacd42dbab05e0bb3149a7277f10740382deb29459ef24b2acb264afd",
+    "controls/wine/ios_fex_critical_native.h": "a3d0475eb446a13cded8ab988b07c9d61a837e72f299f39021a49e7f55029fde",
+    "controls/wine/ios_fex_critical_server.h": "6da2ad942fa59065e3cf147e50f54d802d2fbd22f5fa7c1548618ea363378932",
+    "controls/wine/native-harness.c": "c81fc8f2d20610289efa738f0186c867eae3e3ed29fd4e9ce93a99e772588c10",
+    "extract-controls.py": "7900e450ecd07640142f30a0e609d29a30752604f0fec8bbfc8a90caf3b68c4e",
+    "own-window/OwnWindowStill.xcodeproj/project.pbxproj": "c7b60f6840b362a697b1a58c774a1a15cdecd272d877bb5f3c36184d5036f754",
+    "own-window/OwnWindowStill.xcodeproj/xcshareddata/xcschemes/OwnWindowStill.xcscheme": "84e4c4ec373c2871b4a182b8e8d77137971a3f65d2ac3df0d1f6e77f8fd9a3ab",
+    "own-window/OwnWindowStillTests/OwnWindowStillTests.swift": "35b1e506627440ba4a1bae6524a6b9eaa7724df88b861d1ab08533bc55235721",
+    "own-window/archive-tests/make-source-review.py": "f3bd381ef5f17e66db269b187d34d3a905bba5ccbc22610c0971bc31ab8aeae3",
+    "own-window/archive-tests/test_compiler_locks.py": "bc370dabfc89f7df6af2f02fbd134b34880be2a59b7c2070d0f85f04f280d65c",
+    "own-window/archive-tests/test_diagnostic.py": "c134abbf9f5c7fe54afedd7c062681eb24ae9a0a67f9d2641a0f8e8e0ba97703",
+    "own-window/archive-tests/test_direct.py": "c18f20a2a6612f4706f4400e502f64582951faea170e37feacc6f7e2c0370e1a",
+    "own-window/archive-tests/test_runner.py": "63987060053624a9d2385f91f856a02f97da2ed1a7049756da7c5bac20364991",
+    "own-window/archive-tests/test_swift_modulecache.py": "0d1bb602e54aea813fda81f4489fa3b1931756d91195372873dfea077c79be8d",
+    "own-window/archive-tests/test_xctest_overlay.py": "d2b6de7ef39ca328165c67533111b74f60348d8f3d9357696dc79973746a082d",
+    "own-window/assemble_retained.py": "ae79e04aa1da58f3247b59d8d56e3f20834660e55586006d5262f728a1d7a4f3",
+    "own-window/bounded_child.py": "9dc373d18356d55a6af92ec7d242a80b27ec8d83eab81b5b866109f92fa85e29",
+    "own-window/capture.py": "ab55fca78c7b9cae0cdc666b479c2838261c7011d660d133043cfc1ec067d449",
+    "own-window/compiler_locks.py": "5cd95b0353255bdf6f9b8a8ee9e45ad39b3ccb337f087258a236dee609e5a871",
+    "own-window/direct_build.py": "b73007dbfab9f8f8ead00854239e2a3a1465262de533c99a87b61d40ac1ae140",
+    "own-window/linked_artifact.py": "428b1edb51c2b01726e2afd17d023d0c8c0eca91aaa9d8adad8c3d2d8457bce0",
+    "own-window/local_build.py": "7d88d16d152a68a7ca1e055826366f167d3e18216f5820c80cf7f2ccb300317e",
+    "own-window/protocol.py": "428dd8b7efa54d5c17e0874fa9d0c2002fe58ea858e07ff0cd931b3914895c56",
+    "own-window/test_compiler_locks.py": "cc08c6b08e0e9e90718adfb226b9496337a3a93638ad4554c5900d0a5c032aa3",
+    "own-window/test_support.py": "0f5094858542ffd40d32648b1e998f42b2782bb35704c382dd966ae2c24a624e",
+    "own-window/test_swift_modulecache.py": "8db83998963cf1081b533e04ae2ba9e0e348c11f41df909f54ec5c20f80f178e",
+    "patches/fex/0004-ios-loop-top-register-reconstruction.patch": "d29d0b1ecd50be13211e38f97e406075fe4cae181e5e19b6b7957d15ca2904c9",
+    "patches/fex/0005-ios-native-critical-suspend.patch": "17d9be94d19e0c0bed7204a52e0e5005099927475e8a4d0289f81f589d0b3bde",
+    "patches/madeira/0052-ios-native-critical-suspend.patch": "8fa23f413a8163b44b25fe5569c3fc23b8158e781125bd153530a8a15c583899",
+    "patches/madeira/0053-bounded-critical-owner-sampler.patch": "ede08a8c07a26837b8b457fccc9c233ef4a448098d9e60500b7928731fe29700",
+    "patches/wine/0005-ios-native-critical-suspend.patch": "18c5b931ab186acf5a025779b27d982fb7e0a7b8bba43f53ab9be6cc80d9afb5",
+    "test_checkpoint.py": "713ebb8b835fb341dd2f5a53c8b2c123241a7a0d3342677ec9430d5c43c8cdc3"
+  },
+  "gameplayQualified": false,
+  "gpuQualified": false,
+  "historicalPrivateEvidenceCopied": false,
+  "historicalSourceOnlyProposalSha256": "a9132dd3518cc33229b12d72c2b70592ad15069a17f2ce8fdb929eb77019d429",
+  "pinnedHeads": {
+    "fex": "14c92681f4d62cf84d901460e0358de09c8847a7",
+    "madeira": "48f976429c189f8396e23d251d8a82f43c705922",
+    "wine": "257f271cfffed9f22f7987cac53bc00095d092fe"
+  },
+  "privateFixturesAssetsTokensIncluded": false,
+  "publicSourceFileCount": 45,
+  "schema": "madeira.experimental-native59-source-checkpoint/v1",
+  "sdkOrCompiledArtifactsIncluded": false,
+  "status": "public_source_checkpoint_not_default_series_or_runtime_qualified",
+  "wireProtocolVersion": 931
+}

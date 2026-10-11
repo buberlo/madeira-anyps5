@@ -1,0 +1,46 @@
+diff --git a/Source/Windows/ARM64EC/Module.cpp b/Source/Windows/ARM64EC/Module.cpp
+--- a/Source/Windows/ARM64EC/Module.cpp
++++ b/Source/Windows/ARM64EC/Module.cpp
+@@ -657,11 +657,9 @@
+   }
+ }
+ 
+-static void ReconstructThreadState(FEXCore::Core::InternalThreadState* Thread, ARM64_NT_CONTEXT& Context) {
++static void ReconstructThreadRegisters(FEXCore::Core::InternalThreadState* Thread, ARM64_NT_CONTEXT& Context) {
+   const auto& Config = SignalDelegator->GetConfig();
+   auto& State = Thread->CurrentFrame->State;
+-
+-  State.rip = CTX->RestoreRIPFromHostPC(Thread, Context.Pc);
+ 
+   // Spill all SRA GPRs
+   for (size_t i = 0; i < Config.SRAGPRCount; i++) {
+@@ -676,6 +674,11 @@
+   // Spill EFlags
+   uint32_t EFlags = CTX->ReconstructCompactedEFLAGS(Thread, true, Context.X, Context.Cpsr);
+   CTX->SetFlagsFromCompactedEFLAGS(Thread, EFlags);
++}
++
++static void ReconstructThreadState(FEXCore::Core::InternalThreadState* Thread, ARM64_NT_CONTEXT& Context) {
++  Thread->CurrentFrame->State.rip = CTX->RestoreRIPFromHostPC(Thread, Context.Pc);
++  ReconstructThreadRegisters(Thread, Context);
+ }
+ 
+ // Reconstructs an x64 context from the input thread's state, packed into a regular ARM64 context following the ARM64EC register mapping
+@@ -755,6 +758,17 @@
+   if (!IsDispatcherAddress(Context.Pc)) {
+     ReconstructThreadState(Thread, Context);
+   }
++#ifdef FEX_IOS_HOST
++  else if (Rec.ExceptionCode == 0xe0425355u && Context.Pc == Thread->CurrentFrame->Pointers.DispatcherLoopTop) {
++    // The private iOS suspend signal can interrupt the stable loop entry.
++    // EnterEC has published State.rip and copied the incoming native SP to
++    // its live SRA register, but State.gregs can still describe an earlier
++    // x64 frame. Pack live GPRs/vectors/flags without a block RIP lookup:
++    // the dispatcher has no translated-block metadata and State.rip is current.
++    // Other dispatcher instructions may hold partially spilled state.
++    ReconstructThreadRegisters(Thread, Context);
++  }
++#endif
+   ARM64_NT_CONTEXT GuestContext = StoreStateToPackedECContext(Thread, Context.Fpcr, Context.Fpsr);
+   LogMan::Msg::DFmt("pc: {:X} rip: {:X}", Context.Pc, GuestContext.Pc);
+ 

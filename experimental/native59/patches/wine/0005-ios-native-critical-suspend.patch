@@ -1,0 +1,873 @@
+diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
+--- a/dlls/ntdll/unix/unix_private.h
++++ b/dlls/ntdll/unix/unix_private.h
+@@ -23,6 +23,9 @@
+ 
+ #include <pthread.h>
+ #include <signal.h>
++#ifdef WINE_IOS
++#include "wine/ios_fex_critical_native.h"
++#endif
+ #include "unixlib.h"
+ #include "wine/unixlib.h"
+ #include "wine/server.h"
+@@ -141,6 +144,9 @@
+     PRTL_THREAD_START_ROUTINE start;         /* thread entry point */
+     void                     *param;         /* thread entry point parameter */
+     void                     *jmp_buf;       /* setjmp buffer for exception handling */
++#ifdef WINE_IOS
++    struct ios_fex_critical_native_state ios_fex_critical; /* append, no dynamic TLS */
++#endif
+ };
+ 
+ C_ASSERT( sizeof(struct ntdll_thread_data) <= sizeof(((TEB *)0)->GdiTebBatch) );
+diff --git a/include/wine/ios_fex_critical_abi.h b/include/wine/ios_fex_critical_abi.h
+new file mode 100644
+--- /dev/null
++++ b/include/wine/ios_fex_critical_abi.h
+@@ -0,0 +1,35 @@
++/* Isolated source proposal. Private native Wine/FEX ABI, never a guest context. */
++#ifndef IOS_FEX_CRITICAL_ABI_H
++#define IOS_FEX_CRITICAL_ABI_H
++#include <stdint.h>
++
++#define IOS_FEX_CRITICAL_QUERY_CLASS 0x7fff4152u
++#define IOS_FEX_CRITICAL_MAGIC 0x41504353u
++#define IOS_FEX_CRITICAL_VERSION 1u
++#define IOS_FEX_CRITICAL_ENTER 1u
++#define IOS_FEX_CRITICAL_LEAVE 2u
++#define IOS_FEX_CRITICAL_INACTIVE 1u
++
++struct ios_fex_critical_request
++{
++    uint32_t magic;
++    uint32_t version;
++    uint32_t operation;
++    uint32_t depth;
++    uint64_t token;
++    uint64_t teb;
++    uint32_t flags;
++    uint32_t reserved;
++};
++
++/* ENTER: depth/token/teb/flags/reserved all zero. LEAVE: exact last ENTER
++ * tuple, changing only operation. Nested results retain the outer token.
++ * Successful outer LEAVE returns depth=0/token=0 and retains teb/flags.
++ * ReturnLength is exactly 40 on success; refused LEAVE changes no state.
++ * The native implementation owns the complete prior signal mask. */
++#if defined(__cplusplus)
++static_assert(sizeof(struct ios_fex_critical_request) == 40);
++#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
++_Static_assert(sizeof(struct ios_fex_critical_request) == 40, "private ABI40");
++#endif
++#endif
+diff --git a/include/wine/ios_fex_critical_native.h b/include/wine/ios_fex_critical_native.h
+new file mode 100644
+--- /dev/null
++++ b/include/wine/ios_fex_critical_native.h
+@@ -0,0 +1,183 @@
++/* The production native query body. No Darwin dynamic TLS or heap allocation. */
++#ifndef IOS_FEX_CRITICAL_NATIVE_H
++#define IOS_FEX_CRITICAL_NATIVE_H
++#include <limits.h>
++#include <signal.h>
++#include "ios_fex_critical_abi.h"
++
++#define IOS_CRITICAL_SUCCESS       0u
++#define IOS_CRITICAL_UNSUCCESSFUL  0xc0000001u
++#define IOS_CRITICAL_LENGTH        0xc0000004u
++#define IOS_CRITICAL_PARAMETER     0xc000000du
++#define IOS_CRITICAL_ACCESS        0xc0000022u
++#define IOS_CRITICAL_OVERFLOW      0xc0000095u
++#define IOS_CRITICAL_NOT_READY     0xc00000a3u
++#define IOS_CRITICAL_STATE         0xc0000184u
++
++/* Appended to native ntdll_thread_data in the already allocated, zeroed TEB.
++ * A Mach-O _Thread_local first access can allocate and is unsuitable here. */
++struct ios_fex_critical_native_state
++{
++    uint64_t token;
++    uint64_t teb;
++    uint32_t depth;
++    uint32_t flags;
++    uint32_t poisoned;
++    uint32_t unregistered;
++    sigset_t old_mask;
++};
++
++struct ios_fex_critical_native_ops
++{
++    int (*mask)(int, const sigset_t *, sigset_t *);
++    uint32_t (*exchange)(uint32_t, uint64_t, uint64_t, uint64_t *, uint32_t *, uint64_t *);
++};
++
++static inline void ios_fex_critical_output(struct ios_fex_critical_request *out,
++        uint32_t operation, const struct ios_fex_critical_native_state *state)
++{
++    out->magic = IOS_FEX_CRITICAL_MAGIC;
++    out->version = IOS_FEX_CRITICAL_VERSION;
++    out->operation = operation;
++    out->depth = state->depth;
++    out->token = state->token;
++    out->teb = state->teb;
++    out->flags = state->flags;
++    out->reserved = 0;
++}
++
++/* mode: -1 genuinely uninitialised, 0 explicitly disabled, 1 enabled.
++ * The caller obtains authoritative_teb from native NtCurrentTeb, never FEX.
++ * The same body is used by the native harness with real pthread_sigmask. */
++static inline uint32_t ios_fex_critical_native_query(
++        struct ios_fex_critical_native_state *state,
++        const struct ios_fex_critical_native_ops *ops, uint64_t authoritative_teb,
++        int mode, int self_handle, struct ios_fex_critical_request *data,
++        unsigned int length, unsigned int *return_length)
++{
++    struct ios_fex_critical_request input, output;
++    struct ios_fex_critical_native_state saved;
++    uint32_t status, server_depth;
++    uint64_t server_token, server_teb;
++    sigset_t blocked, original_mask;
++
++    if (return_length) *return_length = 0;
++    if (!self_handle) return IOS_CRITICAL_ACCESS;
++    if (length != sizeof(input)) return IOS_CRITICAL_LENGTH;
++    if (!data || !authoritative_teb) return IOS_CRITICAL_PARAMETER;
++    input = *data;
++    if (input.magic != IOS_FEX_CRITICAL_MAGIC || input.version != IOS_FEX_CRITICAL_VERSION ||
++        input.reserved || (input.operation != IOS_FEX_CRITICAL_ENTER &&
++                           input.operation != IOS_FEX_CRITICAL_LEAVE)) return IOS_CRITICAL_PARAMETER;
++    if (state->poisoned) return IOS_CRITICAL_STATE;
++
++    if (input.operation == IOS_FEX_CRITICAL_ENTER)
++    {
++        if (input.depth || input.token || input.teb || input.flags) return IOS_CRITICAL_PARAMETER;
++        if (mode < 0) return IOS_CRITICAL_NOT_READY;
++        if (state->depth)
++        {
++            if (state->teb != authoritative_teb || state->unregistered) return IOS_CRITICAL_STATE;
++            /* An early mode-off scope must not absorb a later enabled scope. */
++            if ((state->flags & IOS_FEX_CRITICAL_INACTIVE) && mode) return IOS_CRITICAL_STATE;
++            if (state->depth == UINT_MAX) return IOS_CRITICAL_OVERFLOW;
++            state->depth++;
++        }
++        else if (!mode)
++        {
++            state->teb = authoritative_teb;
++            state->flags = IOS_FEX_CRITICAL_INACTIVE;
++            state->token = 0;
++            state->depth = 1;
++        }
++        else
++        {
++            sigemptyset(&blocked);
++            sigaddset(&blocked, SIGUSR1);
++            if (ops->mask(SIG_BLOCK, &blocked, &original_mask)) return IOS_CRITICAL_UNSUCCESSFUL;
++            status = ops->exchange(IOS_FEX_CRITICAL_ENTER, authoritative_teb, 0,
++                                   &server_token, &server_depth, &server_teb);
++            if (status)
++            {
++                /* A server refusal has not registered a scope. Restore ALL prior bits. */
++                if (ops->mask(SIG_SETMASK, &original_mask, NULL))
++                {
++                    state->old_mask = original_mask;
++                    state->poisoned = 1;
++                    return IOS_CRITICAL_UNSUCCESSFUL;
++                }
++                return status;
++            }
++            if (!server_token || server_depth != 1 || server_teb != authoritative_teb)
++            {
++                /* A malformed success may have registered: keep SIGUSR1 blocked. */
++                state->old_mask = original_mask;
++                state->poisoned = 1;
++                return IOS_CRITICAL_STATE;
++            }
++            state->teb = authoritative_teb;
++            state->flags = 0;
++            state->token = server_token;
++            state->depth = 1;
++            state->unregistered = 0;
++            state->old_mask = original_mask;
++        }
++        ios_fex_critical_output(&output, input.operation, state);
++    }
++    else
++    {
++        if (!state->depth || state->teb != authoritative_teb || input.depth != state->depth ||
++            input.token != state->token || input.teb != state->teb || input.flags != state->flags)
++            return IOS_CRITICAL_STATE;
++        if (state->depth > 1)
++        {
++            state->depth--;
++            ios_fex_critical_output(&output, input.operation, state);
++        }
++        else
++        {
++            saved = *state;
++            if (!(state->flags & IOS_FEX_CRITICAL_INACTIVE))
++            {
++                status = ops->exchange(IOS_FEX_CRITICAL_LEAVE, authoritative_teb, state->token,
++                                       &server_token, &server_depth, &server_teb);
++                if (status) return status; /* Refusal preserves mask, tuple and registration. */
++                if (server_token || server_depth || server_teb != authoritative_teb)
++                {
++                    state->poisoned = 1;
++                    return IOS_CRITICAL_STATE;
++                }
++            }
++            /* The locks are released and the server scope is inactive. Clear TLS BEFORE
++             * unmasking: an immediately delivered handler may enter a fresh, real scope. */
++            state->depth = 0;
++            state->token = 0;
++            state->teb = 0;
++            state->flags = 0;
++            state->unregistered = 0;
++            if (!(saved.flags & IOS_FEX_CRITICAL_INACTIVE) &&
++                ops->mask(SIG_SETMASK, &saved.old_mask, NULL))
++            {
++                *state = saved;
++                state->unregistered = 1;
++                state->poisoned = 1; /* Do not submit a second unregister or acquire locks. */
++                return IOS_CRITICAL_UNSUCCESSFUL;
++            }
++            saved.depth = 0;
++            saved.token = 0;
++            ios_fex_critical_output(&output, input.operation, &saved);
++        }
++    }
++    *data = output;
++    if (return_length) *return_length = sizeof(output);
++    return IOS_CRITICAL_SUCCESS;
++}
++
++/* Only the exiting native thread calls this after its existing FEX hold teardown.
++ * pthread termination discards its mask; never unmask/LEAVE somebody else's scope. */
++static inline void ios_fex_critical_native_discard(struct ios_fex_critical_native_state *state)
++{
++    const struct ios_fex_critical_native_state empty = {0};
++    *state = empty;
++}
++#endif
+diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+--- a/include/wine/server_protocol.h
++++ b/include/wine/server_protocol.h
+@@ -6156,6 +6156,28 @@
+ struct d3dkmt_mutex_release_reply
+ {
+     struct reply_header __header;
++};
++
++
++
++struct ios_fex_critical_scope_request
++{
++    struct request_header __header;
++    unsigned int       magic;
++    unsigned int       version;
++    unsigned int       operation;
++    unsigned int       reserved;
++    char __pad_28[4];
++    unsigned __int64   token;
++    client_ptr_t       teb;
++};
++struct ios_fex_critical_scope_reply
++{
++    struct reply_header __header;
++    unsigned __int64   token;
++    client_ptr_t       teb;
++    unsigned int       depth;
++    char __pad_28[4];
+ };
+ 
+ 
+@@ -6467,6 +6489,7 @@
+     REQ_d3dkmt_object_open_name,
+     REQ_d3dkmt_mutex_acquire,
+     REQ_d3dkmt_mutex_release,
++    REQ_ios_fex_critical_scope,
+     REQ_NB_REQUESTS
+ };
+ 
+@@ -6780,6 +6803,7 @@
+     struct d3dkmt_object_open_name_request d3dkmt_object_open_name_request;
+     struct d3dkmt_mutex_acquire_request d3dkmt_mutex_acquire_request;
+     struct d3dkmt_mutex_release_request d3dkmt_mutex_release_request;
++    struct ios_fex_critical_scope_request ios_fex_critical_scope_request;
+ };
+ union generic_reply
+ {
+@@ -7091,8 +7115,9 @@
+     struct d3dkmt_object_open_name_reply d3dkmt_object_open_name_reply;
+     struct d3dkmt_mutex_acquire_reply d3dkmt_mutex_acquire_reply;
+     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
+-};
+-
+-#define SERVER_PROTOCOL_VERSION 930
++    struct ios_fex_critical_scope_reply ios_fex_critical_scope_reply;
++};
++
++#define SERVER_PROTOCOL_VERSION 931
+ 
+ #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
+diff --git a/server/ios_fex_critical_abi.h b/server/ios_fex_critical_abi.h
+new file mode 100644
+--- /dev/null
++++ b/server/ios_fex_critical_abi.h
+@@ -0,0 +1,35 @@
++/* Isolated source proposal. Private native Wine/FEX ABI, never a guest context. */
++#ifndef IOS_FEX_CRITICAL_ABI_H
++#define IOS_FEX_CRITICAL_ABI_H
++#include <stdint.h>
++
++#define IOS_FEX_CRITICAL_QUERY_CLASS 0x7fff4152u
++#define IOS_FEX_CRITICAL_MAGIC 0x41504353u
++#define IOS_FEX_CRITICAL_VERSION 1u
++#define IOS_FEX_CRITICAL_ENTER 1u
++#define IOS_FEX_CRITICAL_LEAVE 2u
++#define IOS_FEX_CRITICAL_INACTIVE 1u
++
++struct ios_fex_critical_request
++{
++    uint32_t magic;
++    uint32_t version;
++    uint32_t operation;
++    uint32_t depth;
++    uint64_t token;
++    uint64_t teb;
++    uint32_t flags;
++    uint32_t reserved;
++};
++
++/* ENTER: depth/token/teb/flags/reserved all zero. LEAVE: exact last ENTER
++ * tuple, changing only operation. Nested results retain the outer token.
++ * Successful outer LEAVE returns depth=0/token=0 and retains teb/flags.
++ * ReturnLength is exactly 40 on success; refused LEAVE changes no state.
++ * The native implementation owns the complete prior signal mask. */
++#if defined(__cplusplus)
++static_assert(sizeof(struct ios_fex_critical_request) == 40);
++#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
++_Static_assert(sizeof(struct ios_fex_critical_request) == 40, "private ABI40");
++#endif
++#endif
+diff --git a/server/ios_fex_critical_server.h b/server/ios_fex_critical_server.h
+new file mode 100644
+--- /dev/null
++++ b/server/ios_fex_critical_server.h
+@@ -0,0 +1,96 @@
++/* Shared production registration/predicate code, directly includable by native tests. */
++#ifndef IOS_FEX_CRITICAL_SERVER_H
++#define IOS_FEX_CRITICAL_SERVER_H
++#include <stdint.h>
++#include "ios_fex_critical_abi.h"
++
++struct ios_fex_critical_scope
++{
++    uint64_t token;
++    uint64_t teb;
++    const void *pending_context;
++    uint64_t capture_generation;
++};
++
++struct ios_fex_critical_facts
++{
++    int running;
++    int amd64;
++    int mode_enabled;
++    int initialised;
++    int start_pending;
++    int logical_suspend;
++    int process_suspend;
++    int debug_hold;
++    int mach_hold;
++    int context_present;
++    int exact_private_pending;
++    int scope_matches_pending;
++    int eligible_suspend_origin;
++};
++
++/* The server constructs every fact under its existing serial request dispatch. */
++static inline int ios_fex_critical_registration_allowed(const struct ios_fex_critical_facts *f)
++{
++    if (!f->running || !f->amd64 || !f->mode_enabled || f->process_suspend ||
++        f->debug_hold || f->mach_hold) return 0;
++    /* A secondary thread can still be starting in an already initialised process. */
++    if (f->start_pending && f->logical_suspend == 1 && !f->context_present) return 1;
++    if (!f->initialised)
++        return !f->context_present && !f->logical_suspend;
++    if (!f->logical_suspend) return !f->context_present || f->exact_private_pending;
++    return f->exact_private_pending && f->eligible_suspend_origin;
++}
++
++/* This does not alter the logical count or manufacture a context ACK. */
++static inline int ios_fex_critical_wait_deferred(const struct ios_fex_critical_scope *scope,
++                                               uint64_t actual_teb,
++                                               const struct ios_fex_critical_facts *f)
++{
++    return scope->token && scope->teb == actual_teb && f->running && f->amd64 &&
++           f->mode_enabled && f->initialised && !f->start_pending && f->logical_suspend > 0 &&
++           !f->process_suspend && !f->debug_hold && !f->mach_hold &&
++           f->exact_private_pending && f->scope_matches_pending && f->eligible_suspend_origin;
++}
++
++/* Only the serialized publisher/ENTER handler calls this with its actual context
++ * object and fresh nonzero generation, never a client-provided context pointer. */
++static inline void ios_fex_critical_bind_pending(struct ios_fex_critical_scope *scope,
++                                               const void *context, uint64_t generation)
++{
++    scope->pending_context = scope->token && generation ? context : 0;
++    scope->capture_generation = scope->pending_context ? generation : 0;
++}
++
++static inline uint32_t ios_fex_critical_register(struct ios_fex_critical_scope *scope,
++        const struct ios_fex_critical_facts *f, uint64_t actual_teb, uint64_t supplied_teb,
++        uint32_t operation, uint64_t supplied_token, uint64_t *next_token,
++        uint64_t *result_token, uint32_t *result_depth)
++{
++    if (!actual_teb || supplied_teb != actual_teb) return 0xc0000022u;
++    if (operation == IOS_FEX_CRITICAL_ENTER)
++    {
++        if (supplied_token || scope->token || !ios_fex_critical_registration_allowed(f))
++            return 0xc0000184u;
++        if (*next_token == UINT64_MAX) return 0xc0000095u;
++        scope->token = ++*next_token;
++        scope->teb = actual_teb;
++        ios_fex_critical_bind_pending(scope, 0, 0);
++        *result_token = scope->token;
++        *result_depth = 1;
++    }
++    else if (operation == IOS_FEX_CRITICAL_LEAVE)
++    {
++        /* A later hard/process/debug hold must not prevent a balanced unlock+leave. */
++        if (!scope->token || supplied_token != scope->token || scope->teb != actual_teb)
++            return 0xc0000184u;
++        scope->token = 0;
++        scope->teb = 0;
++        ios_fex_critical_bind_pending(scope, 0, 0);
++        *result_token = 0;
++        *result_depth = 0;
++    }
++    else return 0xc000000du;
++    return 0;
++}
++#endif
+diff --git a/server/protocol.def b/server/protocol.def
+--- a/server/protocol.def
++++ b/server/protocol.def
+@@ -4271,3 +4271,18 @@
+     data_size_t         runtime_size;   /* size of client runtime data */
+     VARARG(runtime,bytes);              /* client runtime data */
+ @END
++
++
++/* Append-only, self native FEX critical scope (no thread/handle parameter). */
++@REQ(ios_fex_critical_scope)
++    unsigned int       magic;          /* private fixed magic */
++    unsigned int       version;        /* ABI version */
++    unsigned int       operation;      /* 1 ENTER, 2 LEAVE */
++    unsigned int       reserved;       /* must be zero */
++    unsigned __int64   token;          /* ENTER zero, LEAVE exact returned token */
++    client_ptr_t       teb;            /* authoritative native current TEB */
++@REPLY
++    unsigned __int64   token;
++    client_ptr_t       teb;
++    unsigned int       depth;          /* server outer scope: 1 or 0 */
++@END
+diff --git a/server/request_handlers.h b/server/request_handlers.h
+--- a/server/request_handlers.h
++++ b/server/request_handlers.h
+@@ -313,6 +313,7 @@
+ DECL_HANDLER(d3dkmt_object_open_name);
+ DECL_HANDLER(d3dkmt_mutex_acquire);
+ DECL_HANDLER(d3dkmt_mutex_release);
++DECL_HANDLER(ios_fex_critical_scope);
+ 
+ typedef void (*req_handler)( const void *req, void *reply );
+ static const req_handler req_handlers[REQ_NB_REQUESTS] =
+@@ -623,6 +624,7 @@
+     (req_handler)req_d3dkmt_object_open_name,
+     (req_handler)req_d3dkmt_mutex_acquire,
+     (req_handler)req_d3dkmt_mutex_release,
++    (req_handler)req_ios_fex_critical_scope,
+ };
+ 
+ C_ASSERT( sizeof(abstime_t) == 8 );
+@@ -2373,3 +2375,14 @@
+ C_ASSERT( offsetof(struct d3dkmt_mutex_release_request, fence_value) == 24 );
+ C_ASSERT( offsetof(struct d3dkmt_mutex_release_request, runtime_size) == 32 );
+ C_ASSERT( sizeof(struct d3dkmt_mutex_release_request) == 40 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, magic) == 12 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, version) == 16 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, operation) == 20 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, reserved) == 24 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, token) == 32 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_request, teb) == 40 );
++C_ASSERT( sizeof(struct ios_fex_critical_scope_request) == 48 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_reply, token) == 8 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_reply, teb) == 16 );
++C_ASSERT( offsetof(struct ios_fex_critical_scope_reply, depth) == 24 );
++C_ASSERT( sizeof(struct ios_fex_critical_scope_reply) == 32 );
+diff --git a/server/request_trace.h b/server/request_trace.h
+--- a/server/request_trace.h
++++ b/server/request_trace.h
+@@ -3506,6 +3506,23 @@
+     dump_uint64( ", fence_value=", &req->fence_value );
+     fprintf( stderr, ", runtime_size=%u", req->runtime_size );
+     dump_varargs_bytes( ", runtime=", cur_size );
++}
++
++static void dump_ios_fex_critical_scope_request( const struct ios_fex_critical_scope_request *req )
++{
++    fprintf( stderr, " magic=%08x", req->magic );
++    fprintf( stderr, ", version=%08x", req->version );
++    fprintf( stderr, ", operation=%08x", req->operation );
++    fprintf( stderr, ", reserved=%08x", req->reserved );
++    dump_uint64( ", token=", &req->token );
++    dump_uint64( ", teb=", &req->teb );
++}
++
++static void dump_ios_fex_critical_scope_reply( const struct ios_fex_critical_scope_reply *req )
++{
++    dump_uint64( " token=", &req->token );
++    dump_uint64( ", teb=", &req->teb );
++    fprintf( stderr, ", depth=%08x", req->depth );
+ }
+ 
+ typedef void (*dump_func)( const void *req );
+@@ -3818,6 +3835,7 @@
+     (dump_func)dump_d3dkmt_object_open_name_request,
+     (dump_func)dump_d3dkmt_mutex_acquire_request,
+     (dump_func)dump_d3dkmt_mutex_release_request,
++    (dump_func)dump_ios_fex_critical_scope_request,
+ };
+ 
+ static const dump_func reply_dumpers[REQ_NB_REQUESTS] =
+@@ -4128,6 +4146,7 @@
+     (dump_func)dump_d3dkmt_object_open_name_reply,
+     (dump_func)dump_d3dkmt_mutex_acquire_reply,
+     NULL,
++    (dump_func)dump_ios_fex_critical_scope_reply,
+ };
+ 
+ static const char * const req_names[REQ_NB_REQUESTS] =
+@@ -4438,6 +4457,7 @@
+     "d3dkmt_object_open_name",
+     "d3dkmt_mutex_acquire",
+     "d3dkmt_mutex_release",
++    "ios_fex_critical_scope",
+ };
+ 
+ static const struct
+@@ -4495,6 +4515,7 @@
+     { "INFO_LENGTH_MISMATCH",        STATUS_INFO_LENGTH_MISMATCH },
+     { "INSTANCE_NOT_AVAILABLE",      STATUS_INSTANCE_NOT_AVAILABLE },
+     { "INSUFFICIENT_RESOURCES",      STATUS_INSUFFICIENT_RESOURCES },
++    { "INTEGER_OVERFLOW",            STATUS_INTEGER_OVERFLOW },
+     { "INVALID_ACL",                 STATUS_INVALID_ACL },
+     { "INVALID_ADDRESS",             STATUS_INVALID_ADDRESS },
+     { "INVALID_ADDRESS_COMPONENT",   STATUS_INVALID_ADDRESS_COMPONENT },
+diff --git a/server/thread.c b/server/thread.c
+--- a/server/thread.c
++++ b/server/thread.c
+@@ -139,6 +139,9 @@
+ #ifdef WINE_IOS
+     int                     ios_snapshot; /* WoW64: filled by a Mach capture, not by the thread */
+     int                     ios_dirty;    /* WoW64: a SetThreadContext waits for resume_thread() */
++    uint64_t                ios_fex_generation;
++    process_id_t            ios_fex_origin_process;
++    thread_id_t             ios_fex_origin_thread;
+ #endif
+ };
+ #define CTX_NATIVE  0  /* context for native machine */
+@@ -458,6 +461,13 @@
+     thread->ios_priority_port = 0;
+     thread->ios_priority_identity = 0;
+     thread->ios_priority_status = STATUS_SUCCESS;
++    thread->ios_fex_scope.token = thread->ios_fex_scope.teb = 0;
++    thread->ios_fex_scope.pending_context = NULL;
++    thread->ios_fex_scope.capture_generation = 0;
++    thread->ios_fex_pending_context = NULL;
++    thread->ios_fex_capture_generation = 0;
++    thread->ios_fex_suspend_owner = 0;
++    thread->ios_fex_suspend_eligible = 0;
+ #endif
+     thread->dbg_hidden      = 0;
+     thread->bypass_proc_suspend = 0;
+@@ -486,6 +496,115 @@
+     return !thread->bypass_proc_suspend && thread->process->suspend;
+ }
+ 
++
++#ifdef WINE_IOS
++/* BEGIN exact production server helpers (also extracted by the native harness). */
++static int ios_fex_exact_private_pending(struct thread *thread)
++{
++    struct context *ctx = thread->context;
++    return ctx && ctx == thread->ios_fex_pending_context && ctx->status == STATUS_PENDING &&
++           ctx->ios_fex_generation && ctx->ios_fex_generation == thread->ios_fex_capture_generation &&
++           thread->ios_ctx_seq == 0x41505335u &&
++           ctx->ios_fex_origin_process == thread->process->id && ctx->ios_fex_origin_thread;
++}
++
++static struct ios_fex_critical_facts ios_fex_thread_facts(struct thread *thread)
++{
++    extern int ios_x64_signal_suspend_enabled, ios_x64_signal_suspend_mode_ready;
++    struct ios_fex_critical_facts facts;
++    facts.running = thread->state == RUNNING;
++    facts.amd64 = thread->process->machine == IMAGE_FILE_MACHINE_AMD64;
++    facts.mode_enabled = __atomic_load_n(&ios_x64_signal_suspend_mode_ready, __ATOMIC_ACQUIRE) &&
++                         ios_x64_signal_suspend_enabled;
++    facts.initialised = is_process_init_done(thread->process);
++    facts.start_pending = thread->ios_start_pending;
++    facts.logical_suspend = thread->suspend;
++    facts.process_suspend = thread->process->suspend;
++    facts.debug_hold = !!(thread->process->debug_obj || thread->process->debug_event);
++    facts.mach_hold = thread->ios_mach_suspended;
++    facts.context_present = !!thread->context;
++    facts.exact_private_pending = ios_fex_exact_private_pending(thread);
++    facts.scope_matches_pending = thread->ios_fex_scope.pending_context == thread->context &&
++            thread->context && thread->ios_fex_scope.capture_generation == thread->context->ios_fex_generation;
++    facts.eligible_suspend_origin = thread->ios_fex_suspend_eligible && thread->context &&
++            thread->ios_fex_suspend_owner == thread->context->ios_fex_origin_thread;
++    return facts;
++}
++
++static void ios_fex_clear_pending(struct thread *thread)
++{
++    thread->ios_fex_pending_context = NULL;
++    ios_fex_critical_bind_pending(&thread->ios_fex_scope, NULL, 0);
++}
++
++static void ios_fex_ack_context(struct thread *thread, struct context *ctx, uint64_t cookie)
++{
++    ios_fex_clear_pending(thread); /* Actual target publication, never registration. */
++    ctx->status = STATUS_SUCCESS;
++    thread->suspend_cookie = cookie;
++    signal_sync(ctx->sync);
++}
++
++/* Called only after the signal request succeeded and the fresh context was installed,
++ * in the same serial dispatch. No request can observe a half-published origin/tag. */
++static void ios_fex_publish_pending(struct thread *thread, struct context *ctx)
++{
++    ctx->ios_fex_generation = ++thread->ios_fex_capture_generation;
++    ctx->ios_fex_origin_process = current ? current->process->id : 0;
++    ctx->ios_fex_origin_thread = current ? current->id : 0;
++    thread->ios_fex_pending_context = ctx;
++    /* ENTER can precede context creation: bind this exact new object/generation now. */
++    ios_fex_critical_bind_pending(&thread->ios_fex_scope, ctx, ctx->ios_fex_generation);
++}
++
++/* Last logical resume cancels only a still-unacknowledged exact private capture.
++ * Existing waiter handles retain the old object and receive a real failure. The
++ * thread reference is removed before a delayed handler can create its own context. */
++static void ios_fex_cancel_pending(struct thread *thread)
++{
++    struct context *ctx = thread->context;
++    if (!ctx || ctx != thread->ios_fex_pending_context || ctx->status != STATUS_PENDING ||
++        !ctx->ios_fex_generation || ctx->ios_fex_generation != thread->ios_fex_capture_generation ||
++        thread->ios_ctx_seq != 0x41505335u) return;
++    thread->context = NULL;
++    ios_fex_clear_pending(thread);
++    thread->ios_ctx_seq = 0;
++    ctx->status = STATUS_CANCELLED;
++    signal_sync(ctx->sync);
++    release_object(ctx);
++}
++
++/* Every outstanding logical count must come from the original same-process,
++ * direct SuspendThread caller. Mixed or startup/process counts remain hard. */
++static void ios_fex_record_suspend(struct thread *thread, int old_count)
++{
++    int eligible = current && current != thread && current->process == thread->process &&
++        current->req.request_header.req == REQ_suspend_thread &&
++        ios_fex_exact_private_pending(thread) &&
++        thread->context->ios_fex_origin_thread == current->id;
++    if (!old_count)
++    {
++        thread->ios_fex_suspend_eligible = eligible;
++        thread->ios_fex_suspend_owner = eligible ? current->id : 0;
++    }
++    else if (!eligible || thread->ios_fex_suspend_owner != current->id)
++        thread->ios_fex_suspend_eligible = 0; /* remains tainted until count zero */
++}
++
++/* END exact production server helpers */
++#endif
++
++/* Administrative is_thread_suspended and count-query results stay unchanged.
++ * Only these three native waiter gates use the scoped effective predicate. */
++static int is_thread_wait_suspended(struct thread *thread)
++{
++#ifdef WINE_IOS
++    struct ios_fex_critical_facts facts = ios_fex_thread_facts(thread);
++    if (ios_fex_critical_wait_deferred(&thread->ios_fex_scope, thread->teb, &facts)) return 0;
++#endif
++    return is_thread_suspended(thread);
++}
++
+ /* check if address looks valid for a client-side data structure (TEB etc.) */
+ static inline int is_valid_address( client_ptr_t addr )
+ {
+@@ -527,6 +646,9 @@
+ #ifdef WINE_IOS
+     context->ios_snapshot = 0;   /* alloc_object() poisons with 0x55 */
+     context->ios_dirty    = 0;
++    context->ios_fex_generation = 0;
++    context->ios_fex_origin_process = 0;
++    context->ios_fex_origin_thread = 0;
+ #endif
+     memset( &context->regs, 0, sizeof(context->regs) );
+     context->regs[CTX_NATIVE].machine = native_machine;
+@@ -661,6 +783,12 @@
+     int i;
+ 
+     cleanup_thread_completion( thread );
++#ifdef WINE_IOS
++    thread->ios_fex_scope.token = thread->ios_fex_scope.teb = 0;
++    ios_fex_clear_pending(thread);
++    thread->ios_fex_suspend_owner = 0;
++    thread->ios_fex_suspend_eligible = 0;
++#endif
+     if (thread->context)
+     {
+         thread->context->status = STATUS_ACCESS_DENIED;
+@@ -1217,12 +1345,16 @@
+         if (enabled && thread != current && thread->process->machine == IMAGE_FILE_MACHINE_AMD64)
+         {
+             if (thread->context && thread->ios_ctx_seq == 0x41505335u) return;
+-            struct context *fresh = create_thread_context( thread );
++            struct context *fresh;
++            if (thread->ios_fex_capture_generation == UINT64_MAX)
++            { set_error(STATUS_INTEGER_OVERFLOW); return; }
++            fresh = create_thread_context( thread );
+             if (fresh && ios_signal_suspend_x64( thread ))
+             {
+                 if (thread->context) release_object( thread->context );
+                 thread->context = fresh;
+                 thread->ios_ctx_seq = 0x41505335u;
++                ios_fex_publish_pending(thread, fresh);
+                 return;
+             }
+             if (fresh) release_object( fresh );
+@@ -1313,6 +1445,7 @@
+         if (!is_thread_suspended( thread )) stop_thread( thread );
+         thread->suspend++;
+ #ifdef WINE_IOS
++        ios_fex_record_suspend(thread, old_count);
+         ios_pending_persistent_hold = NULL;
+         /* stop_thread() can bail out early (context already captured, or process
+          * init not finished), in which case no hold was established. Take it here.
+@@ -1372,6 +1505,9 @@
+         {
+             resume_delayed_debug_events( thread );
+ #ifdef WINE_IOS
++            ios_fex_cancel_pending(thread);
++            thread->ios_fex_suspend_eligible = 0;
++            thread->ios_fex_suspend_owner = 0;
+             /* WoW64: apply a SetThreadContext made while suspended, while a
+              * persistent Mach hold (if any) still stops the thread. */
+             if (thread->context && thread->context->ios_dirty) ios_wow_ctx_apply( thread );
+@@ -1611,7 +1747,7 @@
+         return STATUS_KERNEL_APC;
+ 
+     /* Suspended threads may not acquire locks, but they can run system APCs */
+-    if (is_thread_suspended( thread )) return -1;
++    if (is_thread_wait_suspended( thread )) return -1;
+ 
+     if (wait->select == SELECT_WAIT_ALL)
+     {
+@@ -1705,7 +1841,7 @@
+     client_ptr_t cookie;
+ 
+     if (thread->wait != wait) return 0;  /* not the current wait */
+-    if (is_thread_suspended( thread )) return 0;  /* cannot acquire locks */
++    if (is_thread_wait_suspended( thread )) return 0;  /* hard holds still cannot acquire locks */
+ 
+     assert( wait->select != SELECT_WAIT_ALL );
+ 
+@@ -1728,7 +1864,7 @@
+ 
+     wait->user = NULL;
+     if (thread->wait != wait) return; /* not the top-level wait, ignore it */
+-    if (is_thread_suspended( thread )) return;  /* suspended, ignore it */
++    if (is_thread_wait_suspended( thread )) return;  /* hard holds still ignore it */
+ 
+ #ifdef WINE_IOS
+     /* Madeira fastsync: ask the objects before declaring a timeout.  With
+@@ -2634,9 +2770,13 @@
+             ctx->regs[CTX_WOW].machine = current->process->machine;
+             copy_context( &ctx->regs[CTX_WOW], wow_context, wow_context->flags & ~ctx->regs[CTX_WOW].flags );
+         }
++#ifdef WINE_IOS
++        ios_fex_ack_context(current, ctx, req->cookie);
++#else
+         ctx->status = STATUS_SUCCESS;
+         current->suspend_cookie = req->cookie;
+         signal_sync( ctx->sync );
++#endif
+ #ifdef WINE_IOS
+         current->ios_start_pending = 0;   /* it posted its start context */
+ #endif
+@@ -3085,3 +3225,35 @@
+ #endif
+     }
+ }
++
++
++/* Self-only native critical registration: no caller-supplied thread/handle authority. */
++DECL_HANDLER(ios_fex_critical_scope)
++{
++#ifdef WINE_IOS
++    static uint64_t next_token;
++    struct ios_fex_critical_facts facts = ios_fex_thread_facts(current);
++    uint64_t result_token;
++    uint32_t result_depth, status;
++    if (get_req_data_size() || req->magic != IOS_FEX_CRITICAL_MAGIC ||
++        req->version != IOS_FEX_CRITICAL_VERSION || req->reserved)
++    {
++        set_error(STATUS_INVALID_PARAMETER);
++        return;
++    }
++    status = ios_fex_critical_register(&current->ios_fex_scope, &facts, current->teb,
++            req->teb, req->operation, req->token, &next_token, &result_token, &result_depth);
++    if (status) { set_error(status); return; }
++    if (req->operation == IOS_FEX_CRITICAL_ENTER && ios_fex_exact_private_pending(current))
++        ios_fex_critical_bind_pending(&current->ios_fex_scope, current->context,
++                                     current->context->ios_fex_generation);
++    reply->token = result_token;
++    reply->teb = current->teb;
++    reply->depth = result_depth;
++    /* An earlier hard gate may have dropped a due timer. Re-evaluate the real
++     * object/deadline, without inventing a signal, ACK or successful wait. */
++    if (req->operation == IOS_FEX_CRITICAL_ENTER) wake_thread(current);
++#else
++    set_error(STATUS_NOT_SUPPORTED);
++#endif
++}
+diff --git a/server/thread.h b/server/thread.h
+--- a/server/thread.h
++++ b/server/thread.h
+@@ -22,6 +22,9 @@
+ #define __WINE_SERVER_THREAD_H
+ 
+ #include "object.h"
++#ifdef WINE_IOS
++#include "ios_fex_critical_server.h"
++#endif
+ 
+ /* thread structure */
+ 
+@@ -134,6 +137,12 @@
+     unsigned int           ios_priority_port;
+     unsigned long long     ios_priority_identity;
+     unsigned int           ios_priority_status;
++    /* Append-only native critical scope. Existing archive offsets remain unchanged. */
++    struct ios_fex_critical_scope ios_fex_scope;
++    struct context        *ios_fex_pending_context; /* borrowed alias of ->context only */
++    uint64_t               ios_fex_capture_generation;
++    thread_id_t            ios_fex_suspend_owner;
++    int                    ios_fex_suspend_eligible;
+ #endif
+ };
+ 

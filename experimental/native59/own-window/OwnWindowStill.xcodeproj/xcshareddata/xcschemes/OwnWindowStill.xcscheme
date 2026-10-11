@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="2700" version="1.7">
+ <BuildAction parallelizeBuildables="NO" buildImplicitDependencies="NO">
+  <BuildActionEntries><BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000001" BuildableName="OwnWindowStillTests.xctest" BlueprintName="OwnWindowStillTests" ReferencedContainer="container:OwnWindowStill.xcodeproj"/></BuildActionEntry></BuildActionEntries>
+ </BuildAction>
+ <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="NO" codeCoverageEnabled="NO">
+  <Testables><TestableReference skipped="NO" parallelizable="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000001" BuildableName="OwnWindowStillTests.xctest" BlueprintName="OwnWindowStillTests" ReferencedContainer="container:OwnWindowStill.xcodeproj"/></TestableReference></Testables>
+ </TestAction>
+</Scheme>

@@ -1,0 +1,31 @@
+// Exact Windows lock templates, compiled with the native iOS bridge disabled.
+#include <FEXCore/Utils/NativeCriticalSection.h>
+#include <cstdint>
+#include <mutex>
+#include <shared_mutex>
+#include <type_traits>
+#include <cstdio>
+#include <cstdlib>
+static unsigned Locks;
+struct FakeMutex {
+  void lock() { ++Locks; }
+  void unlock() { --Locks; }
+  void lock_shared() { lock(); }
+  void unlock_shared() { unlock(); }
+};
+namespace FEXCore {
+namespace Core { struct InternalThreadState {}; }
+@WINDOWS_TEMPLATES@
+}
+int main() {
+  FakeMutex M;
+  static_assert(std::is_same_v<decltype(FEXCore::MaskSignalsAndLockMutex(M)), std::unique_lock<FakeMutex>>);
+  static_assert(std::is_same_v<decltype(FEXCore::GuardSignalDeferringSection(M, nullptr)), std::unique_lock<FakeMutex>>);
+  static_assert(std::is_same_v<decltype(FEXCore::GuardSignalDeferringSectionWithFallback(M, nullptr)), std::unique_lock<FakeMutex>>);
+  FEX_NATIVE_CRITICAL_SCOPE(); FEX_NATIVE_CRITICAL_SCOPE();
+  { auto Scope = FEXCore::MaskSignalsAndLockMutex(M); if (Locks != 1) std::abort(); }
+  { auto Scope = FEXCore::GuardSignalDeferringSection(M, nullptr); if (Locks != 1) std::abort(); }
+  { auto Scope = FEXCore::GuardSignalDeferringSectionWithFallback(M, nullptr); if (Locks != 1) std::abort(); }
+  if (Locks != 0) std::abort();
+  std::puts("NONIOS_OR_NON_ARM64EC_ORIGINAL_LOCK_API_PASS cases=3");
+}

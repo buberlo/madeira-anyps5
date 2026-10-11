@@ -1,0 +1,1157 @@
+diff --git a/FEXCore/Source/Interface/Core/CPUBackend.cpp b/FEXCore/Source/Interface/Core/CPUBackend.cpp
+--- a/FEXCore/Source/Interface/Core/CPUBackend.cpp
++++ b/FEXCore/Source/Interface/Core/CPUBackend.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #include "FEXCore/Config/Config.h"
+ #include "Interface/Context/Context.h"
+ #include "Interface/Core/CPUBackend.h"
+@@ -337,6 +338,9 @@
+      * best-effort answer an exception path got before ml460 added the lock --
+      * strictly better than never returning. */
+     struct IosMigrateLockGuard {
++#if defined(_WIN32) && defined(ARCHITECTURE_arm64ec)
++      FEXCore::NativeCriticalSection Native;
++#endif
+       std::atomic<uint64_t>& Lock;
+       bool Reentered {false};
+       static uint64_t Me() {
+@@ -535,6 +539,7 @@
+ #if !defined(ARCHITECTURE_arm64ec)
+   extern "C" void IosSweepRegisterThreadEx(FEXCore::Core::InternalThreadState* Thread, volatile uint8_t* InSimPtr,
+                                            volatile uint8_t* MigratedPtr) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock lk {IosSweepRegistryLock()};
+     for (size_t i = 0; i < IosSweepSlotMax; i++) {
+       if (!IosSweepSlots[i].Thread) {
+@@ -553,6 +558,7 @@
+   }
+ #else
+   extern "C" void IosSweepRegisterThread(FEXCore::Core::InternalThreadState* Thread, volatile uint8_t* InSimPtr) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock lk {IosSweepRegistryLock()};
+     for (size_t i = 0; i < IosSweepSlotMax; i++) {
+       if (!IosSweepSlots[i].Thread) {
+@@ -569,6 +575,7 @@
+ 
+   extern "C" void IosSweepUnregisterThread(FEXCore::Core::InternalThreadState* Thread) {
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::scoped_lock lk {IosSweepRegistryLock()};
+       for (size_t i = 0; i < IosSweepSlotMax; i++) {
+         if (IosSweepSlots[i].Thread == Thread) {
+@@ -627,6 +634,7 @@
+     IosSweepSlot Snap[IosSweepSlotMax];
+     size_t SnapCount = 0;
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::scoped_lock lk {IosSweepRegistryLock()};
+       for (size_t i = 0; i < IosSweepSlotHighWater; i++) {
+         if (IosSweepSlots[i].Thread && IosSweepSlots[i].Thread != CallerThread) {
+diff --git a/FEXCore/Source/Interface/Core/CodeCache.cpp b/FEXCore/Source/Interface/Core/CodeCache.cpp
+--- a/FEXCore/Source/Interface/Core/CodeCache.cpp
++++ b/FEXCore/Source/Interface/Core/CodeCache.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #include "Utils/crc32.h"
+ #include "FEXCore/Utils/LogManager.h"
+ #include "FEXCore/Utils/MathUtils.h"
+@@ -170,6 +171,7 @@
+   }
+ 
+   // Acquire mutex and re-check CodeMapFD to avoid race conditions
++  FEX_NATIVE_CRITICAL_SCOPE();
+   auto lk = std::unique_lock {Mutex};
+   if (!CodeMapFD) {
+     CodeMapFD = FileOpener.OpenCodeMapFile();
+@@ -180,6 +182,7 @@
+ 
+ void CodeMapWriter::Flush(size_t Offset) {
+   // Acquire exclusive lock and flush circular buffer
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock Lock {Mutex};
+   Flush(Offset, Lock);
+ }
+@@ -203,11 +206,13 @@
+   bool NewLibraryLoad = false;
+   {
+     // Check prior registration with shared lock
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::shared_lock Lock {Mutex};
+     NewLibraryLoad = !KnownFileIds.contains(SectionInfo.FileInfo.FileId);
+   }
+   if (NewLibraryLoad) {
+     // Register to map with exclusive lock
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::unique_lock Lock {Mutex};
+     NewLibraryLoad &= KnownFileIds.insert(SectionInfo.FileInfo.FileId).second;
+   }
+@@ -239,6 +244,7 @@
+ }
+ 
+ void CodeMapWriter::AppendData(std::span<const std::byte> Data) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::shared_lock Lock {Mutex};
+   auto Offset = BufferOffset.fetch_add(Data.size_bytes());
+   if (Offset + Data.size_bytes() > Buffer.size()) {
+@@ -248,6 +254,7 @@
+     Lock.unlock();
+     bool IsResponsibleForFlush = false;
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::unique_lock ExclusiveLock {Mutex};
+       IsResponsibleForFlush = (Offset <= Buffer.size());
+       if (IsResponsibleForFlush) {
+diff --git a/FEXCore/Source/Interface/Core/Core.cpp b/FEXCore/Source/Interface/Core/Core.cpp
+--- a/FEXCore/Source/Interface/Core/Core.cpp
++++ b/FEXCore/Source/Interface/Core/Core.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ /*
+ $info$
+ category: glue ~ Logic that binds various parts together
+@@ -649,6 +650,7 @@
+   }
+ 
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock lk {CodeBufferListLock};
+     CodeBufferList.emplace_back(Buffer);
+   }
+@@ -893,6 +895,7 @@
+   bool WantsDiskCachePatching = DiskCache.IsReadingDiskCache() || DiskCache.IsWritingDiskCache();
+ 
+   if (HasCustomIRHandlers.load(std::memory_order_relaxed)) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::shared_lock lk(CustomIRMutex);
+     auto Handler = CustomIRHandlers.find(GuestRIP);
+     if (Handler != CustomIRHandlers.end()) {
+@@ -1465,6 +1468,7 @@
+   }
+ 
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock CodeLock(CTX->GetCodeInvalidationMutex());
+     CTX->MarkMonoBackpatcherBlock(BlockEntry);
+   }
+@@ -2175,6 +2179,7 @@
+    * published normally on the next synchronous miss.  CompileSingleStep
+    * proves the dispatcher happily consumes an unpublished pointer. */
+   const bool IosUnpublished = FEXCore::Utils::WritePriorityMutex::IosEmissionLocksHeldBySelf();
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::shared_lock<std::remove_reference_t<decltype(CodeInvalidationMutex)>> lk;
+   if (IosUnpublished) {
+     static std::atomic<int> UnpubLogCount {0};
+@@ -2429,6 +2434,7 @@
+   FEXCORE_PROFILE_SCOPED("InvalidateCodeBuffersCodeRange");
+ 
+   LOGMAN_THROW_A_FMT(CodeInvalidationMutex.try_lock() == false, "CodeInvalidationMutex needs to be unique_locked here");
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock lk {CodeBufferListLock};
+   auto it = CodeBufferList.begin();
+   while (it != CodeBufferList.end()) {
+@@ -2464,6 +2470,7 @@
+ ContextImpl::AddCustomIREntrypoint(uintptr_t Entrypoint, CustomIREntrypointHandler Handler, void* Creator, void* Data) {
+   LOGMAN_THROW_A_FMT(Config.Is64BitMode || !(Entrypoint >> 32), "64-bit Entrypoint in 32-bit mode {:x}", Entrypoint);
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock lk(CustomIRMutex);
+ 
+   auto InsertedIterator = CustomIRHandlers.emplace(Entrypoint, CustomIRHandlerEntry {Handler, Creator, Data});
+@@ -2541,6 +2548,7 @@
+ void ContextImpl::RemoveCustomIREntrypoint(FEXCore::Core::InternalThreadState* Thread, uintptr_t Entrypoint) {
+   LOGMAN_THROW_A_FMT(Config.Is64BitMode || !(Entrypoint >> 32), "64-bit Entrypoint in 32-bit mode {:x}", Entrypoint);
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock lk(CustomIRMutex);
+ 
+   CustomIRHandlers.erase(Entrypoint);
+diff --git a/FEXCore/Source/Interface/Core/DiskCache.cpp b/FEXCore/Source/Interface/Core/DiskCache.cpp
+--- a/FEXCore/Source/Interface/Core/DiskCache.cpp
++++ b/FEXCore/Source/Interface/Core/DiskCache.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ 
+ #define XXH_STATIC_LINKING_ONLY
+ 
+@@ -508,7 +509,9 @@
+       if (Self->MemoryLRUCurrentSize <= Self->MemoryLRUMaxSize + Self->MemoryLRUEvictThreshold) {
+         return;
+       }
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::lock_guard IndexGuard(Self->IndexLock);
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::lock_guard LRUGuard(Self->MemoryLRULock);
+       if (Self->MemoryLRU.empty()) {
+         return;
+@@ -607,6 +610,7 @@
+     std::optional<fextl::list<MemoryLRUKey>::iterator> LRUIter;
+     uint64_t CurrentFootprint = 0;
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::lock_guard Guard(IndexLock);
+       auto It = Index.find(LookupKey);
+       if (It == Index.end()) {
+@@ -638,6 +642,7 @@
+     bool Advance = false;
+     while (!FoundMatchingHash) {
+       if (Advance) {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::lock_guard Guard(IndexLock);
+ 
+         EntryUnderReview = nullptr;
+@@ -779,6 +784,7 @@
+       FoundInLRU = true;
+       memcpy(HitData.Blob.data() + BlobOffset, BlobRef->data(), EntrySizeWithoutGuestCode);
+       if (LRUIter) {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::lock_guard Guard(MemoryLRULock);
+         // avoided disk by nabbing from lru, bump to front
+         // LogMan::Msg::IFmt("lru hit! {}", MemoryLRUCurrentSize);
+@@ -813,9 +819,11 @@
+     if (StoreInMemory) {
+       auto NewBlobRef = fextl::make_shared<fextl::vector<uint8_t>>(EntrySizeWithoutGuestCode);
+       memcpy(NewBlobRef->data(), HitData.Blob.data() + BlobOffset, EntrySizeWithoutGuestCode);
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::lock_guard Guard(IndexLock);
+       auto CurrentIndexEntry = LookupLocked(LookupKey, Header.GuestHash, LastFootprintHashed);
+       if (CurrentIndexEntry && !CurrentIndexEntry->MemoryBlob) {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::lock_guard LRUGuard(MemoryLRULock);
+         MemoryLRU.push_front({LookupKey, Header.GuestHash, LastFootprintHashed, EntrySizeWithoutGuestCode});
+         CurrentIndexEntry->LRUEntry = MemoryLRU.begin();
+@@ -944,11 +952,13 @@
+ 
+       fextl::list<MemoryLRUKey>::iterator NewLRUEntry;
+       if (KeepEntryInMemory) {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::lock_guard Guard(Self->MemoryLRULock);
+         Self->MemoryLRU.push_front({LookupKey, IndexAfterHeader->GuestHash, IndexAfterHeader->GuestFootprint, (uint32_t)Blob.size()});
+         NewLRUEntry = Self->MemoryLRU.begin();
+       }
+       {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::lock_guard Guard(Self->IndexLock);
+         auto IndexEntry = Self->LookupLocked(LookupKey, IndexAfterHeader->GuestHash, IndexAfterHeader->GuestFootprint);
+         LOGMAN_THROW_A_FMT(IndexEntry != nullptr, "Stored Index entry not found?");
+@@ -1186,6 +1196,7 @@
+     struct IndexEntry NewEntry {nullptr, 0, (uint32_t)TotalSize, Header.GuestSize, Header.GuestHash, BlobRef};
+     NewEntry.GuestExtents = ExactGuestCodeExtents;
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::lock_guard Guard(IndexLock);
+       auto It = Index.find(LookupKey);
+       if (It == Index.end()) {
+diff --git a/FEXCore/Source/Interface/Core/LookupCache.h b/FEXCore/Source/Interface/Core/LookupCache.h
+--- a/FEXCore/Source/Interface/Core/LookupCache.h
++++ b/FEXCore/Source/Interface/Core/LookupCache.h
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #pragma once
+ #include <atomic>
+ #include <chrono>
+@@ -45,6 +46,9 @@
+   LookupCacheWriteLockToken(FEXCore::Utils::WritePriorityMutex::Mutex& Mutex)
+     : LockRef {Mutex}
+     , Locked {(Mutex.lock(), true)} {}
++#if defined(_WIN32) && defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  NativeCriticalSection Native;
++#endif
+   FEXCore::Utils::WritePriorityMutex::Mutex& LockRef;
+   bool Locked;
+ 
+@@ -64,6 +68,9 @@
+   friend struct GuestToHostMap;
+   LookupCacheReadLockToken(FEXCore::Utils::WritePriorityMutex::Mutex& Mutex)
+     : Lock {Mutex} {}
++#if defined(_WIN32) && defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  NativeCriticalSection Native;
++#endif
+   std::shared_lock<FEXCore::Utils::WritePriorityMutex::Mutex> Lock;
+ };
+ 
+diff --git a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
+--- a/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
++++ b/FEXCore/Source/Interface/Core/SharedCodeBufferManager.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #include "Interface/Core/LookupCache.h"
+ #include "Interface/Core/SharedCodeBufferManager.h"
+ 
+@@ -123,6 +124,7 @@
+       long PrevUseCount = 0;
+       size_t PrevSize = 0;
+       {
++        FEX_NATIVE_CRITICAL_SCOPE();
+         std::scoped_lock lk {LatestMutex};
+         if (Latest) {
+           PrevUseCount = Latest.use_count();
+@@ -149,10 +151,12 @@
+ fextl::shared_ptr<CodeBuffer> SharedCodeBufferManager::GetLatest() {
+ #ifdef FEX_IOS_HOST
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock lk {LatestMutex};
+     if (Latest) return Latest;
+   }
+   AllocateNew(INITIAL_CODE_SIZE);
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock lk {LatestMutex};
+   return Latest;
+ #else
+diff --git a/FEXCore/Source/Utils/AllocatorHooks.cpp b/FEXCore/Source/Utils/AllocatorHooks.cpp
+--- a/FEXCore/Source/Utils/AllocatorHooks.cpp
++++ b/FEXCore/Source/Utils/AllocatorHooks.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #include <FEXCore/Utils/PrctlUtils.h>
+ 
+ #ifdef ENABLE_FEX_ALLOCATOR
+@@ -77,7 +78,13 @@
+ #ifdef FEX_IOS_HOST
+ extern "C" void fex_ios_rpm_lock(void);
+ extern "C" void fex_ios_rpm_unlock(void);
+-namespace { struct IosRpmGuard { IosRpmGuard() { fex_ios_rpm_lock(); } ~IosRpmGuard() { fex_ios_rpm_unlock(); } }; }
++namespace { struct IosRpmGuard {
++#if defined(_WIN32) && defined(ARCHITECTURE_arm64ec)
++  FEXCore::NativeCriticalSection Native;
++#endif
++  IosRpmGuard() { fex_ios_rpm_lock(); }
++  ~IosRpmGuard() { fex_ios_rpm_unlock(); }
++}; }
+ #define IOS_RPM_GUARD() IosRpmGuard ios_rpm_guard_
+ #else
+ #define IOS_RPM_GUARD() ((void)0)
+@@ -143,6 +150,7 @@
+ }
+ 
+ void InitializeThread() {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   rpmalloc_thread_initialize();
+ }
+ 
+diff --git a/FEXCore/include/FEXCore/Utils/NativeCriticalSection.h b/FEXCore/include/FEXCore/Utils/NativeCriticalSection.h
+new file mode 100644
+--- /dev/null
++++ b/FEXCore/include/FEXCore/Utils/NativeCriticalSection.h
+@@ -0,0 +1,57 @@
++// SPDX-License-Identifier: MIT
++#pragma once
++
++#if defined(_WIN32) && defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++#include <FEXCore/Utils/NativeCriticalSectionABI.h>
++
++// Internal FEX symbols, not BT-module exports. Native Wine owns masking,
++// bootstrap identity, depth, and the exact LIFO registration token.
++extern "C" int32_t fex_ios_native_critical_enter(ios_fex_critical_request* State);
++extern "C" int32_t fex_ios_native_critical_leave(ios_fex_critical_request* State);
++extern "C" [[noreturn]] void fex_ios_native_critical_fail(int32_t Status);
++
++namespace FEXCore {
++class NativeCriticalSection final {
++public:
++  NativeCriticalSection() {
++    if (const auto Status = fex_ios_native_critical_enter(&State); Status != 0) {
++      // Wine has already restored the incoming native mask on refused ENTER.
++      // Refusal must not turn into an unprotected lock acquisition.
++      fex_ios_native_critical_fail(Status);
++    }
++    Active = true;
++  }
++
++  NativeCriticalSection(const NativeCriticalSection&) = delete;
++  NativeCriticalSection& operator=(const NativeCriticalSection&) = delete;
++  NativeCriticalSection& operator=(NativeCriticalSection&&) = delete;
++  NativeCriticalSection(NativeCriticalSection&& Other) noexcept
++    : State(Other.State), Active(Other.Active) {
++    Other.Active = false;
++  }
++
++  ~NativeCriticalSection() noexcept {
++    if (Active) {
++      if (const auto Status = fex_ios_native_critical_leave(&State); Status != 0) {
++        // Failed LEAVE retains the native registration/mask. Never continue
++        // guest execution after losing truthful nesting or pending-stop state.
++        fex_ios_native_critical_fail(Status);
++      }
++    }
++  }
++
++private:
++  ios_fex_critical_request State {};
++  bool Active {false};
++};
++} // namespace FEXCore
++
++#define FEX_NATIVE_CRITICAL_JOIN_IMPL(A, B) A##B
++#define FEX_NATIVE_CRITICAL_JOIN(A, B) FEX_NATIVE_CRITICAL_JOIN_IMPL(A, B)
++#define FEX_NATIVE_CRITICAL_SCOPE() \
++  [[maybe_unused]] FEXCore::NativeCriticalSection FEX_NATIVE_CRITICAL_JOIN(FexNativeCritical_, __COUNTER__) {}
++#else
++// Underlying lock/lifecycle semantics are preserved on other targets. The
++// scope macro is a no-op and introduces no native query on those targets.
++#define FEX_NATIVE_CRITICAL_SCOPE() ((void)0)
++#endif
+diff --git a/FEXCore/include/FEXCore/Utils/NativeCriticalSectionABI.h b/FEXCore/include/FEXCore/Utils/NativeCriticalSectionABI.h
+new file mode 100644
+--- /dev/null
++++ b/FEXCore/include/FEXCore/Utils/NativeCriticalSectionABI.h
+@@ -0,0 +1,35 @@
++/* Isolated source proposal. Private native Wine/FEX ABI, never a guest context. */
++#ifndef IOS_FEX_CRITICAL_ABI_H
++#define IOS_FEX_CRITICAL_ABI_H
++#include <stdint.h>
++
++#define IOS_FEX_CRITICAL_QUERY_CLASS 0x7fff4152u
++#define IOS_FEX_CRITICAL_MAGIC 0x41504353u
++#define IOS_FEX_CRITICAL_VERSION 1u
++#define IOS_FEX_CRITICAL_ENTER 1u
++#define IOS_FEX_CRITICAL_LEAVE 2u
++#define IOS_FEX_CRITICAL_INACTIVE 1u
++
++struct ios_fex_critical_request
++{
++    uint32_t magic;
++    uint32_t version;
++    uint32_t operation;
++    uint32_t depth;
++    uint64_t token;
++    uint64_t teb;
++    uint32_t flags;
++    uint32_t reserved;
++};
++
++/* ENTER: depth/token/teb/flags/reserved all zero. LEAVE: exact last ENTER
++ * tuple, changing only operation. Nested results retain the outer token.
++ * Successful outer LEAVE returns depth=0/token=0 and retains teb/flags.
++ * ReturnLength is exactly 40 on success; refused LEAVE changes no state.
++ * The native implementation owns the complete prior signal mask. */
++#if defined(__cplusplus)
++static_assert(sizeof(struct ios_fex_critical_request) == 40);
++#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
++_Static_assert(sizeof(struct ios_fex_critical_request) == 40, "private ABI40");
++#endif
++#endif
+diff --git a/FEXCore/include/FEXCore/Utils/SignalScopeGuards.h b/FEXCore/include/FEXCore/Utils/SignalScopeGuards.h
+--- a/FEXCore/include/FEXCore/Utils/SignalScopeGuards.h
++++ b/FEXCore/include/FEXCore/Utils/SignalScopeGuards.h
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: MIT
+ #pragma once
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ 
+ #include <FEXCore/Debug/InternalThreadState.h>
+ 
+@@ -266,19 +267,43 @@
+ template<template<typename> class LockType = std::unique_lock, typename MutexType>
+ [[nodiscard]]
+ static inline auto MaskSignalsAndLockMutex(MutexType& mutex, uint64_t Mask = ~0ULL) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  struct {
++    NativeCriticalSection native;
++    LockType<MutexType> lock;
++  } scope_guard {NativeCriticalSection {}, LockType<MutexType> {mutex}};
++  return scope_guard;
++#else
+   return LockType<MutexType> {mutex};
++#endif
+ }
+ 
+ template<template<typename> class LockType = std::unique_lock, typename MutexType>
+ [[nodiscard]]
+ static inline auto GuardSignalDeferringSection(MutexType& mutex, FEXCore::Core::InternalThreadState* Thread, uint64_t Mask = ~0ULL) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  struct {
++    NativeCriticalSection native;
++    LockType<MutexType> lock;
++  } scope_guard {NativeCriticalSection {}, LockType<MutexType> {mutex}};
++  return scope_guard;
++#else
+   return LockType<MutexType> {mutex};
++#endif
+ }
+ 
+ template<template<typename> class LockType = std::unique_lock, typename MutexType>
+ [[nodiscard]]
+ static inline auto GuardSignalDeferringSectionWithFallback(MutexType& mutex, FEXCore::Core::InternalThreadState* Thread, uint64_t Mask = ~0ULL) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  struct {
++    NativeCriticalSection native;
++    LockType<MutexType> lock;
++  } scope_guard {NativeCriticalSection {}, LockType<MutexType> {mutex}};
++  return scope_guard;
++#else
+   return LockType<MutexType> {mutex};
++#endif
+ }
+ 
+ #endif
+diff --git a/Source/Windows/ARM64EC/Module.cpp b/Source/Windows/ARM64EC/Module.cpp
+--- a/Source/Windows/ARM64EC/Module.cpp
++++ b/Source/Windows/ARM64EC/Module.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ /*
+ $info$
+ tags: Bin|ARM64EC
+@@ -64,6 +65,196 @@
+ #include <winternl.h>
+ #include <winnt.h>
+ #include <wine/debug.h>
++
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++#include <FEXCore/Utils/NativeCriticalSectionABI.h>
++
++// BEGIN FEX_IOS_NATIVE_CRITICAL_BRIDGE
++// Internal, allocation-free, self-only bridge. Wine supplies authoritative
++// native TEB identity; neither CurrentFrame nor a raw x18 value is consulted.
++extern "C" int32_t fex_ios_native_critical_enter(ios_fex_critical_request* State) {
++  ios_fex_critical_request Request {IOS_FEX_CRITICAL_MAGIC, IOS_FEX_CRITICAL_VERSION,
++                                    IOS_FEX_CRITICAL_ENTER, 0, 0, 0, 0, 0};
++  ULONG Length = 0;
++  const auto Status = NtQueryInformationThread(NtCurrentThread(),
++    static_cast<THREADINFOCLASS>(IOS_FEX_CRITICAL_QUERY_CLASS), &Request, sizeof(Request), &Length);
++  if (Status != 0) {
++    return static_cast<int32_t>(Status);
++  }
++  if (Length != sizeof(Request) || Request.magic != IOS_FEX_CRITICAL_MAGIC ||
++      Request.version != IOS_FEX_CRITICAL_VERSION || Request.operation != IOS_FEX_CRITICAL_ENTER ||
++      Request.depth == 0 || Request.teb == 0 || Request.reserved != 0 ||
++      Request.flags > IOS_FEX_CRITICAL_INACTIVE ||
++      ((Request.flags == 0) ? (Request.token == 0) : (Request.token != 0))) {
++    return static_cast<int32_t>(0xc000000dU);
++  }
++  *State = Request;
++  return 0;
++}
++
++extern "C" int32_t fex_ios_native_critical_leave(ios_fex_critical_request* State) {
++  // Submit exactly the successful ENTER tuple with only operation changed.
++  const auto Previous = *State;
++  auto Request = Previous;
++  Request.operation = IOS_FEX_CRITICAL_LEAVE;
++  ULONG Length = 0;
++  const auto Status = NtQueryInformationThread(NtCurrentThread(),
++    static_cast<THREADINFOCLASS>(IOS_FEX_CRITICAL_QUERY_CLASS), &Request, sizeof(Request), &Length);
++  if (Status != 0) {
++    return static_cast<int32_t>(Status);
++  }
++  if (Length != sizeof(Request) || Request.magic != Previous.magic || Request.version != Previous.version ||
++      Request.operation != IOS_FEX_CRITICAL_LEAVE || Previous.depth == 0 ||
++      Request.depth != Previous.depth - 1 || Request.teb != Previous.teb ||
++      Request.flags != Previous.flags || Request.reserved != 0 ||
++      Request.token != ((Request.depth == 0) ? 0 : Previous.token)) {
++    return static_cast<int32_t>(0xc000000dU);
++  }
++  *State = Request;
++  return 0;
++}
++
++extern "C" [[noreturn]] void fex_ios_native_critical_fail(int32_t Status) {
++  // No logging/formatting/allocator or exception reconstruction on this path.
++  // If native process termination unexpectedly returns, trap forever rather
++  // than proceed to a protected lock or resume guest execution.
++  NtTerminateProcess(NtCurrentProcess(), static_cast<NTSTATUS>(Status));
++  for (;;) {
++    __builtin_trap();
++  }
++}
++// END FEX_IOS_NATIVE_CRITICAL_BRIDGE
++// BEGIN FEX_IOS_PAIRED_NATIVE_CRITICAL
++// Fixed storage only. The table lock never spans protected-lock acquisition,
++// callbacks, unlocks, or native IPC. Native Wine supplies each key's identity.
++namespace {
++constexpr uint32_t NativePairUnmap = 1;
++constexpr uint32_t NativePairRead = 2;
++constexpr size_t NativePairCapacity = 64;
++struct NativePairEntry {
++  uint32_t Kind {};
++  uint64_t Address {}, Size {};
++  ios_fex_critical_request State {};
++  bool Active {}, Ending {};
++};
++static NativePairEntry NativePairs[NativePairCapacity];
++static std::atomic_flag NativePairLock = ATOMIC_FLAG_INIT;
++static_assert(std::atomic<uint32_t>::is_always_lock_free);
++struct NativePairTableGuard {
++  NativePairTableGuard() {
++    for (uint32_t Batch = 0; Batch != 1024; ++Batch) {
++      for (uint32_t Retry = 0; Retry != 64; ++Retry) {
++        if (!NativePairLock.test_and_set(std::memory_order_acquire)) return;
++      }
++      if (Batch != 1023) {
++        // This caller owns no table lock. The already imported, non-alertable
++        // native wait gives a preempted owner an opportunity to run. Native
++        // critical protocol may defer only a private PENDING stop, not hard,
++        // process/debug or already acknowledged suspension. Nominal delays
++        // total <1.024s; this is not a native-syscall wall-time guarantee.
++        LARGE_INTEGER Delay;
++        Delay.QuadPart = -10000;
++        if (const auto Status = NtDelayExecution(FALSE, &Delay); Status != 0)
++          fex_ios_native_critical_fail(static_cast<int32_t>(Status));
++      }
++    }
++    fex_ios_native_critical_fail(static_cast<int32_t>(0xc000009aU));
++  }
++  ~NativePairTableGuard() { NativePairLock.clear(std::memory_order_release); }
++};
++static void NativePairEnter(uint32_t Kind, uint64_t Address, uint64_t Size) {
++  ios_fex_critical_request State {};
++  if (const auto Status = fex_ios_native_critical_enter(&State); Status != 0)
++    fex_ios_native_critical_fail(Status);
++  bool Duplicate = false, Stored = false;
++  {
++    NativePairTableGuard Table;
++    for (const auto& Entry : NativePairs) {
++      if (Entry.Active && Entry.State.teb == State.teb && Entry.State.token == State.token && Entry.State.depth == State.depth)
++        Duplicate = true;
++    }
++    for (auto& Entry : NativePairs) {
++      if (!Duplicate && !Entry.Active) {
++        Entry = {Kind, Address, Size, State, true, false};
++        Stored = true;
++        break;
++      }
++    }
++  }
++  if (Stored) return;
++  if (Duplicate) fex_ios_native_critical_fail(static_cast<int32_t>(0xc000000dU));
++  // Capacity failure is visible before any protected acquisition. Process
++  // termination, not fabricated unwinding, owns disposal of the native scope.
++  fex_ios_native_critical_fail(static_cast<int32_t>(0xc000009aU));
++}
++struct NativePairEnd {
++  ios_fex_critical_request Identity {}, Original {};
++  size_t Slot {};
++  bool Present {};
++};
++static NativePairEnd NativePairPrepareEnd(uint32_t Kind, uint64_t Address, uint64_t Size, bool Required) {
++  NativePairEnd End {};
++  if (const auto Status = fex_ios_native_critical_enter(&End.Identity); Status != 0)
++    fex_ios_native_critical_fail(Status);
++  bool HasOwnEntry = false, Mismatch = false;
++  {
++    NativePairTableGuard Table;
++    for (size_t i = 0; i != NativePairCapacity; ++i) {
++      auto& Entry = NativePairs[i];
++      if (!Entry.Active || Entry.State.teb != End.Identity.teb) continue;
++      HasOwnEntry = true;
++      if (Entry.State.depth + 1 != End.Identity.depth) continue;
++      if (Entry.Ending || Entry.Kind != Kind || Entry.Address != Address || Entry.Size != Size ||
++          Entry.State.token != End.Identity.token || Entry.State.flags != End.Identity.flags) {
++        Mismatch = true;
++        break;
++      }
++      Entry.Ending = true;
++      End.Original = Entry.State;
++      End.Slot = i;
++      End.Present = true;
++      break;
++    }
++  }
++  if (End.Present) return End;
++  if (Mismatch || Required || HasOwnEntry) fex_ios_native_critical_fail(static_cast<int32_t>(0xc000000dU));
++  if (const auto Status = fex_ios_native_critical_leave(&End.Identity); Status != 0)
++    fex_ios_native_critical_fail(Status);
++  return End;
++}
++static void NativePairFinish(NativePairEnd& End) {
++  if (!End.Present) fex_ios_native_critical_fail(static_cast<int32_t>(0xc000000dU));
++  bool Valid = false;
++  {
++    NativePairTableGuard Table;
++    auto& Entry = NativePairs[End.Slot];
++    Valid = Entry.Active && Entry.Ending && Entry.State.teb == End.Original.teb &&
++        Entry.State.token == End.Original.token && Entry.State.depth == End.Original.depth;
++    if (Valid) Entry = {};
++  }
++  if (!Valid) fex_ios_native_critical_fail(static_cast<int32_t>(0xc000000dU));
++  // Protected locks are already released. Temporary authoritative identity is
++  // the innermost native scope, so leave it before the retained BEFORE scope.
++  if (const auto Status = fex_ios_native_critical_leave(&End.Identity); Status != 0)
++    fex_ios_native_critical_fail(Status);
++  if (const auto Status = fex_ios_native_critical_leave(&End.Original); Status != 0)
++    fex_ios_native_critical_fail(Status);
++  End.Present = false;
++}
++static void NativePairRetireOnThreadExit(uint64_t WineSuppliedTeb) {
++  // Called only by Wine's existing self-thread teardown hook. A terminating
++  // thread can abandon unrelated scopes; never invent LIFO LEAVE/unmask or
++  // use a stale row to unlock a mutex. Wine tears its native TLS/server state
++  // down separately. Retirement prevents capacity leaks and reused-TEB binds.
++  NativePairTableGuard Table;
++  for (auto& Entry : NativePairs) {
++    if (Entry.Active && Entry.State.teb == WineSuppliedTeb) Entry = {};
++  }
++}
++} // namespace
++// END FEX_IOS_PAIRED_NATIVE_CRITICAL
++
++#endif
+ 
+ /* ml751: the VA band selector's deferred beacon buffer, filled by
+  * ios_va_emit() in rpmalloc.c before the ARM64EC TEB exists and therefore
+@@ -1317,6 +1508,7 @@
+       return true;
+     }
+ 
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock Lock(ThreadCreationMutex);
+     static std::atomic<uint64_t> IosSmcHandled {0};
+     bool IosSmcSay = true;
+@@ -1666,6 +1858,7 @@
+   }
+ 
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock Lock(ThreadCreationMutex);
+     HandleImageMap(reinterpret_cast<uint64_t>(Address));
+   }
+@@ -1675,6 +1868,33 @@
+ }
+ 
+ void NotifyUnmapViewOfSection(void* Address, BOOL After, NTSTATUS Status) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  // AFTER release precedes tracker/thread-state gates: those can change while
++  // the BEFORE callback's native scope and recursive mutex remain held.
++  if (After) {
++    auto End = NativePairPrepareEnd(NativePairUnmap, reinterpret_cast<uint64_t>(Address), 0, false);
++    if (End.Present) {
++      ThreadCreationMutex.unlock();
++      NativePairFinish(End);
++    }
++    return;
++  }
++  if (!InvalidationTracker || !GetCPUArea().ThreadState()) return;
++  NativePairEnter(NativePairUnmap, reinterpret_cast<uint64_t>(Address), 0);
++  bool Locked = false;
++  try {
++    ThreadCreationMutex.lock();
++    Locked = true;
++    auto [Start, Size] = InvalidationTracker->InvalidateContainingSection(reinterpret_cast<uint64_t>(Address), true);
++    if (Size) HandleImageUnmap(Start, Size);
++  } catch (...) {
++    auto End = NativePairPrepareEnd(NativePairUnmap, reinterpret_cast<uint64_t>(Address), 0, true);
++    if (Locked) ThreadCreationMutex.unlock();
++    NativePairFinish(End);
++    throw;
++  }
++#else
++
+   if (!InvalidationTracker || !GetCPUArea().ThreadState()) {
+     return;
+   }
+@@ -1688,6 +1908,7 @@
+   } else {
+     ThreadCreationMutex.unlock();
+   }
++#endif
+ }
+ 
+ void FlushInstructionCacheHeavy(const void* Address, SIZE_T Size) {
+@@ -1695,6 +1916,7 @@
+     return;
+   }
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(ThreadCreationMutex);
+   InvalidationTracker->InvalidateAlignedInterval(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), false);
+ }
+@@ -1704,6 +1926,7 @@
+     return;
+   }
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(ThreadCreationMutex);
+   InvalidationTracker->InvalidateAlignedInterval(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), false);
+ }
+@@ -1713,6 +1936,7 @@
+     return;
+   }
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(ThreadCreationMutex);
+   InvalidationTracker->InvalidateAlignedInterval(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), false);
+ }
+@@ -1752,6 +1976,9 @@
+   bool* InLockedRead = IosInLockedRWXReadSlot();
+ 
+   if (After && *InLockedRead) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++    auto End = NativePairPrepareEnd(NativePairRead, reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), true);
++#endif
+     {
+       *InLockedRead = false;
+       if (ThreadState) {
+@@ -1759,6 +1986,9 @@
+       }
+       CTX->GetCodeInvalidationMutex().unlock();
+       ThreadCreationMutex.unlock();
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++      NativePairFinish(End);
++#endif
+     }
+     return;
+   }
+@@ -1789,6 +2019,33 @@
+     // Use the locking mechanism for (Persona 5 Royal AppID 1687950) which does exactly the problem described above.
+     auto& InLockedRWXRead = GetFrontendThreadData(ThreadState)->InLockedRWXRead;
+     if (!After) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++      NativePairEnter(NativePairRead, reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size));
++      bool ThreadLocked = false, CodeLocked = false;
++      try {
++        ThreadCreationMutex.lock();
++        ThreadLocked = true;
++        CTX->GetCodeInvalidationMutex().lock();
++        CodeLocked = true;
++        if (InvalidationTracker->BeginUntrackedWriteLocked(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size))) {
++          InLockedRWXRead = true;
++          *InLockedRead = true;
++        } else {
++          auto End = NativePairPrepareEnd(NativePairRead, reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), true);
++          CTX->GetCodeInvalidationMutex().unlock();
++          CodeLocked = false;
++          ThreadCreationMutex.unlock();
++          ThreadLocked = false;
++          NativePairFinish(End);
++        }
++      } catch (...) {
++        auto End = NativePairPrepareEnd(NativePairRead, reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), true);
++        if (CodeLocked) CTX->GetCodeInvalidationMutex().unlock();
++        if (ThreadLocked) ThreadCreationMutex.unlock();
++        NativePairFinish(End);
++        throw;
++      }
++#else
+       ThreadCreationMutex.lock();
+       CTX->GetCodeInvalidationMutex().lock();
+       if (InvalidationTracker->BeginUntrackedWriteLocked(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size))) {
+@@ -1798,11 +2055,18 @@
+         CTX->GetCodeInvalidationMutex().unlock();
+         ThreadCreationMutex.unlock();
+       }
++#endif
+     } else {
+       if (InLockedRWXRead) {
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++        auto End = NativePairPrepareEnd(NativePairRead, reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), true);
++#endif
+         InLockedRWXRead = false;
+         CTX->GetCodeInvalidationMutex().unlock();
+         ThreadCreationMutex.unlock();
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++        NativePairFinish(End);
++#endif
+       }
+     }
+ 
+@@ -1810,6 +2074,7 @@
+   }
+ 
+   if (After && Status == STATUS_SUCCESS) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock Lock(ThreadCreationMutex);
+     InvalidationTracker->InvalidateAlignedInterval(reinterpret_cast<uint64_t>(Address), static_cast<uint64_t>(Size), false);
+   }
+@@ -1867,6 +2132,9 @@
+     return REL_SELFTEST;
+   }
+   auto* Teb = reinterpret_cast<TEB*>(TebPtr);
++#if defined(FEX_IOS_HOST) && defined(ARCHITECTURE_arm64ec)
++  NativePairRetireOnThreadExit(reinterpret_cast<uint64_t>(TebPtr));
++#endif
+ 
+   auto* Depth = reinterpret_cast<volatile uint32_t*>(reinterpret_cast<uintptr_t>(Teb) + 0x16f0);
+   auto* Stamp = reinterpret_cast<volatile uint64_t*>(reinterpret_cast<uintptr_t>(Teb) + 0x16f8);
+@@ -1961,6 +2229,7 @@
+     }
+   }
+ #endif
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(ThreadCreationMutex);
+ #ifdef FEX_IOS_HOST
+   IosTiLog("[FEX-iOS] TI:lock\n");
+@@ -2393,6 +2662,7 @@
+   }
+ 
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock Lock(ThreadCreationMutex);
+     auto it = Threads.find(ThreadTID);
+     if (it == Threads.end()) {
+diff --git a/Source/Windows/Common/ArenaManager.cpp b/Source/Windows/Common/ArenaManager.cpp
+--- a/Source/Windows/Common/ArenaManager.cpp
++++ b/Source/Windows/Common/ArenaManager.cpp
+@@ -1,3 +1,4 @@
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ // SPDX-License-Identifier: GPL-3.0-or-later
+ //
+ // ⛔ NOT BUILT. Superseded by Wine's reserved-area machinery (ml799-ml802).
+@@ -159,6 +160,7 @@
+ }
+ 
+ void SetInject(Inject I, unsigned NthCall) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::lock_guard<std::mutex> G {Lock};
+   InjectMode = I;
+   InjectAt = NthCall;
+@@ -166,6 +168,7 @@
+ }
+ 
+ bool Adopt(uintptr_t base, uintptr_t end) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::lock_guard<std::mutex> G {Lock};
+   if (!base || end <= base || (base & (GRAN - 1)) || (end & (GRAN - 1))) {
+     LogMan::Msg::EFmt("[arena] REJECTED publication [{:#x},{:#x}) -- unaligned, empty or inverted; "
+@@ -195,6 +198,7 @@
+     return nullptr;
+   }
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::lock_guard<std::mutex> G {Lock};
+   for (unsigned i = 0; i < HoleCount; ++i) {
+     const uintptr_t HB = Holes[i].Base;
+@@ -313,6 +317,7 @@
+     return false;
+   }
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::lock_guard<std::mutex> G {Lock};
+ 
+   /* Must match a live carve EXACTLY. A partial or double free would hand the
+@@ -372,6 +377,7 @@
+ }
+ 
+ void Stats(size_t* LargestHole, size_t* TotalFree, unsigned* FreeSlices, unsigned* LiveOut) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::lock_guard<std::mutex> G {Lock};
+   size_t Largest = 0, Total = 0;
+   for (unsigned i = 0; i < HoleCount; ++i) {
+diff --git a/Source/Windows/Common/CRT/Alloc.cpp b/Source/Windows/Common/CRT/Alloc.cpp
+--- a/Source/Windows/Common/CRT/Alloc.cpp
++++ b/Source/Windows/Common/CRT/Alloc.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ #define _SECIMP
+ #define _CRTIMP
+ #include <cstdint>
+@@ -9,7 +10,13 @@
+ #ifdef FEX_IOS_HOST
+ extern "C" void fex_ios_rpm_lock(void);
+ extern "C" void fex_ios_rpm_unlock(void);
+-namespace { struct IosRpmGuard { IosRpmGuard() { fex_ios_rpm_lock(); } ~IosRpmGuard() { fex_ios_rpm_unlock(); } }; }
++namespace { struct IosRpmGuard {
++#if defined(_WIN32) && defined(ARCHITECTURE_arm64ec)
++  FEXCore::NativeCriticalSection Native;
++#endif
++  IosRpmGuard() { fex_ios_rpm_lock(); }
++  ~IosRpmGuard() { fex_ios_rpm_unlock(); }
++}; }
+ #define IOS_RPM_GUARD() IosRpmGuard ios_rpm_guard_
+ #else
+ #define IOS_RPM_GUARD() ((void)0)
+diff --git a/Source/Windows/Common/CRT/CRT_iOS.cpp b/Source/Windows/Common/CRT/CRT_iOS.cpp
+--- a/Source/Windows/Common/CRT/CRT_iOS.cpp
++++ b/Source/Windows/Common/CRT/CRT_iOS.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ // Minimal CRT lifecycle hooks for the iOS-host arm64ec build of libarm64ecfex.dll.
+ // The full CRT.cpp redefines _tls_index, DllMainCRTStartup, and the CRT section
+ // markers, which conflict with mingw's default startup chain that we use on
+@@ -23,16 +24,19 @@
+ 
+ namespace FEX::Windows {
+ void InitCRTProcess() {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   // mingw's default startup already ran the C++ ctors. Ensure the rpmalloc
+   // global heap is up (idempotent) before any per-thread init below.
+   rpmalloc_initialize(nullptr);
+ }
+ void InitCRTThread() {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   // The critical piece that was missing on iOS: give this thread its own
+   // rpmalloc heap. Without it, FEX worker-thread allocations are corrupt.
+   rpmalloc_thread_initialize();
+ }
+ void DeinitCRTThread() {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   rpmalloc_thread_finalize();
+ }
+ } // namespace FEX::Windows
+diff --git a/Source/Windows/Common/ImageTracker.cpp b/Source/Windows/Common/ImageTracker.cpp
+--- a/Source/Windows/Common/ImageTracker.cpp
++++ b/Source/Windows/Common/ImageTracker.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ 
+ #include <array>
+ #include <mutex>
+@@ -125,6 +126,7 @@
+   , SectionInfo {.FileInfo = Info, .FileStartVA = Address, .BeginVA = Address, .EndVA = Address + Nt->OptionalHeader.SizeOfImage} {}
+ 
+ FEXCore::ExecutableFileSectionInfo ImageTracker::HandleImageMap(std::string_view Path, uint64_t Address, bool MainImage) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(CTX.GetCodeInvalidationMutex());
+   const fextl::string ModuleName {BaseName(Path)};
+   const auto Module = reinterpret_cast<HMODULE>(Address);
+@@ -137,6 +139,7 @@
+       }
+       return fextl::robin_map<uint32_t, FEXCore::GuestRelocationType> {};
+     }();
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::unique_lock Lk {ImagesLock};
+     auto [It, Inserted] = MappedImages.emplace(std::piecewise_construct, std::forward_as_tuple(Address),
+                                                std::forward_as_tuple(Path, Address, Nt, std::move(Relocations)));
+@@ -202,14 +205,17 @@
+ }
+ 
+ void ImageTracker::HandleImageUnmap(uint64_t Address, uint64_t Size) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock Lock(CTX.GetCodeInvalidationMutex());
+   CTX.RemoveForceTSOInformation(Address, Size);
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock Lk {ImagesLock};
+   MappedImages.erase(Address);
+ }
+ 
+ std::optional<FEXCore::ExecutableFileSectionInfo> ImageTracker::LookupExecutableFileSection(uint64_t Address) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::shared_lock Lk {ImagesLock};
+   auto It = MappedImages.upper_bound(Address);
+   if (It == MappedImages.begin() || std::prev(It)->second.SectionInfo.EndVA <= Address) {
+diff --git a/Source/Windows/Common/InvalidationTracker.cpp b/Source/Windows/Common/InvalidationTracker.cpp
+--- a/Source/Windows/Common/InvalidationTracker.cpp
++++ b/Source/Windows/Common/InvalidationTracker.cpp
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++#include <FEXCore/Utils/NativeCriticalSection.h>
+ 
+ #include <atomic>
+ #include <cstdlib>  // ml623: getenv/strtoull for the IR-capture target
+@@ -104,6 +105,7 @@
+   const auto AlignedSize = (Address - AlignedBase + Size + FEXCore::Utils::FEX_PAGE_SIZE - 1) & FEXCore::Utils::FEX_PAGE_MASK;
+ 
+   const bool NeedsInvalidate = [&]() {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::unique_lock Lock(IntervalsLock);
+ 
+     FEXCore::IntervalList<uint64_t>::Interval ProtInterval {AlignedBase, AlignedBase + AlignedSize};
+@@ -189,7 +191,9 @@
+ void InvalidationTracker::HandleProcessExecuteFlagsChange(ULONG Flags) {
+   const bool DisableDEP = (Flags & MEM_EXECUTE_OPTION_ENABLE) != 0;
+ 
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock CodeLock(CTX.GetCodeInvalidationMutex());
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock Lock(IntervalsLock);
+ 
+   if (DisableDEP == DEPDisabled) {
+@@ -267,6 +271,7 @@
+ 
+   for (auto* Section = SectionsBegin; Section != SectionsEnd; Section++) {
+     if (Section->Characteristics & IMAGE_SCN_MEM_EXECUTE) {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::unique_lock Lock(IntervalsLock);
+ 
+       uint64_t SectionBase = Address + Section->VirtualAddress;
+@@ -470,6 +475,7 @@
+   InvalidateIntervalInternal(SectionBase, SectionSize);
+ 
+   if (Free) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::unique_lock Lock(IntervalsLock);
+     if (RoutineInvalidationDiagnostics) {
+       LogMan::Msg::EFmt("[iOS-xrem] via=section tracker={} {:#x}-{:#x}", static_cast<void*>(this),
+@@ -499,6 +505,7 @@
+   InvalidateIntervalInternal(AlignedBase, AlignedSize);
+ 
+   if (Free) {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::unique_lock Lock(IntervalsLock);
+     if (RoutineInvalidationDiagnostics) {
+       // ml437 (#74): preserve the first 40 removals plus a 1-in-64 sample
+@@ -521,6 +528,7 @@
+ 
+ bool InvalidationTracker::HandleRWXAccessViolation(FEXCore::Core::InternalThreadState* Thread, uint64_t HostPc, uint64_t FaultAddress) {
+   const auto [NeedsInvalidate, UntrapProt] = [&](uint64_t Address) -> std::pair<bool, ULONG> {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::shared_lock Lock(IntervalsLock);
+     if (!RWXIntervals.Query(Address).Enclosed) {
+       return {false, 0};
+@@ -531,6 +539,7 @@
+   if (NeedsInvalidate) {
+     // IntervalsLock cannot be held during invalidation
+     {
++      FEX_NATIVE_CRITICAL_SCOPE();
+       std::scoped_lock Lock(CTX.GetCodeInvalidationMutex());
+ 
+       InvalidateIntervalInternalLocked(FaultAddress & FEXCore::Utils::FEX_PAGE_MASK, FEXCore::Utils::FEX_PAGE_SIZE);
+@@ -566,6 +575,7 @@
+   {
+     // The hot path: one interval query under a shared lock. A zero Size means "not executable",
+     // which only gets a second chance under a guest window with DEP off.
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::shared_lock Lock(IntervalsLock);
+     const auto Info = QueryExecutableRangeLocked(Address);
+     if (Info.Size || !DEPDisabled || !GuestBase) {
+@@ -586,6 +596,7 @@
+    * range the decoder is only now asking about, and the compiling thread already holds
+    * CodeInvalidationMutex shared. A miss that is not a committed readable page still returns a
+    * zero-size result, so a wild branch still faults. */
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock Lock(IntervalsLock);
+   if (!XIntervals.Query(Address).Enclosed && !PromoteDEPRegionLocked(Address).End) {
+     return {};
+@@ -640,6 +651,7 @@
+ FEXCore::HLE::ExecutableRangeInfo InvalidationTracker::QueryExecutableRangeLocked(uint64_t Address) {
+ #else
+ FEXCore::HLE::ExecutableRangeInfo InvalidationTracker::QueryExecutableRange(uint64_t Address) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::shared_lock Lock(IntervalsLock);
+ #endif
+   const auto XResult = XIntervals.Query(Address);
+@@ -734,6 +746,7 @@
+   }
+ #endif
+   {
++    FEX_NATIVE_CRITICAL_SCOPE();
+     std::scoped_lock CodeLock(CTX.GetCodeInvalidationMutex());
+     CTX.MarkMonoBackpatcherBlock(BlockEntry);
+   }
+@@ -746,6 +759,7 @@
+ }
+ 
+ void InvalidationTracker::DisableSMCDetection() {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::unique_lock Lock(IntervalsLock);
+   SMCDetectionDisabled = true;
+   uint64_t Address = 0;
+@@ -779,6 +793,7 @@
+ }
+ 
+ void InvalidationTracker::InvalidateIntervalInternal(uint64_t Address, uint64_t Size) {
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::scoped_lock CodeLock(CTX.GetCodeInvalidationMutex());
+   InvalidateIntervalInternalLocked(Address, Size);
+ }
+@@ -843,6 +858,7 @@
+ 
+ bool InvalidationTracker::ProtectRWXIntervalsInternal(uint64_t Address, uint64_t Size, bool ForWriteLocked) {
+   const auto End = Address + Size;
++  FEX_NATIVE_CRITICAL_SCOPE();
+   std::shared_lock Lock(IntervalsLock);
+ 
+   if (SMCDetectionDisabled) {
