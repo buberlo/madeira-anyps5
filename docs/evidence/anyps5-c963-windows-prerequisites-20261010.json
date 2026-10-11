@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "native_windows_two_cpu_prerequisites_passed_application_control_blocked_third_no_game_start",
+  "upstream": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceFreezeSha256": "35fbabf1a3e80f489f3c3c5f09eebeca7e620b1911973eeffe6384db6d783552",
+  "archiveSha256": "a76aec3e4d79ece6c02986241c01cd29e2eb8042e9226722ffc318e7f304e4af",
+  "overlaySha256": "7881cf828821c177679e4e983ee3ba231f9c2b2b805560cc8fb999918dc77482",
+  "manifestSha256": "78b30e929cde160c5ed300610a9e58662bb02666c4abaa01b16dac96a53ee659",
+  "returnedEvidenceSha256": "2f47dcc394bf6f094aa626217a26aaa71df7a1b7d71153ee471527992dbf9cc8",
+  "transferReportSha256": "52cdb922f302d0340ba33f386e50c35739eda447e85f438cfab6067497f0ec84",
+  "transportLifetimeReceiptSha256": "1ffccf023c4fd2a2ecb06b907e37e8a0d01eaedad916dd3db42af0d78b11a95a",
+  "verifiedGameFiles": 181,
+  "verifiedPayloadFiles": 256,
+  "requiredPrerequisites": 16,
+  "passedPrerequisites": [
+    {
+      "name": "windows_exception_tests",
+      "exitCode": 0,
+      "executableSha256": "17790d1ffd67e2ce037112147dd111dd83bb22156bbe25900aad5e1689b1f848"
+    },
+    {
+      "name": "exception_personality_tests",
+      "exitCode": 0,
+      "executableSha256": "5fdca45001e44e4a13f4e1f3fd4821a1af170af1d871b5ebba66d6518cd8a717"
+    }
+  ],
+  "remainingPrerequisitesNotExecuted": 14,
+  "os": {
+    "Caption": "Microsoft Windows 11 Pro",
+    "Version": "10.0.26300",
+    "BuildNumber": "26300",
+    "OSArchitecture": "64-bit"
+  },
+  "gpu": [
+    {
+      "Name": "AMD Radeon 780M Graphics",
+      "DriverVersion": "31.0.21029.6002"
+    },
+    {
+      "Name": "Microsoft Remote Display Adapter",
+      "DriverVersion": "10.0.26100.9278"
+    }
+  ],
+  "blockedExecutable": "guest_raise_exception_tests.exe",
+  "applicationControlError": "Exception calling \".ctor\" with \"6\" argument(s): \"An Application Control policy has blocked this file\"",
+  "readOnlyCodeIntegrityObservation": {
+    "eventIds": [
+      3077,
+      3033
+    ],
+    "atUtc": "2026-10-10T07:44:01Z",
+    "blockedFileMatchesThisRun": true,
+    "unexpectedSigningLevelRequired": true,
+    "observedVia": "RDP PowerShell read-only scoped event query",
+    "securitySettingsChanged": false
+  },
+  "ownChildCleanupVerified": true,
+  "gameStarted": false,
+  "gameplayQualified": false,
+  "windowsGpuQualified": false,
+  "deviceAcceptance": false,
+  "listenerClosed": true,
+  "githubActions": false,
+  "rawLogsIncluded": false,
+  "privatePathsIncluded": false,
+  "gameAssetsIncluded": false,
+  "boundary": "Package verification and two native CPU prerequisites passed. Windows application control stopped the next unsigned test before execution; native AVX/GPU and MiniGolf gameplay remain unqualified."
+}

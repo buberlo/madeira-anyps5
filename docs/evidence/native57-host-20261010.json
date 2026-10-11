@@ -1,0 +1,74 @@
+{
+  "status": "built_signed_verified_not_installed",
+  "appBuild": "57",
+  "bundleID": "com.buberlo.anyps5ipad",
+  "architecture": "arm64",
+  "appMachOBytes": 32302768,
+  "appMachOSha256": "67acc6d30d0654a756a7e44d4d68fc69399622367b90e75366cf38ad83c4ec40",
+  "uuid": "1CA153A8-F853-3BF9-968F-AD86398556A8",
+  "dsymUuidMatches": true,
+  "allFourCorrectedMslHelperLiteralsPresent": true,
+  "embeddedPEComponents": {
+    "ntdll.dll": {
+      "sha256": "5c87f2726f5f36a1a72a23ad9283616d21b963650385525a03e9e63bc97c9614",
+      "bytes": 1572864,
+      "machine": "0x8664",
+      "arm64ec_code_map": true
+    },
+    "xtajit64.dll": {
+      "sha256": "a91ddd5269d9de587b1ac244c69ba1a3ae8527662785efcf3ee237ce477f44c5",
+      "bytes": 5865472,
+      "machine": "0x8664",
+      "arm64ec_code_map": true
+    },
+    "winevulkan.dll": {
+      "sha256": "458e1368de5d568674436307e74c80fd248ed94708d76468e6b3316260e1f7a4",
+      "bytes": 917504,
+      "machine": "0x8664",
+      "arm64ec_code_map": true
+    },
+    "vulkan-1.dll": {
+      "sha256": "c3db118a995543fce40abae156f008f2cfc67eacf486263817ee67da0a094a15",
+      "bytes": 655360,
+      "machine": "0x8664",
+      "arm64ec_code_map": true
+    }
+  },
+  "jitProducerReceiptSha256": "37d2dd7940ce432c098bf7f88e257dc5a959498131997e04f731d77aec4df4aa",
+  "nativeArchiveReuseProofSha256": "ef2b6ab9d5f4578fc988c382344a1329d89bd7e31ba63fc9cc01cc8f9f38d10b",
+  "reusedPEComponentNames": [
+    "ntdll.dll",
+    "winevulkan.dll",
+    "vulkan-1.dll"
+  ],
+  "copiedLayoutFilesPreserved": 495,
+  "externalFexArchivesPreserved": 7,
+  "native55RollbackPreserved": true,
+  "signedEntitlementsEqualNative54": true,
+  "helperEntitlementsEqualNative54": true,
+  "profilesEqualNative54": true,
+  "deepStrictCodesignVerified": true,
+  "provisioningUpdatesAllowed": false,
+  "hostProfile": {
+    "configuration": "Debug",
+    "cOptimization": 2,
+    "swiftOptimization": "-O",
+    "debugInformation": "dwarf-with-dsym"
+  },
+  "inputReceiptSha256": "9ef10d5e8138610d644e1070ed3c959fb20fb2fc70e528bb748db06e1df8fc12",
+  "appFileHashesSha256": "604256e0221aa776add88c68c4695192c118218876e80fe924e3facc5b4305df",
+  "buildLogSha256": "59b29de3e066ffb790e43d587f8166b3e4f84ac72250704c95d56667a501c784",
+  "installed": false,
+  "launched": false,
+  "deviceTested": false,
+  "githubActionsUsed": false,
+  "boundary": "Local compile/link/sign with a freshly built and disassembly-verified JIT DLL; other native archives and PE modules reuse hash-verified Native55 inputs with their original provenance. No device installation/JIT/gameplay acceptance.",
+  "nativeLoopTopQualificationReceiptSha256": "050c3189f2753399322e95da51752f91fb09092aa192c0f4fd11e49724bbccca",
+  "schema": 1,
+  "date": "2026-10-10",
+  "signedBuildReceiptSha256": "f7449fc2b534a652f25420ce7a4b820326d3a56c2ee628ce7b3c6afdeff41204",
+  "full803DeviceQualified": false,
+  "eightCpuPhasesDeviceQualified": false,
+  "miniGolfPlayable": false,
+  "privateDiagnosticsOrAssetsIncluded": false
+}

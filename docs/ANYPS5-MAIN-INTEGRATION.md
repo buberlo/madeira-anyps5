@@ -1,5 +1,46 @@
 # Full AnyPS5 main integration
 
+## Targeted Apple graphics integration, 2026-10-11
+
+The pin remains `c963432d`; the active local series now has eleven patches.
+It adds merged #1776/#1831 and a reconciled local implementation of open #2015,
+plus the macOS cache-directory repair found by native testing. Actual device
+limits and native-null support remain distinguished from typed fallback images.
+The full stack reverses cleanly, and the native ARM64 compiler, image-profile
+and disk-cache tests pass. The fresh 47-library runtime passes 54 host cases;
+its loaded production PRX passes 538 public cases, nine complete independently
+validated replays and twelve null-pixel materialization cases. Native Windows
+GPU and iPad execution remain separate. [Detailed implementation and fresh qualification](APPLE-GPU-20261011.md).
+
+Native58 is freshly built and signed with the Wine/FEX suspension-repair
+candidate, with its prior rollback preserved. It is not installed or device
+qualified. Its host build does not include or qualify a new game-side graphics
+package. [Native host evidence](evidence/native58-host-20261011.json).
+
+The following six-patch build and gameplay records retain their original scope.
+
+## Current source refresh, 2026-10-10
+
+The canonical pin is now [`c963432d`](https://github.com/boykopovar/AnyPS5/commit/c963432db05f8b35c62e212b3a36494501522fe2), including all 424 subsequently merged commits. Six local patches reproduce 216 reviewed files and reverse exactly. Schema 22 retains descriptor/interpolation policy identities and rejects old caches. The updated exception/audio paths are reconciled with native CPU-state preservation and strict unsupported Audio3d behavior. Targeted null-pixel and MiniGolf sample-pattern regressions are included; source preparation is separate from actual materialization/GPU acceptance.
+
+The fresh complete 47-library build passes all 53 host cases. Its actual production AGC PRX passes 302 public compiler cases, seven complete request replays and twelve separate null-pixel preparation/capture/materialization cases. All twelve game ELFs and 181 prepared package files are verified. These local CPU results qualify neither native AMD nor iPad rendering; the local AVX-context subtest remains unavailable. The source and focused-contract receipts retain their narrower original scopes; the completed successor is recorded in [full runtime qualification](evidence/anyps5-c963-full-runtime-20261010.json). [Source evidence](evidence/anyps5-c963-source-20261010.json), [focused local CPU/GPU contracts](evidence/anyps5-c963-local-contracts-20261010.json).
+
+Native Windows now passes all sixteen prerequisites: CPU/AVX/exception delivery, loaded-library compiler and null-pixel fixtures, physical AMD offscreen readbacks, five prepared-GPU positives and the expected registration-failure control. MiniGolf starts with its original fixed-function interpolation profile restored, then exits after **6.5862776 seconds** with `0xC0000409` at the strict center I/J proof guard, PC 0. No game image or rendered course is captured. These native AMD fixtures do not qualify the Apple/M2 interpolation route. Smart App Control was restored and visually verified by 09:31 UTC after the authorized temporary suspension. [Current Windows outcome](evidence/anyps5-c963-windows-sixteen-prerequisites-game-start-20261010.json).
+
+Native56 is built and signed with FEX #6021. Its in-place installation was observed, but the strict userdata-equality gate failed and the signed Native55 fallback is installed. A complete read-only comparison now confirms unchanged games, saves, Wine, pairing, settings and symlinks; differences are confined to system snapshots and one dyld cache. The original backup and failed gates remain preserved. A fresh backup basis is required before another update; Native56 JIT/game execution remains unqualified. [Host and backup boundaries](evidence/native56-host-20261010.json), [complete data comparison](evidence/native55-readonly-data-comparison-20261010.json), [MiniGolf status](MINIGOLF.md).
+
+The subsequent instrumentation proof correction admits only the exact literal
+M0 write and payload-free thread-trace form needed by the next complete request.
+Its proof and fixtures are consolidated into patch0001. A new policy tag retains
+schema 22 and separates its cache identity from the qualified runtime above.
+Isolated native controls pass; the new 355-case actual-PRX fixture, eight complete
+request replays and game execution remain pending.
+[Correction details](MINIGOLF.md#instrumentation-proof-correction-after-the-windows-run).
+
+The following sections preserve the preceding `d70b8998` integration and its execution evidence.
+
+## Preceding integration, 2026-10-09
+
 The integration adopts the complete AnyPS5 main branch at
 [`d70b89989473ba1f6ae13e44e079e67f1f8a44b0`](https://github.com/boykopovar/AnyPS5/commit/d70b89989473ba1f6ae13e44e079e67f1f8a44b0),
 434 commits after the previous `6e037e98` pin. It includes all upstream changes

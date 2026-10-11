@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "status": "fresh_cpu_contracts_passed_m3_gpu_capability_deferral_full47_build_only",
+  "upstreamPin": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceFreezeSha256": "35fbabf1a3e80f489f3c3c5f09eebeca7e620b1911973eeffe6384db6d783552",
+  "independentGateReceiptSha256": "2c9de47db8a3bb15486e1b72048504f04f36980da8f93176aee8c8e7e3b17a8a",
+  "actualExecutionReceiptSha256": "b6153f405cf10171b7d0132a0364548d1ba13160ecdf8621db229b91aa738c5c",
+  "actualInputHashes": {
+    "agc_driver_graphics_tests.exe": "4d7f1cf7618514db4ffc9b1f01d87238d11196f0871cd308ace86e8bd66f9f93",
+    "guest_raise_exception_tests.exe": "0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02",
+    "agc_shader_disk_cache_tests.exe": "5b0fc964796abbd3f8d00d5e794b698c8d7ffbe46d62d5283d361f672b093e01",
+    "agc_driver_prepared_graphics_tests.exe": "754904cb7889c7ef3f144694e35bfe3721714417b6e0c057141cbbeb663afd96",
+    "agc_driver_prepared_shaders_tests.exe": "c2ea0e879910040facf3daa26cf54283daa81a6b7c9ad300c67e9b7e80e602ac",
+    "libSceAgc.prx": "0e52bf6613df4fac78baf6487bf7c0b4337d646d00ccbdc8928b5da72ca3bfc6",
+    "libSceAgcDriver.prx": "0652a1dfa7877f83326861364ffe316ad6fc98f3eb233fe9335f1195f150c5ee",
+    "libSceAjm.native.prx": "dab8ebabf68a8082e2c0be03e3a591175d61558e05f9ddeb429c2594719f0ed8",
+    "libSceAmpr.prx": "f167a98e1a213ad243072c85868198aa76b27aeb4fec6dab23f2b7240ace0b30",
+    "libSceAppContent.prx": "dfdd9ebf8217adbe749d65e36fb030604d6050de3affd97cd4054d7fc8d1b49c",
+    "libSceAudio3d.prx": "d1dc934fc3be13312c2b0cf67ba3449515b3d64cdd933fbb43b9c68e8a7270d0",
+    "libSceAudioIn.prx": "6dfde336e26073d0b4d73ecc3dc5fe23edc929c05b505d5b6bf3dad52aef9d7e",
+    "libSceAudioOut.prx": "b553728b3f08a06fe285d41ef41f1ae29358e83a7f4564598b5522f336eb627e",
+    "libSceAvPlayer.native.prx": "0b31015b284528bb619ff356aa516aa3c0a2108f19920a61b7b325731dc5f691",
+    "libSceCdlgPlayerReview.prx": "54f40a4e7c7c50fa573261536185add810c31cde7c1726103e91daecb08f2f03",
+    "libSceCommonDialog.prx": "b9e1a7b0a86c34259c2971504b8e5a80f0d9c89b87350e2ecb47abf0c6e54df2",
+    "libSceHmd.prx": "93e94acafaaba2bb5ac0703ca5177d88dedea122643698c4722a05787a2de114",
+    "libSceHttp.prx": "8a4cd1be1891cee15838949322142ecd34c8ed19898b4e634fd1d44e2510a6f8",
+    "libSceHttp2.prx": "684365dee085c05a5c0e732e4e75664ab753bea539075a82de65640339b18a54",
+    "libSceIme.prx": "746cea5b3df86fd57d0987b8cea2fe754c30bc0d0c2acec754b81bb22d6351a5",
+    "libSceImeDialog.prx": "d8b174ee3e1a9c566918137fab39dca1fb549cbe370ed5b1c425eb20137fab95",
+    "libSceJson2.prx": "cd72d36aaf8203397872ad2c009b102b6a26a2612a2d0d8492d3c48c7c7b9b69",
+    "libSceKeyboard.prx": "d99a0c8c928478df0de4409b4083c12b1c55e0d2a75bac78efdc721619407a98",
+    "libSceLibcInternal.prx": "7b3ea820dbee5a7a03a46c60f75812e059dec96935616d5730089d1796f54d3a",
+    "libSceMouse.prx": "9836b2a249ea95d1dd196356e0187b169b45eff3eb4cd476d13a1ba9cd85b761",
+    "libSceMsgDialog.native.prx": "b6cfc5eccfd5064d1f54b83135ba9331273d87eefbd8cd0b066825b4c423bb94",
+    "libSceNet.prx": "fa93aa202f94e0d43b333e8727852fb7c1dd77829bce46775beb2dbf46a370ab",
+    "libSceNetCtl.prx": "c190b7788efe9ed4995d23f4625b4cb366ccdc849b36f12a80cfe88eabcb7d5a",
+    "libSceNpAuth.prx": "986fecdf6e1be3ef50a250786e05bbd3b48e5f4090233c3d55e048c1bd2aa12c",
+    "libSceNpCommerce.prx": "3425af2899072f7d82e32cee9eb9443e901f6a66a774684ccb52c02b83603373",
+    "libSceNpEntitlementAccess.prx": "982692624c7ad3d728e4a10a4a8c64c97104e8035dc415079224fb8b586e78c6",
+    "libSceNpGameIntent.prx": "12d843f2930e52df6990ac9ac76d53abe3db56360dbca76b69bbad138a87dbc0",
+    "libSceNpManager.prx": "839296f99de6caf15ac3a15654b3100e0db645b65983cc29d3c9377f3e516f51",
+    "libSceNpSessionSignaling.prx": "1a7b0da392c45dd9abb89f6739e0cfc87726bbc71152e58c963c0c2436d70aea",
+    "libSceNpTrophy2.prx": "f63b9f2add8e2994926224e981df2f8045fec07393aa760fea1c3d9a411902af",
+    "libSceNpUniversalDataSystem.prx": "cd175c78bc9c618f4f44fb17a9bcdcbc0322cee4aea2f4e754d37f50848393bc",
+    "libSceNpWebApi2.prx": "d629bf8efe62770319c60835b5659eead6225bc63c4d29b865a36873f81cbf94",
+    "libScePad.prx": "511e7e7b0ac7ec82cfdc5acff723ea4b5acefe5bbbfc0e0f83a93d0e391b3dce",
+    "libSceRazorCpu.prx": "61b824f619599a404b4a45583f6078f931f616c717c8b5167c38c4a01177b25d",
+    "libSceRemoteplay.prx": "ca567dc8dd76522d06e7d16ba57f9a900b4c0be0c21d50724ea73f95aec1a2f6",
+    "libSceRtc.prx": "ea0b31da37b8da1f4bc6611d936cf6882fb5075154576dc580f4c2c9715a542d",
+    "libSceRudp.prx": "d219ac39b543faa307ad9280838dbaa435d32da944dbd4caa35e2d5a8e9513f4",
+    "libSceSaveData.native.prx": "3720fdfe04ce355cb790e02542daa8c4658064c050d24014d6f8c29803e9de06",
+    "libSceSaveDataDialog.native.prx": "d69936c257791d2c6b8c0305c19925bdedb60186184d0f7b9641c1905ffc5f85",
+    "libSceSsl.prx": "72685ea781e0b0e9a17f738aab3c2e64c35dff46b07c12bf76a5efbf8787975f",
+    "libSceSysmodule.prx": "c92794bfacbdb7da5b254b1e2352d2436c9c522578b18db6d64c4784be10cee3",
+    "libSceSystemService.prx": "22b30266e1af25273ef84619a9fdf56a2f4566e1345110c66bdadd7a8c0d4007",
+    "libSceUserService.prx": "e73c91a02842a3e14300e9e115e14192e4a9f2975f4b2ac14139ca20d3b6c1e0",
+    "libSceVideoOut.prx": "7e80ff71532c3585606ea976d559113b3ceb398bedc763021ca82ccdd0af6189",
+    "libSceWebBrowserDialog.prx": "0788a3cccbb171bb85c5bb30a07dd1ef43f792cb3b272a58a842854961076ded",
+    "libc.prx": "b3486a9b413cadcbe8301cd922706bf5aa54a2d07f8d44e7568a870e170aeb73",
+    "libkernel.prx": "8eb6492f5561ebebabb20c4026ad45f9c70b854d6e8c25796d2f77d6b0a9be19",
+    "ulobjmgr.prx": "9783cbb1286cddf0dd10f5e178df532dcb9731942dc86f3a0c8c5d28c2912d63",
+    "source-freeze.json": "35fbabf1a3e80f489f3c3c5f09eebeca7e620b1911973eeffe6384db6d783552",
+    "run-local.py": "0c5c57a657d7461ebff3deaefd9add4f873b41781cea08a6f6d8b3cfd0cf7eb1",
+    "focused-capability-contract.py": "2ce54a49ac03a9b6c331a9957fa303ca6a54c05148ce335cc3dc9421037f1250",
+    "run-fresh-focused-capability-gate.py": "58228144141b54070608becd0fe83f80b7c5823a4d325252f27c1374aa673710"
+  },
+  "cpuContracts": {
+    "agc_driver_graphics_tests": {
+      "actualExitCode": 0,
+      "logSha256": "c5e24368974a8f1d04ee550d7a295bc0ff8fa2c31bcf19fea2f9fc2e61a46601",
+      "arguments": [],
+      "environment": []
+    },
+    "guest_raise_exception_tests": {
+      "actualExitCode": 0,
+      "logSha256": "c6ff9865fe5c9d85dfefe15d53683e76d8181b17b59b7cb7fc1cdc5ce0b7260e",
+      "arguments": [],
+      "environment": []
+    },
+    "agc_shader_disk_cache_tests": {
+      "actualExitCode": 0,
+      "logSha256": "f3e2af793f06fffc10c4b42ef49f28a082c7ec74aae6e990f6c8cfd68e0f2883",
+      "arguments": [],
+      "environment": []
+    }
+  },
+  "gpuContracts": {
+    "agc_driver_prepared_graphics": {
+      "actualExitCode": 0,
+      "logSha256": "667cb679112defd309ec51a5ce526ece83a1acf35ad22cb7c67ca90752d79e18",
+      "arguments": [],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1"
+      ]
+    },
+    "agc_driver_prepared_shaders": {
+      "actualExitCode": 1,
+      "logSha256": "f10aea266df1d31835d107e1c6d4392d91f07ec6951e88e0b15e45843087a7d7",
+      "arguments": [],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1"
+      ]
+    },
+    "agc_driver_prepared_shaders_indirect": {
+      "actualExitCode": 1,
+      "logSha256": "d216fb7801c11d74ae776b37e94a4307e5652d6dc329c8b325d7636fd98ccd57",
+      "arguments": [
+        "--indirect"
+      ],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1"
+      ]
+    },
+    "agc_driver_prepared_shaders_uncached": {
+      "actualExitCode": 1,
+      "logSha256": "75f7e04b21691c6e58dd5a24185ebb2a1a76b6df26eff483ecbd468869ff7218",
+      "arguments": [],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1",
+        "APS5_NO_DISPATCH_CACHE=1"
+      ]
+    },
+    "agc_driver_prepared_shaders_debug": {
+      "actualExitCode": 1,
+      "logSha256": "3fda7dfcc3d607830af96d977cf0a4a3e4d20aab05da1a73f479eef5b8bf4c3d",
+      "arguments": [],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1",
+        "APS5_PROFILE_DRAW=1",
+        "APS5_NO_UNLOCKED_DEVICE=1"
+      ]
+    },
+    "agc_driver_prepared_shaders_debug_failure": {
+      "actualExitCode": 1,
+      "logSha256": "e65aee898b069675aef42fa30b4b678763857cab2d8271e877c68197cb672cdb",
+      "arguments": [
+        "--fail-before-registration"
+      ],
+      "environment": [
+        "ANYPS5_NO_SHADER_CACHE=1",
+        "APS5_PROFILE_DRAW=1",
+        "APS5_NO_UNLOCKED_DEVICE=1"
+      ]
+    }
+  },
+  "localGpuDevice": {
+    "name": "Apple M3 Pro",
+    "vendorId": "0x106b",
+    "deviceId": "0x1b000209"
+  },
+  "exceptionDeliveryCount": 601,
+  "cpuAvxActual": "skipped",
+  "allGpuTestsPassed": false,
+  "full47CompilationAuthorized": true,
+  "unresolvedLocalGpuCases": [
+    "agc_driver_prepared_shaders",
+    "agc_driver_prepared_shaders_debug",
+    "agc_driver_prepared_shaders_indirect",
+    "agc_driver_prepared_shaders_uncached"
+  ],
+  "nativeAmdRequiredCases": [
+    "agc_driver_prepared_graphics",
+    "agc_driver_prepared_shaders",
+    "agc_driver_prepared_shaders_indirect",
+    "agc_driver_prepared_shaders_uncached",
+    "agc_driver_prepared_shaders_debug",
+    "agc_driver_prepared_shaders_debug_failure"
+  ],
+  "gpuScope": "local_Wine_MoltenVK_Apple_M3_Pro_only",
+  "ipadGpuQualified": false,
+  "windowsGpuQualified": false,
+  "deviceOrGameplayQualified": false,
+  "githubActions": false,
+  "ownedPrefixCleanup": [
+    {
+      "flag": "-k",
+      "exitCode": 0
+    },
+    {
+      "flag": "-w",
+      "exitCode": 0
+    }
+  ],
+  "rawLogsIncluded": false,
+  "gameAssetsIncluded": false,
+  "producerSha256": "5e4c776908d804b5e39347ca2520aa855ae92a8b029a5e5ea31e2ddaf210ac6d"
+}

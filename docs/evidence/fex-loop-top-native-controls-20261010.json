@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "isolated_exact_loop_top_source_and_native_controls_pass_device_test_pending",
+  "qualificationReceiptSha256": "050c3189f2753399322e95da51752f91fb09092aa192c0f4fd11e49724bbccca",
+  "candidateSourceSha256": "3ae7c7aa0411e425f3ca6565efb25bdce81b0747b531d2017ac2b05bc96a1561",
+  "originalSourceSha256": "124095b22a2f234b16d01af8fce93149e73b91c0dc377c6dda42026393f14e99",
+  "patchSha256": "739384860ae4ee6f5277dccdb9bc884378976457eb1a036ef9513d567df3c4d0",
+  "guard": {
+    "iosHostOnly": true,
+    "privateExceptionCode": "0xe0425355",
+    "exactDispatcherLoopTopOnly": true,
+    "otherDispatcherInstructionsUnchanged": true,
+    "otherExceptionsUnchanged": true
+  },
+  "change": "Spill existing live SRA GPR/vector/flag mappings before context packing while preserving the already published guest RIP at this exact dispatcher entry.",
+  "nativeArm64SnapshotExecuted": true,
+  "nativeCandidateControls": 14,
+  "nativeNonIosControls": 14,
+  "effectiveMutationsDetected": [
+    "no-live-rsp",
+    "no-live-rcx",
+    "broader-dispatcher",
+    "any-exception",
+    "lost-state-rip",
+    "no-live-vector",
+    "no-live-flags"
+  ],
+  "actualProductionArm64ecObjectCompiled": true,
+  "originalExactSourceFailsLiveRspAssertion": true,
+  "stateAndSerializerAbiUnchanged": true,
+  "nativeCallBoundaryFlagsPreservationQualified": false,
+  "originalFailingDeviceDiagnosticFixed": false,
+  "full803DeviceQualified": false,
+  "eightCpuPhasesDeviceQualified": false,
+  "miniGolfPlayable": false,
+  "canonicalCandidatePromoted": false,
+  "rawDiagnosticsOrAssetsIncluded": false,
+  "githubActionsUsed": false
+}

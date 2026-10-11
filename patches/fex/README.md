@@ -4,7 +4,7 @@ The gitlink names the official `FEX-2610` commit
 `14c92681f4d62cf84d901460e0358de09c8847a7`. Apply this series in order with
 `scripts/apply-patches.sh --only fex`.
 
-Rechecked on 2026-10-09 through GitHub's API and live Git refs: the latest
+Rechecked on 2026-10-10 through GitHub's API: the latest
 official monthly release and official `main` both still name this commit.
 The annotated release tag is peeled before comparing source revisions.
 `scripts/check-upstream-heads.py --json` now checks both the monthly release
@@ -51,3 +51,32 @@ The underlying queries, invalidation and interval removal remain active.
 Rebuild all affected FEX objects together because the tracker gains a private
 constant flag; a partial replacement into older allocation code is unsafe.
 This reduces explicit diagnostic work, without claiming a measured speedup.
+
+`0003-arm64ec-checkcall-lut-bounds.patch` applies the two instructions from
+[FEX PR #6021](https://github.com/FEX-Emu/FEX/pull/6021), pinned to commits
+`4dbb046d62c57639fd93d433bb64896df7332ff0` and
+`3a2b1c0b438fed5062bebff0c5f7c8e21879fe48`. The PR was still open when checked;
+it is a local backport on FEX-2610, not a newer merged release. ARM64EC
+`CheckCall` now loads its `uint32_t` lookup-table size with `ldr w17` and rejects
+an offset equal to that size with `b.hs`. This prevents an alignment-sensitive
+64-bit load and an out-of-bounds entry read. Neither defect is an established
+MiniGolf failure cause or measured FPS improvement.
+
+Run `python3 scripts/check-fex-checkcall.py` on an ARM64 Mac. Pass
+`--pe-compiler /path/to/arm64ec-w64-mingw32-clang` when llvm-mingw is not on PATH;
+use a fresh `--output` directory for repeat runs. The test extracts the actual
+`CheckCall` body and changes only Darwin object-format symbols and relocations.
+Twenty native cases cover empty tables, first/last entries, exact-end and larger
+offsets, below-base addresses, nonzero bytes after the size, and both 8-byte and
+4-but-not-8-byte size alignment. Protected boundary pages detect deliberate
+old-width and old-inclusive-bound mutations. A separate Windows COFF fixture
+verifies that the repaired load links with 4-byte alignment while the old load
+fails; Darwin linking alone does not establish this Windows relocation rule.
+The receipt states explicitly when the COFF check is unavailable.
+
+Changing only `Module.S` requires a new ARM64EC `xtajit64.dll` and app
+repackaging/signing. Unchanged native FEXCore and WOW64 archives can be reused
+only after checking their hashes and ABI against the signed baseline. The
+production object's disassembly must contain both repaired instructions.
+Native assembly tests and a PE link do not replace Wine/FEX execution or iPad
+call, exception and protected-memory regression checks.

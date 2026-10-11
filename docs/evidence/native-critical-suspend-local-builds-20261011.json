@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "atUtc": "2026-10-10T19:40:49.135657+00:00",
+  "status": "isolated_critical_suspend_candidate_locally_built_not_signed_installed_or_runtime_qualified",
+  "problem": "Native57 sampler places the main waiter in the RPM allocator lock; owner and outer cycle remain unknown.",
+  "candidateOnly": true,
+  "canonicalSourcesPromoted": false,
+  "design": {
+    "scope": "Wine native per-thread SIGUSR1 mask and server registration around FEX lock/lifecycle critical sections",
+    "abiBytes": 40,
+    "authoritativeIdentity": "Wine native TEB, not raw FEX x18",
+    "wireRequest": "ios_fex_critical_scope",
+    "protocolVersionBefore": 930,
+    "protocolVersionAfter": 931,
+    "acknowledgement": "Only actual interrupted-context capture completes a pending context.",
+    "deferral": "Only the exact current pending capture and same direct requester are eligible; hard/process/debug/startup stops remain effective.",
+    "pairing": "Preserve nested LIFO registrations, real lock release order and complete prior signal mask."
+  },
+  "localControls": {
+    "nativeMaskChecks": 132,
+    "realPthreadMasksAndSignals": true,
+    "productionServerBodiesWithAdapters": true,
+    "fullServerQueueAndTimerRuntime": false,
+    "wineQualificationSha256": "53fbb1fde3d5b4504578194baa21834dd03a42d52d01e5c43d04d669b5ccdb08",
+    "fexHappyCases": 24,
+    "fexFatalCases": 23,
+    "nonIosVariants": 3,
+    "nonIosCasesPerVariant": 3,
+    "fexNativeQueryStubOnly": true,
+    "fexQualificationSha256": "a38f8a76d4b189cdaa5c27d7ffc170cbdb4c9d2d28511aaab5efff99219a57c7"
+  },
+  "nativeWine": {
+    "freshObjectCount": 6,
+    "archiveCount": 2,
+    "unchangedMembersByteExact": 79,
+    "receiptSha256": "e538fd0cfe543d84ebfe3bf25e48c8ab08e95542adc151603a8af8ec700f5434",
+    "archives": {
+      "libntdll_unix.a": "11d4366a34d27015849f6709fa23fae953d95febce768ef295eb13ba1d456593",
+      "libwineserver.a": "a2d09278456884c3da135d0874c522764d13da8da03f07912bb086a998621c62"
+    },
+    "sdkDependencyHashesFrozenBeforeCompilation": false
+  },
+  "arm64ecFex": {
+    "freshObjectCount": 187,
+    "dllSha256": "a7d7f381aea5472c8542fb0601c5916b8d70e03ca56ce62d809801392e79089d",
+    "receiptSha256": "5464ec40f8fdaf86c0dd4182c094b8f5f994667d3c85fab194d73ebcca7459e3",
+    "exportsUnchanged": true,
+    "importContractsUnchanged": true,
+    "checkCallDisassemblyVerified": true,
+    "supplementaryArenaManagerBuilt": false
+  },
+  "nativeFexArchiveQualificationPending": false,
+  "native58Signed": false,
+  "native58Installed": false,
+  "continuing50Qualified": false,
+  "full803Qualified": false,
+  "cpuEightQualified": false,
+  "gpuQualified": false,
+  "gamePlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Local source, native-mask controls, stubbed FEX controls and fresh binary builds. These do not prove the original allocation/suspend cycle is repaired on the iPad.",
+  "nativeArm64Fex": {
+    "receiptSha256": "a647766fa9060004c0d12cffab5dafeabdde41260cc8e9645430cd29aceefdba",
+    "freshObjectCount": 43,
+    "freshArchiveCount": 2,
+    "reusedArchiveCount": 5,
+    "exactArchiveMembersVerified": true,
+    "nativeGlobalSymbolContractsEqual": true,
+    "nativeGuardActive": false,
+    "sameFullDllLineage": true,
+    "sourceAndGeneratedHeaderRouteFrozen": true
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "status": "sixteen_native_windows_prerequisites_passed_game_new_interpolation_guard_pc72_not_playable",
+  "date": "2026-10-10",
+  "referenceRun": 8,
+  "anyps5Commit": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceFreezeSha256": "6d7718b775d286ec788936b16251aa413ffecaa413c7818d29159ce2e1d95b92",
+  "shaderCache": {
+    "schema": 22,
+    "sourceVersion": "0x3483c09582e11677",
+    "interpolationPolicy": "center-ij-unused-m0-trace-v1"
+  },
+  "titleId": "PPSA03647",
+  "version": "01.000.000",
+  "verifiedPayloadFiles": 256,
+  "verifiedGameFiles": 181,
+  "requiredPrerequisites": 16,
+  "nativePrerequisites": [
+    {
+      "name": "windows_exception_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "exception_personality_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_raise_exception_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_memory_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_raise_exception_default_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "raw_log_output_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "agc_unused_barycentric_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "agc_actual_driver_public_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "physical-gpu",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_graphics",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_indirect",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_uncached",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_debug",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_debug_failure",
+      "status": "passed_expected_registration_rejection",
+      "exitCode": 1,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "null-pixel-materialization",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    }
+  ],
+  "gpuDevice": {
+    "name": "AMD Radeon 780M Graphics",
+    "vendorId": 4098,
+    "deviceId": 5567,
+    "driver": "31.0.21029.6002"
+  },
+  "hostOs": {
+    "name": "Windows 11 Pro",
+    "version": "10.0.26300"
+  },
+  "preparedGpuPositiveCases": 5,
+  "expectedRegistrationRejectionCases": 1,
+  "expectedRegistrationRejectionExitCode": 1,
+  "everyGpuSelectionMatchesPhysicalAmdDevice": true,
+  "nativePublicCompilerCases": {
+    "standalone": 355,
+    "actualProductionPrx": 355,
+    "sameOrderedNames": true
+  },
+  "nativeExceptionDeliveries": {
+    "explicitAvx": 803,
+    "default": 701,
+    "privateRxEach": 1,
+    "nativeWaitCasesEach": 20
+  },
+  "nativeNullPixelCases": 12,
+  "nativeNullPixelGpuExecution": false,
+  "gameStarted": true,
+  "gameSeconds": 6.701467,
+  "gameExitCode": -1073740791,
+  "gameExitHex": "0xC0000409",
+  "captureHelperExitCode": 0,
+  "captureStatus": "not_captured",
+  "captureReason": "Own game exited during capture",
+  "ownedGameImageCaptured": false,
+  "captureHelperExitDoesNotProveImage": true,
+  "renderedCourseVerified": false,
+  "gameplayVerified": false,
+  "iPadExecutionQualified": false,
+  "ownGameTreeJoined": true,
+  "ownReferenceTreeJoined": true,
+  "listenerClosed": true,
+  "returnedLogMemberCount": 41,
+  "rawEvidenceSha256": "aca5935d2c61fe2ce295d63c6aa6d934a1846d97dc94ea6dd95e8cda83bf5907",
+  "transferReportSha256": "a2a3e07083e3bab35487640b33562254ca858bf004028e2c9aa5214526688dcc",
+  "listenerLifetimeReceiptSha256": "07b69e9e1944379fdb245fa20162a5099c61c16518683d015a3e870e226eba03",
+  "sealedPacketReceiptSha256": "666bfe77179b780fcf23c90d246df7e0c492230fca3aaf1fb7c966207bec48a9",
+  "securityRestorationVerifiedByThisReceipt": true,
+  "githubActionsUsed": false,
+  "privateAssetsIncluded": false,
+  "rawShaderDiagnosticsIncluded": false,
+  "privateDataFileHashesPublished": false,
+  "gameVulkanInitializationObserved": true,
+  "gameProfileFixedFunctionInterpolationRestored": true,
+  "actualSwapchain": [
+    837,
+    471
+  ],
+  "actualSwapchainImages": 3,
+  "shaderProgramCounter": 72,
+  "firstGameException": "Strict fixed-function interpolation validation rejected a new program at pc=72",
+  "serializedRequestVersion": 15,
+  "previousPc0FailureObserved": false,
+  "loaderApplicationControlFailureObserved": false,
+  "privateNewShaderRequestRetainedLocally": true,
+  "securityRestorationEvidenceSha256": "9c675b6f7609e8eade664d8a113d403a4880ea578b9368430ae0b5c751a3bd83",
+  "securityRestoration": {
+    "rootWindowsSecurityUiAndUacConfirmed": true,
+    "uiOnWindowsClockMinute": "13:19",
+    "independentRegistryValue": 1,
+    "registryWindowsClockMinute": "13:22",
+    "exactActionUtcSecondsEstablished": false,
+    "otherSecurityProtectionsChanged": false,
+    "networkSettingsChanged": false
+  }
+}

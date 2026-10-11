@@ -1,5 +1,5 @@
 diff --git a/core/libs/prx/libSceAudioOut/src/AudioOut.cpp b/core/libs/prx/libSceAudioOut/src/AudioOut.cpp
-index a6697a1..af84500 100644
+index 5dcdd282..f7db3476 100644
 --- a/core/libs/prx/libSceAudioOut/src/AudioOut.cpp
 +++ b/core/libs/prx/libSceAudioOut/src/AudioOut.cpp
 @@ -12,6 +12,7 @@
@@ -8,9 +8,9 @@ index a6697a1..af84500 100644
  #include "SDL.h"
 +#include "AudioOutIngressTrace.hpp"
  #include "SceTypes.hpp"
+ #include "prx/libc/include/PreciseWait.hpp"
  #include "prx/libkernel/Time/include/Time.hpp"
- 
-@@ -92,6 +93,7 @@ struct Port {
+@@ -93,6 +94,7 @@ struct Port {
      std::uint64_t virtualQueueEnd = 0;
      SDL_AudioDeviceID device = 0;
      SDL_AudioSpec spec = {};
@@ -18,7 +18,7 @@ index a6697a1..af84500 100644
  };
  
  static std::mutex g_mutex;
-@@ -130,6 +132,7 @@ static bool openDevice(Port& port) {
+@@ -132,6 +134,7 @@ static bool openDevice(Port& port) {
  }
  
  static void closeDevice(Port& port) {
@@ -26,9 +26,9 @@ index a6697a1..af84500 100644
      if (port.device != 0 && SDL_WasInit(SDL_INIT_AUDIO) != 0) {
          SDL_ClearQueuedAudio(port.device);
          SDL_CloseAudioDevice(port.device);
-@@ -192,10 +195,12 @@ static const void* prepareBuffer(const Port& port, const void* data, std::vector
+@@ -200,17 +203,21 @@ static void sleepUs(std::unique_lock<std::mutex>& lock, std::uint64_t us) {
  
- static void queueAudio(Port& port, const void* data) {
+ static void queueAudio(Port& port, const void* data, std::unique_lock<std::mutex>& lock) {
      if (data == nullptr) {
 +        bool cleared = false;
          const std::uint64_t waitStart = sceKernelGetProcessTime();
@@ -38,10 +38,7 @@ index a6697a1..af84500 100644
 +                cleared = true;
                  break;
              }
-             struct timespec req{};
-@@ -203,9 +208,11 @@ static void queueAudio(Port& port, const void* data) {
-             req.tv_nsec = static_cast<long>(DRAIN_SLEEP_US * 1000ULL);
-             nanosleep(&req, nullptr);
+             sleepUs(lock, DRAIN_SLEEP_US);
          }
 +        AudioOutIngressTrace::Event(port.ingressTrace, cleared ? "null-drain-clear" : "null-drain", true, cleared);
          return;
@@ -51,7 +48,7 @@ index a6697a1..af84500 100644
      std::vector<std::uint8_t> prepareBuf;
      const void* prepared = prepareBuffer(port, data, prepareBuf);
      const std::uint32_t preparedSize = port.samplesNum *
-@@ -218,6 +225,7 @@ static void queueAudio(Port& port, const void* data) {
+@@ -223,6 +230,7 @@ static void queueAudio(Port& port, const void* data, std::unique_lock<std::mutex
          port.spec.format, port.spec.channels, port.spec.freq);
  
      if (cvtResult < 0) {
@@ -59,7 +56,7 @@ index a6697a1..af84500 100644
          throw std::runtime_error(std::string("SDL_BuildAudioCVT: ") + SDL_GetError());
      }
  
-@@ -231,6 +239,7 @@ static void queueAudio(Port& port, const void* data) {
+@@ -236,6 +244,7 @@ static void queueAudio(Port& port, const void* data, std::unique_lock<std::mutex
          cvt.buf = convertBuf.data();
          cvt.len = static_cast<int>(preparedSize);
          if (SDL_ConvertAudio(&cvt) < 0) {
@@ -67,16 +64,14 @@ index a6697a1..af84500 100644
              throw std::runtime_error(std::string("SDL_ConvertAudio: ") + SDL_GetError());
          }
          queueData = cvt.buf;
-@@ -249,6 +258,7 @@ static void queueAudio(Port& port, const void* data) {
+@@ -254,12 +263,16 @@ static void queueAudio(Port& port, const void* data, std::unique_lock<std::mutex
      while (SDL_GetQueuedAudioSize(port.device) > minQueued) {
          if (sceKernelGetProcessTime() - waitStart > DRAIN_TIMEOUT_US) {
              SDL_ClearQueuedAudio(port.device);
 +            AudioOutIngressTrace::Event(port.ingressTrace, "pacing-timeout-clear", false, true);
              break;
          }
-         struct timespec req{};
-@@ -257,7 +267,10 @@ static void queueAudio(Port& port, const void* data) {
-         nanosleep(&req, nullptr);
+         sleepUs(lock, DRAIN_SLEEP_US);
      }
  
 -    if (SDL_QueueAudio(port.device, queueData, queueSize) < 0) {
@@ -87,7 +82,7 @@ index a6697a1..af84500 100644
          throw std::runtime_error(std::string("SDL_QueueAudio: ") + SDL_GetError());
      }
      // APS5_LOG_OUT("device=%u type=%d bytes=%u queued=%u", port.device, port.type, queueSize, SDL_GetQueuedAudioSize(port.device));
-@@ -352,6 +365,14 @@ int APS5_VABI sceAudioOutOpen(int userId, int type, int index, std::uint32_t len
+@@ -347,6 +360,14 @@ int APS5_VABI sceAudioOutOpen(int userId, int type, int index, std::uint32_t len
              if (type != PORT_TYPE_VIBRATION) {
                  openDevice(port);
              }
@@ -104,7 +99,7 @@ index a6697a1..af84500 100644
              return i + 1;
 diff --git a/core/libs/prx/libSceAudioOut/src/AudioOutIngressTrace.hpp b/core/libs/prx/libSceAudioOut/src/AudioOutIngressTrace.hpp
 new file mode 100644
-index 0000000..c369f74
+index 00000000..c369f746
 --- /dev/null
 +++ b/core/libs/prx/libSceAudioOut/src/AudioOutIngressTrace.hpp
 @@ -0,0 +1,413 @@

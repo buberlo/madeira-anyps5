@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "production_partial_pass_wrong_driver_fixture_failed",
+  "qualificationReceiptSha256": "0a7e17ba9c580c80d37f999ab0d653cefac0d05353f056ba1a9b661f5f95b80e",
+  "productionDriverSha256": "54b71b606cf695bbf5becca96c734d46b4ed2399924087153735ce3946eba7ac",
+  "actualPublicShaderCasesPassed": 538,
+  "completePrivateRequestReplaysPassed": 9,
+  "referenceSpirvAndBindingLayoutsUnchanged": true,
+  "namedExportCount": 3725,
+  "exportNamesOrdinalsAndForwardersUnchanged": true,
+  "importsUnchanged": true,
+  "additionalPrivateHelperExportsExcluded": 6,
+  "originalPc112RegistrationPositivePassed": true,
+  "failedControl": {
+    "name": "original-pc112-registration-wrong-driver",
+    "expectedExitCode": 1,
+    "actualExitCode": 3,
+    "cause": "The deliberately different driver file was absent. The filesystem identity comparison threw instead of returning the intended identity rejection."
+  },
+  "remainingRegistrationNullAndHostCasesQualified": false,
+  "ownedWinePrefixCleanupWaitCompleted": true,
+  "gpuExecuted": false,
+  "deviceExecuted": false,
+  "miniGolfPlayable": false,
+  "githubActionsUsed": false,
+  "privateShaderBytesOrGameAssetsIncluded": false,
+  "boundary": "This attempt remains failed. A separate recipe repair must provide an existing different driver and rerun the complete qualification; accepting the abort exit code would not repair the control."
+}

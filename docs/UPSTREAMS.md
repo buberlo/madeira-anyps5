@@ -1,12 +1,11 @@
 # Pinned upstreams
 
-Recorded 2026-10-08. `git submodule status` checks local checkouts. Dates below are the
-commits we resolved while creating the pins, not a claim about later
-upstream movement.
+Rechecked 2026-10-10. `git submodule status` checks local checkouts. The table
+records fixed source inputs; subsequent upstream movement needs a new review.
 
 | Path | Remote | Commit | Branch |
 | --- | --- | --- | --- |
-| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `6e037e9899efb7439913a6e1151b901a92c9c9c8` | `main` |
+| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `c963432db05f8b35c62e212b3a36494501522fe2` | `main` |
 | `upstreams/Madeira` | https://github.com/willfaust/Madeira.git | `48f976429c189f8396e23d251d8a82f43c705922` | `main` |
 | `upstreams/FEX` | https://github.com/FEX-Emu/FEX.git | `14c92681f4d62cf84d901460e0358de09c8847a7` | `FEX-2610` tag |
 | `upstreams/wine` | https://github.com/willfaust/wine.git | `257f271cfffed9f22f7987cac53bc00095d092fe` | `madeira-lgpl` |
@@ -35,12 +34,55 @@ commits AnyPS5 itself recorded. Vulkan-Headers inside that pin is
 Clones are shallow (`--depth 1`) except where a submodule add had already
 fetched a branch tip. The gitlink is the full commit id either way.
 
-The [2026-10-08 refresh report](UPSTREAM-REFRESH.md) documents the complete
-AnyPS5 update and reconciliation of the local patch series. The table records
-heads observed at 09:34 UTC, plus the official monthly FEX release. Madeira
-and Wine required no additional pin change. Later upstream movement is separate.
+The [2026-10-08 refresh report](UPSTREAM-REFRESH.md) preserves the earlier
+AnyPS5 update and reconciliation of the local patch series. The current table
+records the 2026-10-10 check at 03:11 UTC, retaining the official monthly FEX
+release. Madeira and Wine required no additional pin change. Later upstream
+movement is separate.
 Installed game packages have separate provenance and do not change when this
 source pin is updated.
+
+## Targeted Apple GPU additions, 2026-10-11
+
+The AnyPS5 pin remains `c963432d`. Its existing macOS/Apple changes #927, #1565,
+#1571 and #1580 are retained. Three later changes are explicit local backports:
+merged #1776 (`b7502114`) spills oversized compute LDS to a per-workgroup storage
+buffer; merged #1831 (`b23bd732`) preserves complete descriptor-array ranges
+during draw snapshots; open #2015 (`b288aa84` head) supplies typed placeholder
+images with stricter local feature, ownership and policy checks. A separate
+macOS cache-path correction was required by the unchanged native cache test.
+The active series now contains eleven patches and reverses cleanly.
+
+These scoped additions do not claim the entire later upstream main branch.
+Native ARM64 CPU tests pass. The fresh 47-library Windows HLE build also passes
+54 host cases under local Wine, plus 538 actual-PRX compiler cases, nine full
+replays and twelve null-pixel cases. Actual GPU/game qualification remains
+separate. [Implementation, source identities and limitations](APPLE-GPU-20261011.md).
+
+## MiniGolf refresh, 2026-10-10
+
+The complete AnyPS5 snapshot adds all 424 merged commits after `d70b8998`.
+All six local patches were reconciled, preserving protected guest memory,
+AVX/flags delivery, module lifecycle, save behavior, strict Audio3d errors,
+descriptor policy and the EXEC-aware interpolation proof. Fresh application
+matches 216 reviewed files exactly; reversal restores their upstream contents
+and modes. Schema 22 rejects prior shader caches and retains local policy
+metadata. A new installation uses a distinct shader-cache directory.
+
+The local graphics patch also adopts the null-pixel fixes from
+[#1902](https://github.com/boykopovar/AnyPS5/pull/1902) and
+[#2022](https://github.com/boykopovar/AnyPS5/pull/2022), retaining refusal of
+color-writing draws without a pixel program. The MiniGolf sample pattern
+`0x22eea66a` has a production-decoder regression. Existing format/sample queries,
+guest-memory import, invalidation and writeback remain required. This is source
+integration; the fresh complete runtime, native Windows comparison and physical
+iPad draw must be qualified separately.
+
+Madeira, Wine, MoltenVK and official FEX main/release match the pins above.
+FEX #6021 is a separate unmerged backport. Madeira #227 remains excluded;
+#228 is an audio experiment requiring measured underruns, and #211 is reserved
+for an observed alias fault. No optional change is treated as a MiniGolf fix
+without matching runtime evidence.
 
 ## Checking for subsequent updates locally
 
@@ -61,6 +103,11 @@ pin. Preserve historical device evidence and qualify newly built packages
 separately. Do not use floating branches as build inputs. No GitHub Actions are
 used; this command does not schedule automatic runs.
 
+## Historical checkpoints, 2026-10-08
+
+The following records describe earlier source and installed-package states;
+the current pins and qualification status are recorded above.
+
 The same-day [follow-up snapshot](evidence/anyps5-followup-20261008.json)
 adds all 200 subsequently merged AnyPS5 commits at `8388121a`. All 33 local
 patches were reconciled, including the newer HTTP2 completion routing, NP
@@ -72,8 +119,12 @@ qualification.
 
 The [FEX-2610 integration record](evidence/fex-2610-integration-20261008.json)
 separates source reconciliation, builds and bounded device checks. The FEX pin
-now names the official release; [two reproducible patches](../patches/fex/README.md)
-carry the iOS port and allocator adaptations. Monthly releases are always checked;
+now names the official release. Its [four active patches](../patches/fex/README.md)
+carry the iOS port, allocator adaptations, optional diagnostics and the isolated
+ARM64EC lookup correction from PR #6021. The latter passes 20 native assembly
+cases, a Windows COFF alignment check and a fresh full DLL build; device execution
+and any MiniGolf benefit remain separate. [CheckCall qualification](evidence/fex-arm64ec-checkcall-20261010.json).
+Monthly releases are always checked;
 `--fex-release` also emits that result as a separate JSON field for older consumers.
 The earlier [merge audit](evidence/fex-2610-ios-port-audit-20261008.json) remains a
 historical pre-integration record.

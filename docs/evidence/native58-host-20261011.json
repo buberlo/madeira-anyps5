@@ -1,0 +1,71 @@
+{
+  "status": "built_signed_verified_not_installed",
+  "appBuild": "58",
+  "bundleID": "com.buberlo.anyps5ipad",
+  "architecture": "arm64",
+  "appMachOBytes": 32305696,
+  "appMachOSha256": "ced9d5bc25ff3cb1e9b05d56486ce649e8e4f08621534abe5664a4c6101dce45",
+  "uuid": "4BA5691B-213B-3BAD-9747-9542CC2642E1",
+  "dsymUuidMatches": true,
+  "allFourCorrectedMslHelperLiteralsPresent": true,
+  "embeddedPEComponents": {
+    "ntdll.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 1572864,
+      "machine": "0x8664",
+      "sha256": "5c87f2726f5f36a1a72a23ad9283616d21b963650385525a03e9e63bc97c9614"
+    },
+    "vulkan-1.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 655360,
+      "machine": "0x8664",
+      "sha256": "c3db118a995543fce40abae156f008f2cfc67eacf486263817ee67da0a094a15"
+    },
+    "winevulkan.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 917504,
+      "machine": "0x8664",
+      "sha256": "458e1368de5d568674436307e74c80fd248ed94708d76468e6b3316260e1f7a4"
+    },
+    "xtajit64.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 5885952,
+      "machine": "0x8664",
+      "sha256": "a7d7f381aea5472c8542fb0601c5916b8d70e03ca56ce62d809801392e79089d"
+    }
+  },
+  "freshNativeFexArchiveCount": 2,
+  "freshNativeFexObjectCount": 43,
+  "reusedNativeFexArchiveCount": 5,
+  "reusedPEComponentNames": [
+    "ntdll.dll",
+    "winevulkan.dll",
+    "vulkan-1.dll"
+  ],
+  "native57RollbackPreserved": true,
+  "deepStrictCodesignVerified": true,
+  "provisioningUpdatesAllowed": false,
+  "hostProfile": {
+    "cOptimization": 2,
+    "configuration": "Debug",
+    "debugInformation": "dwarf-with-dsym",
+    "swiftOptimization": "-O"
+  },
+  "inputReceiptSha256": "912e6ba96b3276cea0498a9cf15c191042985e015558dacf5daedd772719f82b",
+  "appFileHashesSha256": "5d1d90483444a9eb003aee449ac817073eb954a9a2a166edcf12c1b24d048a63",
+  "buildLogSha256": "21fe85324753074d6c86d20948f4f193d4c19ba5e71b848c0f8b3fabdb123c1b",
+  "installed": false,
+  "launched": false,
+  "deviceTested": false,
+  "deviceOperations": false,
+  "full803Qualified": false,
+  "cpuEightQualified": false,
+  "runtimeAccepted": false,
+  "gamePlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Local Native58 compile/link/sign only: corrected six-object Wine archives, fresh full ARM64EC JIT, 43 freshly qualified native FEX objects in two archives plus five exact unaffected archives, physical candidate source/header route. No installation, JIT, CPU, GPU, userdata preservation or gameplay acceptance.",
+  "schema": 1,
+  "date": "2026-10-11",
+  "signedBuildReceiptSha256": "5d39ce81a46b331d0b1f72991f1f356da436443f858422e7299834c12d98dcef",
+  "privateDiagnosticsOrAssetsIncluded": false
+}

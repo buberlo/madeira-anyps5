@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "title": "MiniGolf instrumentation proof: rebuilt production CPU qualification",
+  "status": "production_raw47_composition_and_cpu_contracts_passed_gpu_and_game_rerun_pending",
+  "upstreamAnyPS5": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceCorrection": {
+    "exactLiteralM0AndPayloadFreeThreadTraceOnly": true,
+    "strictInterpolationGuardsRetained": true,
+    "sourceCheckpointPreserved": "minigolf-instrumentation-proof-source-20261010.json"
+  },
+  "productionBuild": {
+    "freshProductionTranslationUnits": 3,
+    "freshTranslationUnitNames": [
+      "InstructionTranslator.cpp",
+      "ShaderDiskCache.cpp",
+      "UnusedBarycentricProof.cpp"
+    ],
+    "retainedUnchangedObjects": 888,
+    "runtimeModules": 47,
+    "freshlyLinkedRuntimeModules": 1,
+    "byteIdenticalReusedRuntimeModules": 46,
+    "productionExportNamesOrdinalsAndForwardersUnchanged": true,
+    "productionImportsUnchanged": true,
+    "shaderCache": {
+      "format": 22,
+      "sourceVersion": "0x3483c09582e11677",
+      "policyTag": "center-ij-unused-m0-trace-v1",
+      "distinctFromPrecedingRuntime": true
+    }
+  },
+  "actualCpuValidation": {
+    "importedProductionPublicCases": 355,
+    "orderedCaseNamesVerified": true,
+    "original302CasesPreserved": true,
+    "additionalPublicCases": 53,
+    "completePrivatePrepareCaptureMaterializeReplays": 8,
+    "precedingSevenSpirvAndLayoutOutputsByteIdentical": true,
+    "newCompleteRequestSerializer": 15,
+    "nullPixelPrepareCaptureMaterializeCases": 12,
+    "wrongLoadedDriverControlsRejected": true,
+    "freshHostCases": 53,
+    "directHostCases": 40,
+    "registeredHostCases": 13,
+    "hostFailures": 0,
+    "hostCTestSkips": 0,
+    "separateLocalAvxContextSubtestUnavailable": true,
+    "freshlyRelinkedStaticShaderHostExecutables": 7,
+    "byteIdenticalRetainedHostExecutables": 45,
+    "twoPreparedGpuExecutablesRelinkedButNotExecuted": true,
+    "ownedCommandRecordsVerified": 98,
+    "actualLoadedProductionLibraryVerified": true,
+    "completeWineRuntimeAndProviderClosureReadBack": true
+  },
+  "preservedHistory": {
+    "initialSelectivePhaseRemainsFailed": true,
+    "failureWasMissingRealTestOnlyHostLibrary": "libSceRudp",
+    "actual355EightAndNull12FromThatPhaseRetained": true,
+    "separateFreshHostContinuationPassed": true,
+    "testOnlyLibraryReusedFromHashQualifiedActualProvider": true,
+    "testOnlyLibraryNotAddedToGame47": true,
+    "earlierCacheTimeoutRemainsUnresolved": true
+  },
+  "scope": {
+    "localCpuQualification": true,
+    "newGpuExecution": false,
+    "newNativeWindowsGameRun": false,
+    "newIpadExecution": false,
+    "gameImageCaptured": false,
+    "courseRendered": false,
+    "gameplayVerified": false,
+    "fpsImprovementClaimed": false,
+    "privateGameDataPublished": false,
+    "rawPrivateDiagnosticsPublished": false,
+    "githubActions": false
+  }
+}

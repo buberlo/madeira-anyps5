@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "native56_seven_of_eight_initial_cpu_phases_passed_not_gpu_or_game_qualification",
+  "nativeBuild": 56,
+  "device": "iPad14,10",
+  "deviceOs": "27.0.1",
+  "phases": [
+    {
+      "phase": "cpu-avx2",
+      "seconds": 78.59108479198767,
+      "checks": {
+        "cases": 6,
+        "mode": "avx2",
+        "referenceSeed": 4660
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "0095b3531ea4c2acdc23c9c08f451fe2b117fecbe4e3c1d82af756eea1ed61df",
+      "logSha256": "a8607d0936d02e209a72c943ecf0323a6f99cb74192c4601c126a66ad163e9ae"
+    },
+    {
+      "phase": "allocator-collisions",
+      "seconds": 106.2782913330011,
+      "checks": {
+        "cases": 18,
+        "productionSourceStandalone": true,
+        "actualLoadedLibcQualified": false
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "1eb8bb40a56baa61c2b395ed21cc569aeeba4870dc8df3e122186a977248feaf",
+      "logSha256": "2fcfaf43d66f414c83777787ead09bbf1c622d234f0cae886c2dcf351d30d077"
+    },
+    {
+      "phase": "memory-4gib",
+      "seconds": 138.7414233329764,
+      "checks": {
+        "cases": 53,
+        "censusRegions": 1,
+        "virtualBytes": 4294967296,
+        "resident4GiBClaim": false,
+        "nativeAddressSpaceQualified": false
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "9b7636e36c703f22a32f0c1c45ad6c1d8f17614bb415e80abda1790f03d64889",
+      "logSha256": "531c4492f150d36b5394afd10d83f4ae2289badcc252e700e23a060db007ec63"
+    },
+    {
+      "phase": "protected-store-state",
+      "seconds": 91.03773470799206,
+      "checks": {
+        "cases": 192,
+        "faults": 192,
+        "nestedFaults": 96,
+        "rejectedRequests": 864
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "ef4d9b82ca689c5280ac20f2085cb04f309f16273260740e4815b4fe9dc6ba65",
+      "logSha256": "b08b87e0e826eef0f439e6055cdbc4b866802ef8da8bb3a050aab1c7c2e53359"
+    },
+    {
+      "phase": "pending-avx-unprotected",
+      "seconds": 75.68497499998193,
+      "checks": {
+        "cases": 6,
+        "faults": 0,
+        "protected": false
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "f58ee57c4f75f2deaebeeaef4ad415b25ad76d8333a54d91089f9c2c983cbb90",
+      "logSha256": "be6eb605bf55138880b44b8d1794b082a4686608bc13cb036d2c984a9fff3e25"
+    },
+    {
+      "phase": "pending-avx-protected",
+      "seconds": 75.9683216669946,
+      "checks": {
+        "cases": 6,
+        "faults": 6,
+        "protected": true
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "3bdbf0b0a82911b071961197218e3e7a4fafc77cad59a55e00f9dfcc7c9a425d",
+      "logSha256": "b22fae977855159c71d0e74cf2e82e6722567dae9c24674dd34f237e0b7e1708"
+    },
+    {
+      "phase": "guest-exceptions",
+      "seconds": 136.0147850830108,
+      "checks": {
+        "cases": 6,
+        "actualRelinkedGuestElf": true
+      },
+      "guestExitCode": 0,
+      "guestExitedBeforeCollectorTermination": true,
+      "duringFixtureLogReads": 0,
+      "preTerminationLogReads": 1,
+      "libraryRestoredByteForByte": true,
+      "protectedMetadataPreserved": true,
+      "ownProcessesClosed": true,
+      "receiptSha256": "1883d5be7597d16ce913c529bb34a266fea891d57c7f6436ddd210ee34912e72",
+      "logSha256": "d6dc3828bffe48a7795a96d49fa1ea086835fceac1395131870926de77c4b301"
+    }
+  ],
+  "jitPoolMiB": 512,
+  "remainingRequiredPhases": [
+    "guest-raise-exception"
+  ],
+  "allocatorLoadedLibcQualified": false,
+  "fourGiBResidentClaim": false,
+  "nativeAddressSpaceQualified": false,
+  "gpuQualified": false,
+  "gamePlayable": false,
+  "performanceQualified": false,
+  "fullSaveInventoryRecheckedDuringCpuPhases": false,
+  "collectorSourceFreezeSha256": "2c63b1427ed693caf72aed9e76c9c5d9625950136618fd96bb7bae69a2254a49",
+  "historicalFailedReceiptsUnmodified": true,
+  "githubActionsUsed": false,
+  "privateAssetsIncluded": false,
+  "rawLogsIncluded": false,
+  "failedRaiseAttemptAndSeparateRecovery": {
+    "fixtureLaunched": false,
+    "libraryWasPublished": true,
+    "failure": "Own main appeared before fixture launch; cleanup refused an unreturned process identity",
+    "attemptReceiptSha256": "1b6e50b1ff1b1737d08c389c5e6a8842b6cec6b232e748bd3b4d352ba7b79282",
+    "closedReadReceiptSha256": "8ab61a74aca1cc7bdb617c832175ff67d2f89bb1bfd3768e0344126e7af57373",
+    "separateRestoreReceiptSha256": "0a0323e08bca319c361619eecb09b305e9d9bf50a2c512a075f134907dbc1fcf",
+    "observedLibraryExactlyMatchedSingleUseCardBytes": true,
+    "originalLibraryRestoredByteForByte": true,
+    "protectedMetadataUnchanged": true,
+    "originalFailureUnmodified": true,
+    "restartCauseEstablished": false
+  },
+  "failedFreshRaiseExecution": {
+    "status": "initial_cpu_probe_failed_or_inconclusive",
+    "success": false,
+    "phase": "guest-raise-exception",
+    "launchAttempted": true,
+    "libraryRestored": true,
+    "ownProcessesClosed": true,
+    "protectedMetadataPreserved": true,
+    "cleanupErrors": [],
+    "seconds": 136.5582140420156,
+    "duringFixtureLogReads": 0,
+    "preCleanupLogReads": 1,
+    "receiptSha256": "97256125237b4771fa1df83f4f2ac59fd877d99dca6a07c67291a38867d5e335",
+    "logSha256": "7d1513cae0a791a6bf4dd504cd5050f29b95ace2014b088c4f5ef94191d6cdf9",
+    "normalGuestExitObserved": false,
+    "firstFaultStage": "Continuing worker; continuation into Wine/ARM64EC exception delivery",
+    "syntheticSuspensionExceptionsExpected": true,
+    "completeFixturePass": false,
+    "originalFailureUnmodified": true
+  }
+}

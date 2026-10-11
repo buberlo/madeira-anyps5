@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "date": "2026-10-11",
+  "status": "pc76_qualified_actual_production_driver_local_cpu_not_gpu_or_gameplay",
+  "qualificationReceiptSha256": "3d0e67dee5c9396b6fdb64a098ffa64e9a599f59fc20b46cf0f515f621976f41",
+  "compositionReceiptSha256": "6fff72d7bdbe2c711c0bc46dfd804fa243edc967917f40eb5b211ebbc047ef2f",
+  "host53ReceiptSha256": "90d78dcea9789bc29d6ce7d2c4e1d5f47f9d18ee75c2b11d04aa3ba7e798d5f3",
+  "rawDriverSha256": "54b71b606cf695bbf5becca96c734d46b4ed2399924087153735ce3946eba7ac",
+  "freshExportCount": 3725,
+  "strictExportAbiAndNativeImportsMatched": true,
+  "publicCompilerCases": 538,
+  "fullRequestReplays": 9,
+  "allNineSpirvAndLayoutOutputsMatchPrevious": true,
+  "registrationOnlyPreparations": 2,
+  "nullPixelshaderCases": 12,
+  "hostCases": 53,
+  "hostSkipped": 0,
+  "cacheSchema": 22,
+  "cacheIdentity": "0x6879cb019925606d",
+  "prefixCleanup": [
+    {
+      "flag": "-k",
+      "exitCode": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "flag": "-w",
+      "exitCode": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "boundedCacheInventoryRaceRetries": 1,
+  "retryScope": "Only exact owned cache-temp lstat ENOENT; whole partial inventory discarded; caps and unknown-error failures retained",
+  "priorFailedRunsReclassified": false,
+  "gpuExecution": false,
+  "nativeWindowsGameTested": false,
+  "ipadGameTested": false,
+  "gamePlayable": false,
+  "privateContentsIncluded": false,
+  "githubActionsUsed": false
+}

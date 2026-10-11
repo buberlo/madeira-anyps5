@@ -104,6 +104,52 @@ def choose_targets(source, explicit, manifest):
     return sorted(set(targets) | {'libc', 'libkernel'})
 
 
+def choose_additional_tests(source, requested):
+    """Admit only literal test executable targets declared by this source tree."""
+    if len(requested) != len(set(requested)):
+        raise ValueError('Duplicate additional test target')
+    available = set()
+    for path in (source / 'core').rglob('CMakeLists.txt'):
+        # CMake comments cannot grant admission to an executable target.
+        text = re.sub(r'#\[\[(.*?)\]\]', '', path.read_text(), flags=re.DOTALL)
+        text = re.sub(r'#[^\n]*', '', text)
+        available.update(re.findall(r'\badd_test_executable\(\s*([A-Za-z0-9_]+)\s', text))
+    for name in requested:
+        if not re.fullmatch(r'[A-Za-z0-9_]+_tests', name) or name not in available or name in TESTS:
+            raise ValueError('Unknown, unsafe or already selected additional test target: ' + name)
+    return sorted(requested)
+
+
+def additional_ctest_inventory(targets, text):
+    """Use registered commands, retaining fixture arguments and all target cases."""
+    cases = {}
+    covered = set()
+    for test in json.loads(text)['tests']:
+        names = {Path(str(value).replace('\\', '/')).name for value in test.get('command', [])}
+        matches = [target for target in targets if target + '.exe' in names]
+        if not matches:
+            continue
+        name = test['name']
+        if len(matches) != 1 or name in cases or not re.fullmatch(r'[A-Za-z0-9_.-]+', name):
+            raise ValueError('Ambiguous or unsafe additional CTest case: ' + name)
+        cases[name] = matches[0]
+        covered.add(matches[0])
+    if covered != set(targets):
+        raise ValueError('Additional CTest registration missing: ' + repr(sorted(set(targets) - covered)))
+    return dict(sorted(cases.items()))
+
+
+def additional_ctest_results(expected, report):
+    cases = ET.parse(report).getroot().findall('.//testcase')
+    names = [case.get('name') for case in cases]
+    if len(names) != len(expected) or set(names) != set(expected):
+        raise ValueError('Additional CTest results differ from registered inventory')
+    for case in cases:
+        if case.get('status', 'run') != 'run' or any(case.find(tag) is not None for tag in ('failure', 'error', 'skipped')):
+            raise ValueError('Additional CTest case failed, skipped or did not run: ' + case.get('name'))
+    return {name: {'status': 'passed', 'target': expected[name]} for name in names}
+
+
 def quote(value):
     value = str(value)
     if re.search(r'[\r\n"%!^&|<>]', value):
@@ -169,6 +215,10 @@ def main():
     parser.add_argument('--source', type=Path, default=ROOT / 'upstreams/AnyPS5',
                         help='Patched AnyPS5 checkout (use an isolated checkout for pin upgrades)')
     parser.add_argument('--wine', default=os.environ.get('APS5_WINE'))
+    parser.add_argument('--wine-prefix', type=Path,
+                        help='Dedicated Wine prefix; default: the existing local toolchain prefix')
+    parser.add_argument('--additional-test', action='append', default=[], metavar='TARGET',
+                        help='Additional declared test executable target, executed through its registered CTest cases')
     parser.add_argument('--toolchain', type=Path, default=ROOT / 'build/toolchains/winlibs/mingw64')
     parser.add_argument('--ffmpeg', type=Path, default=ROOT / f'build/toolchains/ffmpeg-{FFMPEG_COMMIT}')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/hle-runtime/hle-runtime.zip')
@@ -178,6 +228,7 @@ def main():
         parser.error('--jobs must be positive')
     source = args.source.resolve()
     targets = choose_targets(source, args.targets, args.from_hle)
+    additional_tests = choose_additional_tests(source, args.additional_test)
     if os.name != 'nt' and not args.wine:
         parser.error('Set APS5_WINE or --wine to the local Wine executable')
     args.build.mkdir(parents=True, exist_ok=True)
@@ -216,7 +267,7 @@ def main():
     # Keep both commits separately so a pin upgrade cannot mislabel its binaries.
     environment['APS5_SOURCE_COMMIT'] = anyps5_commit
     if os.name != 'nt':
-        environment.update(WINEPREFIX=str(ROOT / 'build/toolchains/winlibs-wine-prefix'),
+        environment.update(WINEPREFIX=str((args.wine_prefix or ROOT / 'build/toolchains/winlibs-wine-prefix').resolve()),
                            WINEDEBUG='-all', WINEDLLOVERRIDES='winemenubuilder.exe=d')
     def run(name, command, extra_path=(), extra_environment=None, working_directory=None, timeout=None):
         batch = args.build / (name + '.cmd')
@@ -242,12 +293,13 @@ def main():
                      '-DAPS5_AGC_CREATE_LOG=OFF', '-DFFMPEG_PREBUILT_DIR=' + win(args.ffmpeg),
                      '-DPython3_EXECUTABLE=' + win(python_home / 'python.exe')])
     run('build', ['cmake', '--build', win(args.build), '--target', 'relinker', 'nid_patcher',
-                  *targets, *TESTS, '--parallel', str(args.jobs)])
+                  *targets, *TESTS, *additional_tests, '--parallel', str(args.jobs)])
     runtime_inputs_before = runtime_input_hashes(args.build, args.toolchain) if not args.skip_tests else None
     passed = []
     case_results = {}
     # These CPU/API contracts need an address arena, not the full console map.
-    # Reserve 8–12 GiB lazily; an explicit caller setting is still respected.
+    # Reserve 4 GiB lazily starting at 8 GiB; explicit caller settings are
+    # retained so local Wine hosts can use an independently qualified range.
     test_arena = {name: environment.get(name, value) for name, value in {
         'APS5_GUEST_ARENA_LAZY': '1', 'APS5_GUEST_ARENA_BASE': '0x200000000',
         'APS5_GUEST_ARENA_SIZE': '0x100000000', 'APS5_GUEST_ARENA_CHUNK': '0x10000000',
@@ -266,6 +318,19 @@ def main():
             if target in CTEST_CONTRACTS:
                 case_results.update(ctest_case_results(target, args.build / ('test-' + target + '.xml')))
             passed.append(target)
+        if additional_tests:
+            run('inventory-additional', ['ctest', '--test-dir', win(args.build), '--show-only=json-v1'],
+                working_directory=args.build, timeout=45)
+            inventory = additional_ctest_inventory(additional_tests, (args.build / 'inventory-additional.log').read_text())
+            selection = args.build / 'additional-ctest-cases.txt'
+            selection.write_text('\n'.join(inventory) + '\n')
+            report = args.build / 'test-additional.xml'
+            run('test-additional', ['ctest', '--test-dir', win(args.build), '--tests-from-file', win(selection),
+                '--no-tests=error', '--output-on-failure', '--parallel', '1', '--timeout', '60',
+                '--output-junit', win(report)],
+                [args.build / 'core/libs/libs/unpatched', args.build / 'tests'], test_arena, args.build,
+                timeout=60 * len(inventory) + 45)
+            case_results.update(additional_ctest_results(inventory, report))
     runtime_inputs_after = runtime_input_hashes(args.build, args.toolchain) if not args.skip_tests else None
     if runtime_inputs_before != runtime_inputs_after:
         changed = sorted(name for name in set(runtime_inputs_before) | set(runtime_inputs_after)
@@ -285,6 +350,8 @@ def main():
         'anyps5_diff_sha256': hashlib.sha256(subprocess.check_output(['git', '-C', str(source), 'diff', 'HEAD'])).hexdigest(),
         'flags': {'build_type': 'Release', 'APS5_SLIM': True, 'APS5_ENABLE_TIMING_LOG': False, 'APS5_AGC_CREATE_LOG': False},
         'host_tests_passed': passed, 'host_test_runtime': 'Windows' if os.name == 'nt' else 'local Wine',
+        'additional_host_tests_passed': additional_tests if passed else [],
+        'wine_prefix': environment.get('WINEPREFIX') if os.name != 'nt' else None,
         'host_test_case_results': case_results,
         'host_test_cases_skipped': sorted(name for name, result in case_results.items() if result['status'] == 'skipped'),
         'host_test_runtime_inputs': runtime_inputs_before,

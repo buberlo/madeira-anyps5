@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "kind": "sanitized_anyps5_c963_source_qualification",
+  "date": "2026-10-10",
+  "status": "source_roundtrip_and_native_decoder_qualified_full_runtime_pending",
+  "source": {
+    "repository": "https://github.com/boykopovar/AnyPS5",
+    "commit": "c963432db05f8b35c62e212b3a36494501522fe2",
+    "previous_commit": "d70b89989473ba1f6ae13e44e079e67f1f8a44b0",
+    "upstream_commits_since_previous_pin": 424,
+    "adoption_scope": "Complete merged main snapshot plus six reconciled local patches and targeted open null-pixel fixes",
+    "patches_sha256": {
+      "0001-ipad-runtime-compatibility.patch": "84d4233c373cd3224168d4e47233024248e2cde675aa7e4352b460c07cfcb2c1",
+      "0002-bounded-exception-logging.patch": "b01bf2074c6f61e0ed5904575f3d19ad042611e18769aa6f955be79ec84b6452",
+      "0003-valid-image-descriptor-policy.patch": "6069a40a0416ac3fd223262392d46bbd1064f134211099b06d5d4b5f5d0bf7bc",
+      "0004-no-vintrp-exec-aware-input-liveness.patch": "6000c9293cb974ab183c55796cd9aedcc3e583e4b5caad6f1d46e403f06b0c33",
+      "0062-bounded-legacy-audioout-ingress-trace.patch": "c3d40d2b86ee7611ec6a39b56e49f84ecd22ddc7991bf7a05af4029ede662c9c",
+      "0065-audioout-frame-pacing.patch": "5282030acd32d984607b064798ef73b7e8eac7a8bac21655f415aa86a4fa5d04"
+    },
+    "patch_touched_file_count": 216,
+    "original_preserved_patch_touched_file_count": 212,
+    "shader_request_version": 15,
+    "supported_previous_private_request_version": 14,
+    "shader_disk_cache_format": 22,
+    "shader_instruction_inventory": {
+      "implemented": 1166,
+      "total": 1166,
+      "already_included_in_previous_pin": true,
+      "scope": "Implementation inventory, not shader correctness or GPU acceptance"
+    },
+    "testOnlyReconciliation": "Optional-note Linux fixture expects exact module initializer argument/result imports already present in merged upstream; all malformed and bounds cases retained.",
+    "windowsFileErrorReconciliation": "Windows-only NativeWindowsError delegates upstream WindowsFileTime::Failure and preserves original GetLastError for handle-based fchmod ACCESS_DENIED retry; no header, shader, or ABI changes.",
+    "socketIsOpenReconciliation": "Remove duplicate local IsOpen definition; upstream already provides the identical locked map-membership implementation. Family, guest socket bridge and filesystem/socket handle guards remain intact.",
+    "graphicsSetHelperReconciliation": "Remove unchecked duplicate Vulkan descriptor layout/pool helpers; retain checked implementations with strict per-set/per-stage limits and unchanged storage-buffer UAB flags/calls.",
+    "graphicsUabFixtureReconciliation": "Fixture-only capability reconciliation: a default-false storage-buffer UAB capability must reject the 17-buffer request without leaks before explicit true enables the unchanged positive layout/pool and 16-limit negative checks.",
+    "depthCapabilityFixtureReconciliation": "Fixture-only D16/D32 single-sample finite capability queries plus eleven strict missing-query/format/feature/query-result/sample/extent/layer/resource-limit negative controls with zero leaked mock images; nine reuse assertions and all production depth/MSAA/coherence guards retained.",
+    "wineDispatcherExceptionReconciliation": "Resolve trusted ntdll exported data cells, prefer ARM64EC native Unix endpoint, validate/read the entire finite native dispatcher interval before suspension, and retry only that half-open range alongside existing NtContinue/winpthreads guards. Preserve native waits, private/JIT executable code, APC ownership, async AVX and integer/flags bridges; malformed available cells fail explicitly before suspension.",
+    "pin_and_patch_series_sha256": "f002f8c4062e0cbf2196bfbae65ce0fb5d486cd3ae70d75e849dcdfdf571420b",
+    "shader_generated_source_version": "bacc6ae7a4d5aacb",
+    "shader_cache_unchanged_by_descriptor_and_audio_fixture_batch": true,
+    "windowsFutimesReconciliation": "Update the existing owned disk descriptor first. Only an immediately captured ACCESS_DENIED may reopen metadata rights; current original/reopened volume and full128-bit nonzero file IDs must match before any fallback write. Query failures and mismatches fail closed; invalid times, borrowed-handle ownership, precision and errno bookkeeping remain strict.",
+    "audio3dFixtureReconciliation": "Test-only upstream port fixture uses real object reset9 and explicitly expects valid but unimplemented PCM/gain/legacy/unknown attributes to return NOT_SUPPORTED; malformed payloads remain INVALID_PARAMETER. Production Audio3d is byte-identical and still has no object PCM renderer.",
+    "pin_and_patch_series_encoding": "SHA256 of canonical compact JSON with upstreamPin and orderedPatches name/sha256, followed by LF.",
+    "shader_cache_unchanged_by_metadata_only_stat_batch": true,
+    "windowsMetadataOnlyStatReconciliation": "Use preceding CRT file/directory mode for path precision queries; borrowed regular descriptors query native Basic+Standard metadata directly, retaining CRT mode/size/link/zero-field semantics and exact times without Wine GetFileType content reads. Only explicit unsupported metadata classes may fall back to CRT, which must classify FIFO/CHR; all other errors fail and the handle is never closed. Original strict timestamp/rename/unlink checks retained and actual pipe/invalid descriptor/path atime assertions added."
+  },
+  "qualification": {
+    "fresh_base_apply_exact_candidate_identity": true,
+    "reverse_exact_upstream_identity": true,
+    "canonical_complete_series_reverse_check": true,
+    "canonical_diff_check": true,
+    "native_graphics_syntax_files_passed": 8,
+    "native_execution_syntax_files_limited_by_upstream_apple_libcxx_atomic_shared_ptr": 4,
+    "compiled_production_sample_decoder": {
+      "exact_pattern": "0x22eea66a",
+      "positive_patterns": 1,
+      "sample_positions_checked": 4,
+      "strict_negative_controls": 3,
+      "failures": 0,
+      "gpu_execution": false
+    },
+    "production_fp_exp2_branch_host_adapter": {
+      "positive_cases": 12,
+      "positive_failures": 0,
+      "omitted_clamp_negative_control_failures_detected": 2,
+      "gpu_execution": false
+    },
+    "independent_exception_timed_wait_memory_audio3d_source_review": "no_blocking_defect_found",
+    "native_relinker_and_nid_patcher_tests": {
+      "status": "fresh_native_tools_43_cases_passed",
+      "tests": 43,
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0,
+      "logSha256": "7547e8f5efa39a53e747c50a604437c1f5ba4282aabbca86648f2698ab1898a3",
+      "xmlSha256": "dd4c1a08dd01690e25153b4768aabe47bd0082ecd6c72d5717cd69aa0d7e671b",
+      "sourceTestSha256": "1a89480270f3061f20257096bfb1c39a0895aeb40a1cb85c496f1dc79de44775"
+    },
+    "wine_dispatcher_classifier": {
+      "status": "source_reviewed_exact_body_26_controls_and_windows_adapter_cross_compiled_not_executed",
+      "exactProductionSourceSha256": "7eb447099c897aeb423915d3508c6ca64c8556b5cb85b3f7af11e8a5c4582215",
+      "portableControlsPassed": 26,
+      "portableFailures": 0,
+      "nativeWindowsMissingExportsAndArm64EcSelectionCovered": true,
+      "windowsAdapterObjectCompiled": true,
+      "actualFullProductionPrxExecution": false,
+      "deviceExecution": false,
+      "requiredIpadSafeSelfRead": "APS5_SAFE_SELF_READ=1",
+      "previousRealLostDeliveryFailurePreserved": true
+    },
+    "windows_futimes_descriptor_repair": {
+      "status": "source_reviewed_production_mingw_compiled_and_exact_body_controls_passed_full_runtime_pending",
+      "productionSourceSha256": "7aaf79fd15f9674fa6f98c8f15d8cddf007e5ad371924d80f790265ed89b6c91",
+      "fixtureSourceSha256": "bf636d6effde45301c9275deaba3f44494d48aefcb1f3d1ff592cee50399b9d0",
+      "hostAdapterCasesPassed": 18,
+      "omittedIdentityGuardNegativeControlFailedAsExpected": true,
+      "uncapturedNativeErrorNegativeControlFailedAsExpected": true,
+      "hostAdapterReceiptSha256": "cb27183b28a7a93fd0df14b6076925b0758335557d57962a137de22f28e192a6",
+      "mingwProductionCompileReceiptSha256": "faaaf17c747ac9fddb64059a51b5b7ea5df6d0a67be417a0a6f9ab98bd3a628f",
+      "actualWin32ApiChecksPassed": 132,
+      "actualWin32ApiReceiptSha256": "dc673a73756e81d0b15e6c5913ea29ce28ce157bba3cb8a0f7a40a816f7f4659",
+      "actualApiFinding": "Owned descriptor metadata updates preserve exact100ns timestamps after rename/unlink; ReOpenFile instead fails on old names or reopens replacement files. Wine permits direct metadata on the data-only handle, so ACCESS_DENIED fallback was not executed by this actual API probe.",
+      "actualWin32AccessDeniedFallbackExecuted": false,
+      "freshProductionPrxExecution": false,
+      "deviceExecution": false,
+      "originalReviewedFutimesFixtureSourceSha256": "60c1ce6290e5e56ab8788b6cab39e1252308135d099b0b5c8779f9728757192e"
+    },
+    "audio3d_port_fixture_reconciliation": {
+      "status": "source_reviewed_runtime_pending",
+      "sourceSha256": "0c0496f0ab7a232d5f614af5e52f7282d1f95f818f412dec50e540908cc294eb",
+      "productionAudio3dSourceUnchangedSha256": "2bdecbf338dac2a37fd6d8c11a9ff72483470f96edcf460c9c7c14e48760a1dc",
+      "previousRealFailedFixturePreserved": true,
+      "missingPcmRendererRemainsUnsupported": true
+    },
+    "windows_metadata_only_stat_repair": {
+      "status": "source_reviewed_production_mingw_compiled_and_exact_body_controls_passed_full_runtime_pending",
+      "productionSourceSha256": "2b4a50caf6c3219838812185a0acb10ac48227d797beba4cbcf4f65b15234765",
+      "fixtureSourceSha256": "bf636d6effde45301c9275deaba3f44494d48aefcb1f3d1ff592cee50399b9d0",
+      "hostAdapterCasesPassed": 30,
+      "expectedFailingMutants": 5,
+      "hostAdapterReceiptSha256": "a717749ee669b005c3208b17a09f606eb095504fb432d5bbfb602b53f638a9db",
+      "mingwProductionCompileReceiptSha256": "3702d8143ec7ff88b15db55801a1f99f91e0176336ae99bfca1d4ca41375b54f",
+      "actualLocalWineCausalReceiptSha256": "b64609b24e86b79b77a809e837f1fd8b0bcaaa6af7b7b665aef109c2f52f2e77",
+      "actualCausalFinding": "Exact native metadata APIs preserve access time, whereas isolated GetFileType, CRT descriptor stat and original production path/descriptor stat change it through a Wine device-placeholder content probe. Exact mtime remains unchanged.",
+      "previousRealTimestampFailurePreserved": true,
+      "originalPrecisionAssertionsRetained": true,
+      "rebuiltProductionPrxExecution": false,
+      "nativeWindowsReferenceExecution": false,
+      "deviceExecution": false
+    }
+  },
+  "new_regression_scope": {
+    "unwritten_pixel_program": "state decode, partial-address and color-write rejection assertions",
+    "null_pixel_registered_abi": "DecodeGraphicsPrograms and PrepareGraphicsStages; zero inherited SGPRs, registered artifact reuse",
+    "null_pixel_wave32_fallback": "InvocationFor and SourceHandleFor creation/reuse; not null-fragment Capture/Materialize or GPU rendering",
+    "cache22": "encode/decode rejects previous format; policy-specific cache identities; request14/15 compatibility; decoded MSAA image modes, binding Prepare/Populate and Recompile SPIR-V shape/sample assertions",
+    "new_null_pixel_regressions_executed": false,
+    "cache22_regressions_executed": false,
+    "windows_file_error_adapter": "Existing fresh full GuestFilesystem tests must validate readonly/rename/deleted/open descriptor, socket and invalid-handle paths; runtime qualification pending.",
+    "private_executable_exception": {
+      "status": "source_reviewed_windows_x64_object_compiled_not_executed",
+      "sourceSha256": "b43aec30443698457eaebe85ccfd3e687f1928c2c9ab20c0a4c773061f1ed46b",
+      "ordinaryDeliveryTotals": {
+        "noCpuAvx": 601,
+        "cpuAvxEnvironmentAbsent": 701,
+        "cpuAvxExplicitLocalOptIn": 803
+      },
+      "separatePrivateRxDelivery": 1,
+      "requiredNativeWaitDeliveries": 20,
+      "scope": "Owned nine-byte private executable x86 code, saved RIP and handler thread/Pthread identity, one delivery without resubmission, stop and successful Join before release; does not claim actual runtime success yet.",
+      "apiSignalRemains30": true,
+      "explicitPreserveAvxZeroIsNotSuccessful701Mode": true
+    }
+  },
+  "previous_full_prx_proof": {
+    "fixture_case_count": 302,
+    "fixture_and_analysis_header_unchanged": true,
+    "public_source_sha256": {
+      "core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp": "574b94082ad197d010b9a0f34fc3793b909d1bf04b1feac5c520bf9690fd0f6f",
+      "core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp": "e336cb81fc2f240d5e00e0d0abd0b7f8f6dc1a4e1782562cc15e1ca1c6c78136"
+    },
+    "fresh_runtime_requalification": "pending",
+    "complete_private_replay_count_required": 7,
+    "private_request_content_included": false
+  },
+  "native56_importer_review": {
+    "status": "inert_template_reviewed_not_frozen_or_executed",
+    "derived_from_existing_protected_importer": true,
+    "semantic_delta": "Native54 to Native56 checks; preparation root restricted to fresh-build directory",
+    "offline_test_count": 45,
+    "test_classes": {
+      "ReplacementContracts": 32,
+      "AtomicContracts": 13
+    },
+    "offline_failures": 0,
+    "source_sha256": {
+      "import_minigolf_replacement.py": "f57b55508a9d606a0a322c23456a8b99ce63694c590093da74da52a5a24c7424",
+      "atomic_library.py": "70b0edc83381c4d44dd4486df6a10f52bf1cc9e542cb4460209160555400033b",
+      "test_replacement.py": "77515d58f79085d4017a0673b815671385cf0a9b173aa2384404d7ef0576377a"
+    },
+    "contracts_preserved": [
+      "owned command lease and complete rollback budget",
+      "only exact own app and helper termination",
+      "original MiniGolf and Solitaire full backups/readback",
+      "hash-closed fresh package and no duplicate library card",
+      "same-directory rename publication with no direct-overwrite fallback",
+      "raw-byte rollback even when rename acknowledgement is lost",
+      "leave partial fresh folder unregistered",
+      "no default device commands, game launch or app install"
+    ],
+    "runtime_afc_atomicity_proven": false,
+    "device_actions": false
+  },
+  "acceptance": {
+    "fresh_47_library_build": false,
+    "fresh_runtime_host_tests": false,
+    "fresh_loaded_prx_302_case_proof": false,
+    "fresh_seven_complete_private_replays": false,
+    "windows_vulkan_reference": false,
+    "ipad_import": false,
+    "ipad_game_launch": false,
+    "minigolf_playable": false,
+    "gpu_or_gameplay_claim": false,
+    "actual_dispatcher_repair_803_plus_private_rx": false
+  }
+}

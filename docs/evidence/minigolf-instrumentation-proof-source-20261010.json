@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "title": "MiniGolf exact M0 and payload-free instrumentation interpolation proof",
+  "status": "source_implemented_native_controls_passed_production_rebuild_pending",
+  "upstreamAnyPS5": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "precedingQualifiedSourceFreezeSha256": "35fbabf1a3e80f489f3c3c5f09eebeca7e620b1911973eeffe6384db6d783552",
+  "problem": {
+    "completeRequestSerializer": 15,
+    "instructionCount": 5,
+    "vintrpInstructions": 0,
+    "firstWindowsGameError": "fixed-function interpolation guard rejected unmodeled literal M0 write and payload-free thread trace",
+    "originalProofFailureReproduced": true
+  },
+  "change": {
+    "literalM0": "Only exact SOP1 S_MOV_B32 literal-to-M0 encoding and operands admitted",
+    "threadTrace": "Only exact payload-free SOPP S_TTRACEDATA encoding and operands admitted",
+    "strictRejectionsRetained": [
+      "M0-dependent reads and indexed operations",
+      "nonzero trace payloads",
+      "arbitrary EXEC changes",
+      "invalid or incomplete P1/P2 sequences",
+      "unproven raw center I/J reads"
+    ],
+    "shaderCacheFormat": 22,
+    "newPolicyTag": "center-ij-unused-m0-trace-v1",
+    "distinctGeneratedSourceIdentityRequired": true
+  },
+  "validation": {
+    "isolatedNativeControls": 54,
+    "detectedDeliberateGuardMutations": 3,
+    "additionalPublicSyntheticCases": 53,
+    "originalProductionAssertionsPreserved": 302,
+    "productionFixtureSyntaxPassed": true,
+    "oldAndNewSixPatchSeriesApplyAndReverseExactly": true,
+    "oldQualifiedSourceAndOutputsRetained": true
+  },
+  "sourceFiles": {
+    "core/shader/recompiler/Translation/include/Translation/UnusedBarycentricProof.hpp": {
+      "before": {
+        "sha256": "e336cb81fc2f240d5e00e0d0abd0b7f8f6dc1a4e1782562cc15e1ca1c6c78136",
+        "bytes": 29870,
+        "mode": 420
+      },
+      "after": {
+        "sha256": "9a0a4e3c2ec88b23c0be20f80031a34717ab1c1548408f1e9bc445f198e639b3",
+        "bytes": 31362,
+        "mode": 420
+      }
+    },
+    "core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp": {
+      "before": {
+        "sha256": "574b94082ad197d010b9a0f34fc3793b909d1bf04b1feac5c520bf9690fd0f6f",
+        "bytes": 66680,
+        "mode": 420
+      },
+      "after": {
+        "sha256": "0f6223f5e1d66eb07021166a84c77f6f7b2ebfd54ea4d3137a64aa5b1aa8e328",
+        "bytes": 67792,
+        "mode": 420
+      }
+    },
+    "core/libs/prx/libSceAgcDriver/tests/InstrumentationProofCases.hpp": {
+      "before": null,
+      "after": {
+        "sha256": "6e9000ef11a19e8e596f452b2c92147a010421c7e5c3a1656356bfbacfeaf2a8",
+        "bytes": 6026,
+        "mode": 420
+      }
+    },
+    "core/shader/recompiler/CMakeLists.txt": {
+      "before": {
+        "sha256": "c4d056841315a35972d542a9b48b6ed409250581452b67a7d23a9c41b1f7c854",
+        "bytes": 18364,
+        "mode": 420
+      },
+      "after": {
+        "sha256": "d0a0a7497ddcd62dbdd602261c1b5e48c956c8c5c1bad211c15d399fbd5a1a3b",
+        "bytes": 18656,
+        "mode": 420
+      }
+    }
+  },
+  "scope": {
+    "production355CasesExecuted": false,
+    "eightFullProductionReplaysExecuted": false,
+    "gpuExecuted": false,
+    "windowsGameRerun": false,
+    "ipadExecuted": false,
+    "gameplayVerified": false,
+    "githubActions": false,
+    "rawPrivateRequestsPublished": false
+  }
+}

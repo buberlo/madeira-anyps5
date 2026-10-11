@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "date": "2026-10-11",
+  "status": "failed_stale_runner_predicate_before_gpu_or_game",
+  "upstream": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "activePatchCount": 11,
+  "titleId": "PPSA03647",
+  "version": "01.000.000",
+  "platform": {
+    "os": "Windows 11 Pro",
+    "build": "26300",
+    "cpu": "AMD Ryzen 9 7940HS",
+    "gpu": "AMD Radeon 780M",
+    "gpuDriver": "31.0.21029.6002"
+  },
+  "verifiedGameFiles": 180,
+  "verifiedPayloadFilesExcludingManifest": 259,
+  "recordedPassedPrerequisites": [
+    "windows_exception_tests",
+    "exception_personality_tests"
+  ],
+  "nextCapturedFixture": {
+    "name": "guest_raise_exception_tests",
+    "summaryDeliveries": 803,
+    "integerStateVerified": true,
+    "avxModeChecks": {
+      "preserve": 64,
+      "mutate": 64,
+      "reset-avx": 64
+    },
+    "reportedVectorErrors": 0,
+    "resultRowRecorded": false,
+    "exitAndClosurePassingInferredFromThrowSite": true
+  },
+  "runnerDefect": {
+    "expectedDeliveries": 553,
+    "capturedDeliveries": 803,
+    "bothStreamsAlreadyRead": true,
+    "defaultModeExpectedDeliveries": 701,
+    "defaultModeAsyncAvxOptIn": false
+  },
+  "gpuExecuted": false,
+  "gameStarted": false,
+  "gameplayQualified": false,
+  "ipadAcceptance": false,
+  "githubActions": false,
+  "privatePayloadPublished": false
+}

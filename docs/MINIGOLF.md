@@ -1,6 +1,470 @@
 # 3D MiniGolf — PPSA03647
 
-Version **01.000.000** now has a freshly prepared six-patch combined runtime
+Version **01.000.000** uses a private decrypted twelve-ELF dump. The target
+remains a complete offline single-player course with touch input, sound and
+save/load, without an initial FPS threshold. A rendered course and completed
+stroke are not established.
+
+The current source is complete AnyPS5 through `c963432d` with eleven local
+patches, including LDS spill, complete descriptor-array snapshots and typed
+image fallback. Fresh native CPU tests pass. The new 47-library Windows runtime
+passes 54 host cases under local Wine; its actual production PRX passes 538
+ordered public cases, nine complete shader replays and twelve null-pixel cases.
+All nine SPIR-V modules and binding layouts match the earlier qualified outputs
+and pass independent validation. These results qualify CPU preparation, not
+native Windows GPU or iPad gameplay.
+[Apple implementation and limits](APPLE-GPU-20261011.md),
+[fresh runtime evidence](evidence/apple-gpu-runtime-cpu-20261011.json).
+
+The new private package is now **prepared, unexecuted** with those fresh tools
+and libraries: twelve relinked ELFs, 47 NID-patched HLE implementations, three
+compiler DLLs and all 3,186 guest NIDs are covered. An independent second pass
+over all 47 raw libraries reproduces their packaged patched bytes. Preparation
+uses twelve verified retained decrypted inputs and 101 unchanged assets; it
+does not claim equality with every file in the original 127-file download.
+Independent disk readback verifies all 180 package files and finds zero
+unresolved guest NIDs, native imports or forwarders.
+The earlier packages remain unchanged. Windows has now verified this package
+and begun its prerequisites; the new game runtime has not yet started. It has
+not been imported into the iPad library.
+[Preparation record](evidence/apple-gpu-minigolf-package-prepared-20261011.json).
+
+Windows run 10 remains the latest actual game run: its preceding driver passes
+all 26 prerequisites, then aborts at a strict interpolation guard at PC 76 after
+7.1236738 seconds. The later six-patch PC 76 driver and current eleven-patch
+runtime have separate local CPU qualification; neither has a new native
+Windows game result. The preceding Native57 installation passed protected-data
+preservation, but its first Continuing50 observation does not establish the
+required deliveries despite JIT activation. Native58 is now installed and closed
+with accessible protected-data preservation accepted. Its first actual device
+probe activates JIT and begins Continuing50, but does not complete within 120
+seconds. Fresh CPU qualification still precedes import and rendering.
+[Historical PC 76 qualification](evidence/minigolf-pc76-qualification-20261011.json),
+[latest native Windows game result](evidence/anyps5-c963-windows-run10-20261010.json),
+[accepted Native57 installation](evidence/native57-preservation-accepted-20261011.json),
+[accepted Native58 installation](evidence/native58-preservation-accepted-20261011.json),
+[Continuing50 observation](evidence/native57-continuing50-observation-20261011.json).
+
+The latest Windows prerequisite attempt, on 2026-10-11, verifies all 180 game
+files and 259 payload files, excluding the manifest. Its first two recorded
+prerequisites pass. The next captured fixture reports 803 exception deliveries,
+correct integer state and 64 checks in each of three AVX modes. The runner stops
+because its inherited validator still expects 553 deliveries. The third result
+row is not recorded, and neither GPU tests nor the game start in this attempt.
+The correction must distinguish the explicit-AVX 803-delivery branch from the
+default 701-delivery branch, where async AVX is intentionally not opted in.
+[Windows prerequisite attempt](evidence/apple-gpu-windows-prerequisite-attempt-20261011.json).
+
+The corrected runner subsequently records three passing native Windows
+prerequisites, including all 803 exception deliveries, 64 checks in each AVX
+mode, private executable-page delivery and the native-wait checks. Each child
+exits zero with complete output and closed owned processes. Application Control
+then refuses the next child, `guest_memory_tests.exe`, before its result or
+output is recorded. The default 701-delivery mode, GPU checks and game are still
+unexecuted. A zero outer script exit only means this failure was caught and
+returned; it does not qualify the reference run.
+[Corrected Windows attempt](evidence/apple-gpu-windows-three-prerequisites-20261011.json).
+
+A further Windows run passes six prerequisites, including all 36 memory checks,
+both exact exception modes (803 with explicit AVX and 701 without that opt-in),
+and twelve raw-logger cases. It then stops because the runner incorrectly asks
+the standalone shader suite for 538 cases; that suite emits its exact ordered
+355 cases. The separate production-driver suite must still pass all 538 cases.
+Its execution, GPU tests and the game are not reached. Smart App Control was
+briefly disabled with explicit approval and restored; its UI and registry both
+confirm the original enabled state. This is a test-runner defect, not an observed
+MiniGolf rendering failure.
+[Latest Windows prerequisite result](evidence/apple-gpu-windows-six-prerequisites-20261011.json).
+
+### Native59 ownership diagnostic, 2026-10-11
+
+Native59 is installed and closed after a preserving update. It changes only
+native `server.o` and `virtual.o`; all 35 other objects in the ntdll archive,
+all seven native FEX archives and the four embedded PE components retain their
+Native58 bytes. Thirty-two native controls check the bounded ownership reads.
+The original Native58 Continuing50 failure remains a failure.
+
+The optional diagnostic records the RPM allocator lock owner and recursion
+depth from the live FEX pool mapping, plus the sampled thread's private native
+critical state. It rejects foreign, ambiguous or changing mappings and logs
+after resuming the sampled thread. The former watchdog and long RIP profiler
+are skipped only when this diagnostic is explicitly enabled. Equal repeated
+reads are observations, not an atomic snapshot or proof of the hang's cause.
+A fresh device observation and CPU qualification remain required before import.
+[Signed diagnostic build](evidence/native59-host-20261011.json).
+
+An earlier installation preflight stopped before device operations because the
+externally supplied Python interpreter changed after the historical provenance
+record was sealed. A complete replay identifies this as the sole mismatch among
+53,993 inputs; the signed applications, runtime archives and retained protected
+data still match. A separate execution-tool record declares the actual new
+interpreter and preserves the historical record. The subsequent update succeeds:
+complete USB reads verify 3,649 readable files and 11,227,745,899 bytes. Protected
+records remain equal; eight added and nine removed ordinary system records
+satisfy the exact preservation policy, with no changed file records. Native
+installer, monitor and observer join, and all source identities remain stable.
+Opaque contents, installed executable bytes, CPU execution and gameplay are
+not independently verified by this installation result.
+[Accepted Native59 installation](evidence/native59-preservation-accepted-20261011.json).
+
+### Native58 installation and preservation, 2026-10-11
+
+The suspension-repair candidate is now compiled, linked and signed into Native58.
+Its fresh Wine archives, full ARM64EC JIT and two changed native FEX archives
+are verified; unaffected archives and the signed Native57 rollback retain their
+bytes. The same-bundle update is now accepted: fresh complete accessible-data
+reads preserve protected data and opaque metadata under the exact ordinary-system
+file policy. The app ends closed and all owned operations join. Opaque contents
+and installed executable bytes were not independently read.
+
+The first Native58 device probe activates automatic built-in JIT, allocates the
+512-MiB pool and begins the original Continuing50 fixture. After 120 seconds,
+the log has no captured interrupted context, completed 50-delivery result or
+normal guest exit. The host is still present; a crash or the hang's cause is
+not established. The collector completes in 136.244 seconds, closes its own
+process, restores the original library byte for byte and preserves protected
+metadata, without cleanup errors. No profiler or log query runs during the
+fixture. This failed or incomplete observation does not qualify the suspension
+repair, Continuing50, all 803 deliveries, the eight fresh CPU phases, GPU or
+gameplay. The new game-side package remains unimported and unexecuted.
+[Actual Native58 observation](evidence/native58-continuing50-observation-20261011.json).
+[Accepted installation and boundaries](evidence/native58-preservation-accepted-20261011.json),
+[signed host build](evidence/native58-host-20261011.json).
+
+## Source and host refresh, 2026-10-10
+
+### Native57 installation and protected-data acceptance
+
+The preceding signed Native57 update completed successfully. Full before/after USB
+reads preserve the protected accessible games, saves, Wine prefix, pairing and
+settings against the accepted current baseline. The final inventory contains
+**10,908,776,215 readable bytes in 3,460 files / 5,736 entries**. Whole-inventory
+raw equality is false: eight ordinary system files are added and nine are
+absent, with no changed file records. These differences satisfy the exact
+prospective system-artifact policy; all selected before/after bytes are retained
+and hashed. Every current readable file has an explicit verified provider.
+
+The native installer exits zero, the app ends closed, and the installer,
+monitor and observer all join without observation errors. Source closure is
+replayed under the live observer and its final fingerprints remain unchanged.
+This accepts installation and protected-data preservation; it does not verify
+installed binary bytes, inaccessible SystemData contents, Keychain, Native57
+JIT/CPU execution, GPU output or gameplay. The Continuing-only 50-round check,
+full 803-delivery test and all eight fresh CPU phases remain required.
+[Accepted installation and boundaries](evidence/native57-preservation-accepted-20261011.json).
+
+The first fresh Continuing50 attempt observes JIT enabled, the debugger attached
+and both FEX thread initializations completed. The 120-second log contains eight
+suspend records and seven resume records after the first suspend, but no captured
+interrupted context or normal guest exit. Wine logs the first eight operations
+of each counter and every 256th afterward; these samples do not establish total
+operation counts or balanced suspension. The host remains alive; a crash and its
+cause are not established. The collector ends after **139.650 seconds**, restores
+the original library and protected metadata, and closes its own processes without
+cleanup errors. This failed or incomplete diagnostic does not qualify Continuing50,
+the full 803 deliveries or any of the eight CPU phases. MiniGolf import remains
+blocked on those fresh results. [Actual observation](evidence/native57-continuing50-observation-20261011.json).
+
+A subsequent **45-second sampler diagnostic** captures both Wine threads after the fixture begins. The main is RUN at the same native PC, LR and SP in all four passes; the worker waits in `read`, with `wait_select_reply` as its link-register function. The fixture still has no normal guest exit or printed interrupted-context records; this does not establish the in-memory delivery count. The collector completes in **62.379 seconds total**, closes its exact owned process, restores the original raw library and preserves the three protected metadata files, with no cleanup errors.
+
+The watchdog can perturb scheduling or introduce a logger wait; sampling resume return codes are unchecked, and the stack addresses are candidates. This capture alone identifies neither the original hang's cause nor a repair. Continuing50, full 803, all eight CPU phases, import and GPU/gameplay acceptance remain unqualified. [Bounded observation and limitations](evidence/native57-bounded-sampler-observation-20261011.json).
+
+Inspection of the matching ARM64EC DLL and its COFF symbols maps the sampled main PC to `fex_ios_rpm_lock`'s nonzero-owner acquisition loop. The link register is the return from `FEXCore::Allocator::malloc`'s call to that lock. This identifies the current main waiter, independently of the worker's separate code-invalidation hold stamp. It does not read the RPM owner or depth, identify the owner, unwind the outer caller or exclude a stale owner / mismatched identity. No repair or CPU gate is accepted by this attribution. [Bound code inspection](evidence/native57-rpm-spin-source-attribution-20261011.json).
+
+An isolated suspension repair candidate now passes 132 native signal-mask and adapted server controls, 24 FEX scope cases, 23 expected fatal cases and nine controls for unchanged non-iOS paths. Six fresh iOS Wine objects form two completed archives; all 79 retained members remain byte-identical. The full ARM64EC FEX DLL is freshly compiled and retains its export/import contracts. The candidate masks `SIGUSR1` before FEX lock acquisition and binds temporary server deferral to the exact pending capture and requester. It does not synthesize an acknowledgement or bypass hard suspension. Forty-three affected native ARM64 objects also rebuild successfully into two FEX archives with equal public symbol contracts; five unaffected archives retain their exact bytes. This candidate is now signed and installed as Native58; fresh CPU gates remain pending. The RPM owner is still unknown; local build success does not establish a repaired allocation/suspend cycle. [Local candidate evidence](evidence/native-critical-suspend-local-builds-20261011.json), [accepted Native58 preservation](evidence/native58-preservation-accepted-20261011.json).
+
+Earlier rejected captures, the seven-file diagnostic, the fresh two-read
+baseline and the update refused before installation for disk reserve remain
+preserved as historical evidence. Their results are not reclassified by the
+later accepted update. [Historical pre-install checks](evidence/native57-preservation-preflight-20261010.json).
+
+### Conditional interpolation groups after the PC 76 failure
+
+The current Windows failure contains complete interpolation groups on optional
+forward branches. Some destinations have ordinary initial values on the skipped
+path. An isolated proof now follows definitions through the acyclic graph:
+definitions intersect at joins, while possibly interpolated values union. A
+subsequent read requires a complete definition on every path. P1/P2 pairs remain
+inside one block; every group must use the same unmodified original SGPR for M0.
+Fresh instruction decoding and complete rebuilt-graph equality run before this
+analysis, and the original raw I/J liveness and EXEC checks remain active.
+
+The request then reaches a scalar-buffer load into VCC_HI. The ordinary
+translator already supports this destination; the proof now models precisely
+one word at VCC_HI or one/two words at VCC_LO, with SGPR bank bounds and existing
+EXEC/M0 rejection intact. This changes validation coverage, not the instruction's
+execution semantics.
+
+Native source qualification passes **538 ordered public guards**, retaining all
+484 previous names in order, and a separate **148-case subset** containing eleven
+private requests. Both suites pass ASan/UBSan; five deliberately broken safety
+checks are detected. The proposed production fixture also passes syntax checking.
+The freshly linked production PRX now passes those 538 public cases and all nine
+existing complete request replays, with identical SPIR-V and binding-layout
+bytes. All 3,725 export names, ordinals and forwarders, and the imports, match the
+preceding driver after excluding exactly six new compiler-private helpers.
+The attempt remains failed: a registration identity negative control used an
+absent alternate driver, so the filesystem comparison aborted instead of
+returning its expected rejection. A separate recipe repair must rerun the full
+qualification with a real different file. That retry passes the public identity
+negative and all 538 shader cases, but its live output-size walk races an atomic
+shader-cache rename after three full replays. This runner attempt also remains
+failed; its correction must keep output and disk limits intact.
+GPU output and a new game run remain
+pending. The original PC 76 request contains registration metadata, not a
+complete runtime resource snapshot. [Source qualification](evidence/minigolf-pc76-source-20261010.json),
+[partial production attempt](evidence/minigolf-pc76-production-attempt-20261010.json),
+[runner retry](evidence/minigolf-pc76-control-runner-20261011.json).
+
+### Uniform SCC branch proof after the PC 72 failure
+
+The complete PC 72 request contains a forward uniform SCC branch around a small
+optional arithmetic block, followed by more interpolation using the original
+center I/J pair. The proof now accepts only an exact three-block skip diamond
+with complete P1/P2 sequences and preserved raw I/J values on both paths.
+Nested branches, EXEC changes, memory effects and writes overlapping the raw
+pair remain rejected. The interpolation guard remains enabled.
+
+The isolated production driver passes **401 ordered public cases**, including
+46 new branch-proof regressions, **nine complete request replays**, **twelve
+null-pixel cases** and the full **53-case host suite**. All eight previous replay
+outputs retain identical SPIR-V and binding-layout bytes. Its complete 3,725
+export-name/ordinal/forwarder table and imports match the preceding driver.
+Two newly autoexported compiler-private symbols initially broke that ABI check;
+the failed build remains recorded. A fresh link excludes exactly those two
+symbols and restores the original ABI, without weakening the comparison.
+
+Cache schema remains 22 with policy `center-ij-unused-m0-trace-scc-skip-v2` and
+source identity `0xa13bab0bc36edc45`. Only the AGC library is freshly linked;
+46 other modules retain their verified bytes. A new Windows packet has all
+47 modules freshly NID-patched and independently replayed against all 3,186
+guest imports; the twelve guest ELF outputs and 181-file layout are explicitly
+reused unchanged. These are local CPU/preparation results. The new native
+Windows run and the iPad GPU/gameplay checks remain separate.
+[Production proof evidence](evidence/minigolf-scc-skip-production-20261010.json).
+
+### Instrumentation proof correction after the Windows run
+
+The first complete request from the sixteen-prerequisite Windows run has five
+instructions, no VINTRP and no read of the original center I/J values before
+their full overwrite. The strict unused-input proof did not model a literal
+write to M0 and a payload-free thread-trace operation. The existing translator
+already handles both forms. The source now admits only their exact decoded
+encodings and operands; M0-dependent operations, trace payloads, arbitrary EXEC
+changes and invalid P1/P2 sequences remain rejected.
+
+The unchanged original proof rejects that complete private request. Its isolated
+native replacement passes 54 controls and detects three deliberately broken
+guards. Another 53 public synthetic regressions preserve the previous 302
+production assertions. Both old and new six-patch series apply and reverse
+exactly, with the old qualified sources retained. Cache format remains 22; a
+new interpolation policy tag must generate a distinct source identity and old
+caches cannot establish qualification of the correction.
+
+**The correction is rebuilt and locally qualified through the actual production
+PRX:** all **355 ordered public cases**, **eight complete private request replays**
+and **twelve null-pixel cases** pass. The complete serializer-15 request that
+triggered the recorded Windows failure now passes preparation, resource capture
+and materialization. The preceding seven replay outputs preserve both their
+SPIR-V and binding-layout bytes. The loaded production-library path and both
+wrong-library rejection controls are verified.
+
+The selective build compiles only `InstructionTranslator.cpp`,
+`ShaderDiskCache.cpp` and the public proof fixture. It freshly links the AGC PRX
+and import library, retaining all **46 other runtime libraries** and 888 unchanged
+objects by exact input/dependency identity. Export names, ordinals, forwarders
+and imports remain equal. Cache schema stays **22**, with policy
+`center-ij-unused-m0-trace-v1` and new source identity **`0x3483c09582e11677`**.
+
+A separate fresh host continuation passes **53 cases: forty direct targets and
+thirteen registered cases**, with no CTest skips or failures. Seven host
+executables are relinked against the new shader archive; the other 45 keep their
+verified bytes. The separate AVX-context subtest remains unavailable on local
+Wine. The initial selective phase failed while staging the real test-only
+`libSceRudp` library; its failed result and completed shader checks remain
+preserved. The continuation uses that library's verified original provider,
+without adding it to the game's 47-library dependency set.
+
+**These local results are CPU/compiler contracts.** The subsequent native Windows
+reference passes the freshly relinked GPU fixtures and starts MiniGolf with these
+runtime bytes. The earlier PC 0 request is no longer the first failure: the latest
+run reaches a different strict proof guard at PC 72. No game image, course or iPad
+execution is qualified. The original source-only checkpoint is retained.
+[Rebuilt production qualification](evidence/minigolf-instrumentation-proof-production-20261010.json),
+[source correction and bounded validation](evidence/minigolf-instrumentation-proof-source-20261010.json).
+
+All 424 merged commits after `d70b8998` are included. Six-patch application reproduces 216 reviewed files exactly and reverses to the new upstream contents/modes. The original patched source and historical results remain preserved. Schema 22 retains local policy metadata, rejects older cache formats and uses the current source-derived identity; the refreshed package uses a new cache directory. Exception delivery retains the native AVX/flags/protected-store bridge alongside the bounded NtContinue/winpthread retry. Audio3d continues to report unsupported PCM/render behavior honestly. [Source qualification](evidence/anyps5-c963-source-20261010.json).
+
+The matching native relinker and NID patcher pass all 43 tool tests without skips. Their actual execution belongs to the earlier tool qualification; subsequent runtime-only changes preserve the checked tool/source closure and do not count as another execution. The old module-import expectation now includes the two existing module-init argument/result helpers while retaining malformed-note and bounds checks.
+
+**The preceding complete 47-library build passes all 53 host cases:** forty directly executed targets and thirteen registered CTest cases, with no CTest skips or failures. The separate AVX-context subtest remains explicitly unavailable on local Wine; native Windows and iPad/FEX execution are still required. The fresh production AGC PRX passes all **302 public compiler cases** and **seven complete private request replays** through preparation, resource capture and materialization. Generated cache schema 22 and the actual loaded-library identity are bound to this runtime. All **181 prepared game-package files**, twelve relinked ELFs, 3,186 guest NIDs and 47 independent library-patching replays are verified. This qualifies local preparation and CPU contracts, not game rendering. [Complete runtime qualification](evidence/anyps5-c963-full-runtime-20261010.json).
+
+The targeted #1902/#2022 fixes register and prepare a consistent null pixel program and treat unwritten address registers as unset. A separate synthetic fixture now passes **twelve actual-production-library preparation/capture/materialization cases**, including absent/zero/partial addresses at wave32/64, stale input/SGPR removal, late variant preparation and reuse, enabled-color-write rejection and missing nonbuiltin variants. Its wrong-loaded-library identity control fails as required. An invalid color format with a nonzero mask remains a legitimate depth-only state; rejection cases explicitly enable the color target. This fixture creates no Vulkan device and does not execute device shader registration. [Reusable fixture and local build instructions](LOCAL-HLE-BUILD.md#production-null-pixel-materialization-check).
+
+The exact `0x22eea66a` sample pattern passes the production decoder with three strict rejection controls. Existing depth format/sample queries and guest-memory coherence remain intact. General multisample depth and HTILE transfer remain guarded. Real local Wine/MoltenVK execution on **Apple M3 Pro** passes prepared graphics and the expected registration-failure control; **four prepared-shader modes fail because storage-image multisampling is unavailable**. Those failures remain recorded and are not counted as passing GPU tests. All six modes now pass the separate native AMD reference described below; the refreshed iPad GPU path remains unqualified. [Focused local CPU/GPU contracts](evidence/anyps5-c963-local-contracts-20261010.json).
+
+### Repairs required by the refreshed host tests
+
+The first focused execution exposed an omitted feature bit in an upstream positive update-after-bind mock fixture and a lost exception delivery during the new `NtContinue` stress test. The graphics fixture now enables the feature explicitly for its positive case and retains false-feature and limit rejection checks. The depth-reuse fixture supplies both required capability queries, retains all original reuse assertions and adds eleven strict negative controls. These mock checks do not prove physical GPU execution.
+
+Exception diagnostics identified the lost delivery inside Wine's native dispatcher return. A bounded retry uses validated dispatcher export cells safely read before suspension; private executable memory outside that interval remains eligible. Current local execution passes **601 ordinary deliveries, twenty native wait cases and one separate private-RX delivery**, with correct thread/RIP, observed return, join and release. Local AVX remains unavailable. Native Windows separately passes the **803-delivery explicit-AVX mode and 701-delivery default mode**, including private-RX and native-wait checks; iPad/FEX execution remains required.
+
+The Audio3d port fixture now tests the actual reset-state attribute and strict unsupported PCM behavior. Both it and the object-attribute contracts pass without changing the production Audio3d implementation. A Windows-only adapter also reconciles the local handle-based `fchmod` path with upstream's errno mapper and restores the captured Win32 error for its access-denied retry.
+
+The descriptor-timestamp failure after rename is reproduced with 132 synthetic Win32 checks under local Wine. Updating the existing handle preserves precise timestamps after rename and unlink. `ReOpenFile` instead fails after rename or resolves a different inode when the old pathname is reused. The repair uses the original handle first, captures the error before translation and permits a permission retry only after comparing the current volume and full 128-bit identity of both handles. Eighteen production-body controls and two failing mutations cover that fallback and its errors. Local Wine permits the genuine data-only handle directly, so a real permission-denied retry is not claimed as executed.
+
+A separate access-time failure is reproduced in the actual kernel PRX: Wine's `GetFileType` probes regular-file contents for device placeholders, and `_fstat64` calls it as well. Each isolated call changes the requested access timestamp while native metadata queries preserve it. The repair uses `FileBasicInfo` and `FileStandardInfo` on borrowed regular-file handles and the already obtained CRT classification for path metadata. Unsupported metadata may fall back to the CRT only for confirmed pipe or character descriptors; other errors remain errors. Thirty production-body controls and five failing mutations pass. The complete rebuilt filesystem regression now passes with its original precise timestamp assertions and additional path-access, pipe and invalid-descriptor checks.
+
+Focused gate attempt 5 timed out after 90 seconds in the unchanged shader-cache executable. A separate instrumented diagnostic completed its child-process return, invocation-isolation stages and final flush; it remains diagnostic evidence. Later unchanged, uninstrumented gates pass, including **final gate 7 against the completed runtime's actual bytes**, with cache schema 22. The earlier timeout remains preserved and its cause is unresolved; no production cache repair or timeout increase is claimed. The complete host suite and production qualification described above subsequently pass.
+
+### Native Windows prerequisites and game startup
+
+The current private Windows packet verifies **256 payload files and 181 game files**,
+including the newly linked AGC PRX, 46 verified reused libraries and twelve converted
+ELFs. **All sixteen prerequisites pass on the physical AMD Radeon 780M**: native
+CPU/AVX/exception checks, twelve raw-logger cases, two ordered **401-case** compiler
+fixtures, BDA/8-bit/BC1 offscreen readbacks, all six prepared-GPU modes and twelve
+null-pixel cases against the actual production PRX. Five prepared-GPU positives
+exit zero; the deliberate registration-failure control exits one with its expected
+diagnostic. Every GPU selection matches the physical device. Owned processes are
+joined without discarded output.
+
+Native exception execution includes **803 deliveries with explicit AVX and 701 in
+default mode**, plus one separate private-RX delivery and twenty native-wait cases
+in each mode. The null-pixel fixture creates no GPU device. Native synthetic GPU
+fixtures use the queried AMD interpolation support; **MiniGolf's fixed-function
+interpolation profile is restored before launch**. These tests do not qualify the
+M2 fixed-function path.
+
+**Run 9 uses the qualified SCC-skip runtime and starts MiniGolf**, then exits
+after **6.223519 seconds** with **`0xC0000409`**. The first shader exception now
+comes from a different program at **PC 112**:
+
+```text
+ShaderRecompiler::Recompile: fixed-function interpolation requires unmodified center I/J pairs and complete P1/P2 sequences on a proven entry/discard path (pc=112)
+```
+
+The strict proof guard remains enabled. The actual game cache is format **22**,
+source identity **`0xa13bab0bc36edc45`**, with policy
+`center-ij-unused-m0-trace-scc-skip-v2`. The requested window is **1920 × 1080**;
+the actual swapchain is **837 × 471**, with **three images**. These measurements
+do not establish the game render-target resolution. The capture helper exits
+zero but reports `not_captured` because the owned game exits during capture;
+no PNG is returned. **No screenshot, rendered course, completed stroke,
+120-second run or gameplay acceptance is established.** The new request remains
+private for local diagnosis. [Run 9 evidence](evidence/anyps5-c963-windows-run9-20261010.json).
+
+The first complete run with the preceding 302-case runtime exited after
+**6.5862776 seconds** at PC 0. Its retained request led to the narrow M0/trace proof
+correction described above. [Historical startup evidence](evidence/anyps5-c963-windows-sixteen-prerequisites-game-start-20261010.json).
+
+Run 7 passes its sixteen prerequisites but module loading fails for
+`libSceImeDialog.prx` with Win32 error **4551** and process exit **`0xC0000135`**.
+The dependency audit has no missing imports. This is an Application Control loader
+rejection, not a shader or gameplay result. [Run 7 evidence](evidence/anyps5-c963-windows-run7-20261010.json).
+
+The preceding **run 8 loads the modules, initializes Vulkan and starts MiniGolf**, then exits
+after **6.701467 seconds** with **`0xC0000409`**. Its first shader exception is:
+
+```text
+ShaderRecompiler::Recompile: fixed-function interpolation requires unmodified center I/J pairs and complete P1/P2 sequences on a proven entry/discard path (pc=72)
+```
+
+The new complete serializer-15 request remains private for local diagnosis. The
+strict proof guard stays enabled. The requested window is **1920 × 1080**; the
+actual swapchain is **837 × 471**, with **three images**. This does not establish
+the game render-target resolution. The capture helper exits zero but reports
+`not_captured` because the own game exits during capture; no PNG is returned.
+**No screenshot, rendered course, completed stroke, 120-second run or gameplay
+acceptance is established.** [Run 8 evidence](evidence/anyps5-c963-windows-run8-20261010.json).
+
+Smart App Control was temporarily disabled with explicit permission for the
+reference runs. After run 9, Windows Security shows it enabled at Windows clock
+minute **14:32**, and an independent read-only registry check confirms value **1** at
+**14:33**. Exact action UTC seconds are not established. Own reference/game trees
+are joined and the listener is closed; other security and network settings are
+unchanged. All builds and tests remain local, without GitHub Actions.
+
+The initial Application Control rejection and the [nine-prerequisite](evidence/anyps5-c963-windows-nine-prerequisites-20261010.json)
+and [fourteen-prerequisite](evidence/anyps5-c963-windows-fourteen-prerequisites-20261010.json)
+checkpoints remain preserved. Their reader limitations were corrected without
+changing the game profile or strict shader guard. Earlier Windows comparisons
+below retain their exact historical package scopes.
+
+### Native56 installation and data-equality gate
+
+FEX #6021 corrects the 32-bit lookup-table size load and rejects `index == size`. Twenty extracted native assembly cases, two guard-page mutations, a COFF alignment control and production-object disassembly pass. The fresh full ARM64EC DLL is built and packaged in signed Native56. There is no established connection to MiniGolf's previous failure or FPS. The host retains the existing app identity, helper, memory permissions and profiles; unchanged native archives and three PE modules retain their original hash-verified provenance. [FEX qualification](evidence/fex-arm64ec-checkcall-20261010.json).
+
+The original strict update recipe stopped at its 8-GiB backup bound. AFC denies root `SystemData` contents and an independent exact CoreDevice listing also fails, so a full-container backup is not established. A separately authorized accessible-only procedure preserves every readable game/save/settings/pairing/Wine file and records opaque system metadata without claiming inaccessible contents or Keychain bytes backed up or restorable. An earlier second comparison stopped at an own-app process appearance. The bounded own-app system log identified **DAS Prewarm launch** followed by suspension; Apple's [launch-sequence documentation](https://developer.apple.com/documentation/uikit/about-the-app-launch-sequence) describes this prewarm behavior. Failed captures and their evidence remain preserved.
+
+The subsequent recapture accepted an accessible backup of **9,648,347,044 bytes across 2,699 files**, verified by local replay and two fresh complete USB reads with the app closed. The observer closed one proven suspended OS-prewarm process using exact PID/path/build checks. This backup remains retained.
+
+**Same-bundle Native56 installation was observed as build 56, but its post-install userdata equality check failed.** The automatic fallback installed and closed the signed Native55 app; its strict comparison also differs from the accepted backup. Those failed gates remain recorded. [Native56 host and update evidence](evidence/native56-host-20261010.json).
+
+A subsequent complete read-only USB inventory establishes the exact differences: eight newly named system snapshots have byte-identical old providers, nine old snapshot paths are absent, and one 78,904-byte dyld cache changed. All 4,745 entries below Documents, preferences, application support, 510 symlinks and opaque system-root metadata remain equal. This confirms preservation of the readable games, saves, Wine prefix, pairing and settings. The full readable backup remains intact. It does not establish a rename operation or which install event changed the caches, restore inaccessible contents, or retrospectively pass the strict update gates. A fresh backup basis and a narrowly scoped install comparison are required before the next Native56 attempt. Native56 JIT, GPU and gameplay remain unqualified. [Complete data comparison](evidence/native55-readonly-data-comparison-20261010.json).
+
+### Later Native56 installation and current readback
+
+A later native installation command completed successfully and reported build 56. Its enclosing update stopped on an iPadOS status-observation error, so that historical result remains failed. The subsequent independent read-only phase confirms the current Native56 identity and hashes all **9,647,839,116 readable bytes in 2,698 files / 4,789 entries**. Protected game/save/Wine/pairing/settings data matches the retained composite; only the prospective ordinary-system-file policy differences are present, with their bytes retained.
+
+The final closed-state query found another exact own app process. It did not exit within the fixed 130-second wait, and the log does not establish its start cause or a fresh DAS prewarm. All three owned read/monitor/observer tasks joined. **That first reconciliation remains unaccepted.** Its complete evidence is retained and has not been relabelled. No reinstall, launch or userdata write occurred in this read-only phase. Protected `SystemData` contents and Keychain remain outside the backup claim. [Current readback and failure boundary](evidence/native56-readonly-reconciliation-20261010.json).
+
+A second execution of the same reviewed helper completed successfully in **398.974 seconds**. It ordinarily closed the previously observed own main process, observed and closed one fully proven suspended/NotVisible DAS prewarm, streamed another complete **2,698-file / 9,647,839,116-byte** inventory, retained the allowed system-file bytes, and verified the full local source/provider bytes and a fresh final closed state. All read, monitor and observer tasks joined. This independently accepts the current Native56 protected-data state without reclassifying the earlier failed installer or readback. It performed no installation, launch or userdata write. Native56 JIT, CPU execution, GPU and gameplay still require their separate tests. [Accepted current-state evidence](evidence/native56-readonly-reconciliation-accepted-20261010.json).
+
+### First Native56 CPU execution and library recovery
+
+A fresh CPU launch automatically enables built-in JIT, obtains the separate RX/RW
+512-MiB pool and runs the x86-64 AVX2 fixture. All six numerical cases match their
+independent references, followed by a zero guest exit and clean Wine-thread
+completion before collector termination. This establishes execution of those
+cases; the complete phase remains failed.
+
+The collector's broad word filter rejects benign host diagnostics containing
+`skipped` or `unavailable`. Its cleanup then refuses two metadata scan timestamps
+on existing library entries and default fields saved on the temporary CPU card.
+A separate closed-app USB read verifies the exact differences and both protected
+title manifests plus global settings. Recovery atomically restores the original
+library and reads it back byte-for-byte, ending with the own app closed. No game
+saves or pairing files are written by the collector or recovery. The failed
+attempt is preserved; the remaining CPU phases, GPU and gameplay are open.
+[CPU attempt and separate recovery](evidence/native56-avx2-attempt-and-recovery-20261010.json).
+
+The corrected collector retains every numerical, count, target and terminal
+check, scopes unavailable/skip detection to fixture results and permits only the
+observed default fields and bounded forward metadata-scan timestamps. All 180
+offline controls pass before plan creation. A **fresh actual AVX2 phase passes
+in 78.591 seconds**: automatic JIT, all six reference cases, zero guest exit
+before any collector termination, one final log read, original-library byte
+restoration, protected metadata equality and own-process closure. The historical
+failed attempt remains failed. This passes one CPU phase; allocator, mapping,
+protected-state, exception, GPU and game qualification remain open.
+[Passed fresh AVX2 phase](evidence/native56-avx2-passed-20261010.json).
+
+Seven of the eight initial Native56 CPU phases now pass in independent fresh
+launches. The additional phases verify standalone allocator collisions, 4-GiB
+virtual mappings, protected store state, pending AVX with and without protection,
+and relinked guest exceptions. Every passed phase records zero guest exit before
+collector termination, one final log read, original-library restoration, protected
+metadata equality and clean own-process closure. The remaining
+`guest-raise-exception` execution fails in its Continuing worker while resuming
+through the Wine/ARM64EC exception path; no normal guest exit is observed. The
+expected synthetic suspension exceptions are not themselves the failure. Cleanup
+restores the original library and protected metadata and closes the launched own
+process. This is a CPU continuation blocker, not a GPU or gameplay result.
+[Current CPU phases and failed continuation](evidence/native56-cpu-phases-20261010.json).
+
+A separate 120-second Continuing-only diagnostic also fails to complete. Automatic
+JIT succeeds, but the test records no interrupted-context rows and no normal
+guest exit. The observed native ARM64EC exit thunk resumes with an unaligned
+stack after a synthetic suspension; this narrows the investigation without
+establishing a production repair. One final log read, original-library byte
+restoration, protected metadata equality and own-app closure succeed. The
+original 803-delivery gate remains failed and the initial CPU acceptance stays
+at seven of eight phases. [Bounded diagnostic](evidence/native56-continuing-diagnostic-20261010.json).
+
+## Preceding package baseline
+
+Version **01.000.000** had a freshly prepared six-patch combined runtime
 package against complete AnyPS5 main `d70b8998`. All twelve decrypted ELFs relink,
 the dependency audit passes and all 170 package files are verified. **Native
 Windows execution passes all eight isolated array-load prerequisites and stops
@@ -665,3 +1129,139 @@ also require a Solitaire card/Undo regression. A successful preparation, live
 process or visible menu does not satisfy these checks.
 
 All builds and tests are local. No GitHub Actions are used.
+
+
+## PC 112 production attempt, 2026-10-10
+
+The next isolated correction validates mandatory forward control-flow blocks,
+active NSA address words and complete register footprints through the terminal
+interpolation block. Unknown, indexed or partial accesses remain rejected while
+raw center inputs are live or interpolation pairs are pending. It retains the
+strict guard and existing interpolation behavior.
+
+A real production relink preserves all **3,725 export names, ordinals and
+forwarders plus every import**. Eight new compiler-private autoexports are
+hidden, and one previous stateless sort alias resolves locally to the exact
+**1,216-byte** relocation-free body verified in both prior and new builds.
+The new cache remains schema 22 with identity `409d82e2083d0bae`.
+
+All **484 ordered public cases** and the previous **nine complete requests**
+pass through that actual PRX; their SPIR-V and binding layouts remain byte
+identical. The tenth complete request passes interpolation validation but fails
+subsequently in runtime resource-table evaluation at descriptor source 0, dword 0.
+No tenth materialized shader, subsequent null/host suite, new Windows packet or
+iPad GPU result is established. The attempt remains failed; its source and
+artifacts are retained and its own Wine server closed. The candidate has not
+been promoted into the canonical source or game package.
+[Actual production attempt](evidence/minigolf-pc112-production-attempt-20261010.json).
+
+
+The tenth request is now traced to `PrepareRegistered()`: it contains thirty
+zero-initialized UserData words and only code plus header memory. This is a valid
+shader-registration capture, with no live resource tables. The actual draw path
+obtains those inputs later through `ShaderMemory::capture()`. Its failed offline
+resource-table evaluation is therefore an expected missing-input rejection, not
+a demonstrated resource-table compiler bug. A separate preparation/artifact
+test and explicit negative capture test now qualify that boundary; a later live
+draw capture is required for full materialization evidence.
+
+The separate successor runs against the unchanged production PRX and preserves
+the failed attempt above. Its imported registration fixture successfully runs
+`PrepareShader()` and `GetArtifact()`, then confirms the exact rejection of
+missing runtime resources by `CaptureResources()`. A wrong-driver control is
+also rejected. All **12 null-pixelshader cases** and a fresh **53-target host
+suite** pass. The 484 public cases and nine complete requests retain their
+actual earlier execution proofs; they are not counted as newly rerun here.
+
+This qualifies a bounded Windows diagnostic package with nine complete shader
+replays and one registration/negative-resource gate. It does not establish a
+tenth materialized shader, an iPad graphics result or a playable course. The
+canonical source and existing game packages remain unchanged until that next
+run supplies the required evidence.
+[Registration boundary and fresh host tests](evidence/minigolf-pc112-registration-20261010.json).
+
+
+## Windows run 10: prerequisites pass, next shader guard
+
+The new packet passes **26 prerequisites** on the physical AMD Radeon 780M:
+the original sixteen, nine complete resource-bound replays and one separate
+registration test. Both compiler suites execute the same 484 ordered cases;
+803 explicit-AVX and 701 default exception deliveries pass. The original PC 112
+registration request passes preparation and artifact generation while its absent
+runtime SRT correctly remains a capture error. It is not a tenth complete replay.
+
+MiniGolf proceeds past that shader and exits after **7.1236738 seconds** with
+`0xC0000409` at another interpolation guard, **PC 76**. Its inline serializer-15
+request contains code and header regions with thirty zero user-data words. This
+allows private registration/compiler analysis, but does not establish actual
+resource capture or GPU execution. The owned-window capture reports that the
+game exited during capture; no image or direct `.req` snapshot was returned.
+
+The cache remains schema 22 with a fresh policy identity. Fixed-function
+interpolation, three 837 × 471 swapchain images and the requested 1920 × 1080
+window remain unchanged. All prerequisite and game processes are joined, no
+stdout/stderr is discarded, the scoped transfer listener closes, and Smart App
+Control is restored through Windows Security with independent registry value 1.
+A course image, a first stroke and the iPad graphics path remain open.
+[Actual run and independent audit](evidence/anyps5-c963-windows-run10-20261010.json).
+
+
+## Native57 build: exact LoopTop suspend repair
+
+Native57 is built and signed locally. It embeds a freshly linked ARM64EC JIT
+runtime with a narrowly scoped context reconstruction change: for the private
+`0xe0425355` suspend exception at exact dispatcher LoopTop on iOS, copy the live
+SRA GPR/vector/flag mappings before packing, keeping the already published RIP.
+Other dispatcher addresses and exceptions retain their existing behavior. The
+original failing log did not print the live SRA stack pointer, so the causal
+explanation remains a source-supported candidate until a new device run.
+
+Fourteen native ARM64 captured-state controls and fourteen non-iOS controls pass;
+the original source and seven omission/broader-guard mutations fail their exact
+assertions. The entire changed production translation unit compiles as ARM64EC,
+and the complete runtime is rebuilt from 187 objects with unchanged exports.
+The prior table-size/bounds correction remains present in actual object code.
+These fixtures verify mapping and packing, not native-call flag preservation or
+general native auxiliary-register preservation.
+
+The optimized host retains the bundle ID, Native54 provisioning profiles and
+memory/debug entitlements, automatic JIT helper and the seven verified native
+archives. The new DLL is the only changed copied layout file. Native55 and
+Native56 files remain preserved. **Native57 installation and protected-data
+preservation are now accepted; the 50-round Continuing diagnostic, full
+803-delivery test, all eight fresh CPU phases and GPU acceptance remain
+required.** [Source/native controls](evidence/fex-loop-top-native-controls-20261010.json),
+[signed host build](evidence/native57-host-20261010.json),
+[accepted installation](evidence/native57-preservation-accepted-20261011.json).
+
+The fresh Native56 pre-installation baseline is now verified by two complete,
+independent USB reads with identical hashed inventories. Every readable current
+file has an explicit locally replayed provider: 3,461 files totaling
+10,909,284,143 bytes. All 2,698 original backup providers remain verified,
+including files no longer present on the device. Fourteen current files were
+newly copied; other current bytes come from individually approved preserved
+providers. The native operation and both observers finish successfully, and
+source closure remains unchanged. This proves the accessible baseline, not
+opaque SystemData or Keychain contents, Native57 installation, or gameplay.
+The observed initial changes do not relax the subsequent update preservation
+policy. [Preservation evidence](evidence/native57-preservation-preflight-20261010.json).
+
+## PC76 completed local qualification
+
+The bounded cache-inventory successor now completes the actual production
+driver qualification: 538 public compiler cases, nine complete request replays
+with byte-identical SPIR-V/layout outputs, two registration-only preparations,
+twelve null-pixelshader cases and all 53 fresh host cases. Export names,
+ordinals, forwarders and native imports match the prior qualified driver.
+One exact owned cache-temp rename race triggers a complete inventory retry;
+all resource caps remain active. Both wrong-driver controls and full prefix
+cleanup finish with their expected results. Earlier failed runs remain failed.
+These CPU results allow preparation of the next Windows package; they do not
+prove native GPU rendering, a MiniGolf course, or iPad gameplay.
+[Qualification evidence](evidence/minigolf-pc76-qualification-20261011.json).
+
+The subsequent Native57 update attempt reads a full pre-installation inventory
+matching the verified baseline, then stops before installation because the
+Mac has less than its required 6-GiB planning reserve. The native task and both
+observers join. Native56 is not replaced, and no userdata writes are performed
+by the installer. [Preservation evidence](evidence/native57-preservation-preflight-20261010.json).

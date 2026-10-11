@@ -1,0 +1,23 @@
+From: madeira-anyps5 local integration
+Subject: [PATCH] ARM64EC: load the LUT size as uint32_t and reject its end
+
+Apply the two-instruction repair from FEX-Emu/FEX PR #6021, commits
+4dbb046d62c57639fd93d433bb64896df7332ff0 and
+3a2b1c0b438fed5062bebff0c5f7c8e21879fe48, onto the qualified iOS port.
+This is a call-checker correctness repair, not a measured game/FPS fix.
+
+diff --git a/Source/Windows/ARM64EC/Module.S b/Source/Windows/ARM64EC/Module.S
+--- a/Source/Windows/ARM64EC/Module.S
++++ b/Source/Windows/ARM64EC/Module.S
+@@ -480,9 +480,9 @@ DIRECT_SYSCALL_WRAPPER("#NtProtectVirtualMemoryNative", WineNtProtectVirtualMemorySyscallId)
+   subs x16, x11, x9
+   b.lo end
+   adrp x17, NtDllRedirectionLUTSize
+-  ldr x17, [x17, #:lo12:NtDllRedirectionLUTSize]
++  ldr w17, [x17, #:lo12:NtDllRedirectionLUTSize]
+   cmp x16, x17
+-  b.hi end
++  b.hs end
+   adrp x17, NtDllRedirectionLUT
+   ldr x17, [x17, #:lo12:NtDllRedirectionLUT]
+   ldr w11, [x17, x16, lsl #2]

@@ -1,0 +1,816 @@
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/include/Driver/Dispatch/IndirectDispatch.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/Driver/Dispatch/IndirectDispatch.hpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/include/Driver/Dispatch/IndirectDispatch.hpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/include/Driver/Dispatch/IndirectDispatch.hpp
+@@ -5,7 +5,7 @@
+ 
+ namespace AgcDriver::DriverDetail {
+ 
+-enum IndirectPath { IndirectGpu = 0, IndirectPendingImage = 1, IndirectCopiedWrite = 2, IndirectNotImported = 3, IndirectThreadDimensions = 4, IndirectFillKernel = 5, IndirectMisaligned = 6, IndirectDisabled = 7, IndirectPaths = 8 };
++enum IndirectPath { IndirectGpu = 0, IndirectPendingImage = 1, IndirectCopiedWrite = 2, IndirectNotImported = 3, IndirectThreadDimensions = 4, IndirectFillKernel = 5, IndirectMisaligned = 6, IndirectDisabled = 7, IndirectWorkgroupMemory = 8, IndirectPaths = 9 };
+ 
+ }
+ 
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp
+@@ -225,16 +225,6 @@
+     // variant (design_cpu_final M4): only when the resource cache served or took the object
+     // (reusable, cacheable) and recipes are on (APS5_NO_DISPATCH_RECIPE=1 builds none); else null.
+     void Dispatch(const ShaderRecompiler::RecompileResult& shader, std::uint32_t x, std::uint32_t y, std::uint32_t z, std::span<const Graphics::GuestMemorySnapshot> snapshots = {}, std::uint64_t programAddress = 0, std::shared_ptr<PreparedDispatch> prepared = nullptr, std::shared_ptr<const Recipe>* recipe = nullptr);
+-    // A dispatch whose group counts are the three dwords at `arguments` in guest memory
+-    // (DISPATCH_INDIRECT): the GPU reads them in place from the host import, ordered after everything
+-    // recorded before, so the CPU never waits for the shader that wrote them. When the GPU could not
+-    // see the current bytes the counts are read on the CPU instead (through the flush hook, as the
+-    // driver resolved every indirect dispatch before) and the dispatch is recorded as a direct one:
+-    // cpuReason 1 storage-image results were pending over them, 2 a recorded dispatch writes them
+-    // through a copied buffer (its CPU write-back lands only when the batch is reaped) or a label
+-    // over those dwords is pending, 3 the memory is not host-imported; 0 when recorded GPU-side. argumentReadMs is
+-    // what that CPU read (its sync) took. The device limit on group counts is not checked GPU-side.
+-    // Debug aid: APS5_NO_GPU_INDIRECT=1 (in the driver) keeps every indirect dispatch on the CPU path.
+     struct IndirectOutcome {
+         int cpuReason;
+         double argumentReadMs;
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Dispatch/IndirectDispatch.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Dispatch/IndirectDispatch.cpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Dispatch/IndirectDispatch.cpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/src/Driver/Dispatch/IndirectDispatch.cpp
+@@ -20,7 +20,7 @@
+     lastReport = now;
+     std::uint64_t cpu = 0;
+     for (int i = 1; i < IndirectPaths; ++i) cpu += counts[i];
+-    std::fprintf(stderr, "[indirect] gpu-side %llu, cpu-side %llu (thread dimensions %llu, fill kernel %llu, pending image results %llu, pending label or copied write %llu, not imported %llu, misaligned %llu, disabled %llu); CPU argument reads took %.1f s\n", static_cast<unsigned long long>(counts[IndirectGpu]), static_cast<unsigned long long>(cpu), static_cast<unsigned long long>(counts[IndirectThreadDimensions]), static_cast<unsigned long long>(counts[IndirectFillKernel]), static_cast<unsigned long long>(counts[IndirectPendingImage]), static_cast<unsigned long long>(counts[IndirectCopiedWrite]), static_cast<unsigned long long>(counts[IndirectNotImported]), static_cast<unsigned long long>(counts[IndirectMisaligned]), static_cast<unsigned long long>(counts[IndirectDisabled]), readWaitedMs / 1000);
++    std::fprintf(stderr, "[indirect] gpu-side %llu, cpu-side %llu (thread dimensions %llu, fill kernel %llu, pending image results %llu, pending label or copied write %llu, not imported %llu, misaligned %llu, disabled %llu, device memory LDS %llu); CPU argument reads took %.1f s\n", static_cast<unsigned long long>(counts[IndirectGpu]), static_cast<unsigned long long>(cpu), static_cast<unsigned long long>(counts[IndirectThreadDimensions]), static_cast<unsigned long long>(counts[IndirectFillKernel]), static_cast<unsigned long long>(counts[IndirectPendingImage]), static_cast<unsigned long long>(counts[IndirectCopiedWrite]), static_cast<unsigned long long>(counts[IndirectNotImported]), static_cast<unsigned long long>(counts[IndirectMisaligned]), static_cast<unsigned long long>(counts[IndirectDisabled]), static_cast<unsigned long long>(counts[IndirectWorkgroupMemory]), readWaitedMs / 1000);
+ }
+ 
+ void Driver::dispatchIndirect(QueueState& queue, std::span<const std::uint32_t> packet, const Submission& submission) {
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
+@@ -172,6 +172,20 @@
+         if (pipeline != VK_NULL_HANDLE) destroyPipeline(device, pipeline, nullptr);
+         if (layout != VK_NULL_HANDLE) destroyLayout(device, layout, nullptr);
+         if (module != VK_NULL_HANDLE) destroyModule(device, module, nullptr);
++    }
++};
++
++constexpr std::uint64_t WorkgroupMemoryGranule = 1u << 20u;
++
++struct WorkgroupMemory {
++    VkDevice device = VK_NULL_HANDLE;
++    PFN_vkDestroyDescriptorPool destroyPool = nullptr;
++    std::unique_ptr<Graphics::DeviceBuffer> buffer;
++    VkDescriptorPool pool = VK_NULL_HANDLE;
++    VkDescriptorSet set = VK_NULL_HANDLE;
++    ~WorkgroupMemory() {
++        buffer.reset();
++        if (pool != VK_NULL_HANDLE) destroyPool(device, pool, nullptr);
+     }
+ };
+ 
+@@ -266,6 +280,8 @@
+     // Device-local buffers of a repeated 16-byte fill pattern (FillBuffer), most recently used
+     // last; each is filled once by a doubling chain in device memory.
+     std::vector<std::pair<std::array<std::uint32_t, 4>, std::shared_ptr<Graphics::DeviceBuffer>>> patternBuffers;
++    VkDescriptorSetLayout workgroupMemoryLayout = VK_NULL_HANDLE;
++    std::shared_ptr<WorkgroupMemory> workgroupMemory;
+     // Compute pipeline objects by variant (and push-constant use), under their own mutex: the
+     // dispatch's find-or-insert and the verify switch's lookups touch the map, recipes hold weak
+     // references to its objects.
+@@ -360,6 +376,54 @@
+         return function;
+     }
+ 
++    void CreateWorkgroupMemoryLayout() {
++        const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
++        VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
++        info.bindingCount = 1;
++        info.pBindings = &binding;
++        check(DeviceFunction<PFN_vkCreateDescriptorSetLayout>("vkCreateDescriptorSetLayout")(device, &info, nullptr, &workgroupMemoryLayout), "vkCreateDescriptorSetLayout workgroup memory");
++    }
++
++    std::shared_ptr<WorkgroupMemory> WorkgroupMemoryFor(const Graphics::Context& context, std::uint32_t x, std::uint32_t y, std::uint32_t z, std::uint32_t dwords) {
++        const std::uint64_t range = properties.limits.maxStorageBufferRange;
++        const auto groupBytes = static_cast<std::uint64_t>(dwords) * 4u;
++        std::uint64_t groups = 1;
++        for (const std::uint64_t count : {x, y, z}) {
++            if (count != 0u && groups > range / groupBytes / count) {
++                throw std::runtime_error("Vulkan dispatch: the LDS of " + std::to_string(x) + "x" + std::to_string(y) + "x" + std::to_string(z) + " workgroups of " + std::to_string(groupBytes) + " bytes each is over maxStorageBufferRange " + std::to_string(range));
++            }
++            groups *= count;
++        }
++        const auto bytes = std::max<std::uint64_t>(groups, 1u) * groupBytes;
++        if (workgroupMemory != nullptr && workgroupMemory->buffer->Size() >= bytes) return workgroupMemory;
++        const auto size = std::min<std::uint64_t>((bytes + WorkgroupMemoryGranule - 1u) / WorkgroupMemoryGranule * WorkgroupMemoryGranule, range);
++        auto memory = std::make_shared<WorkgroupMemory>();
++        memory->device = device;
++        memory->destroyPool = DeviceFunction<PFN_vkDestroyDescriptorPool>("vkDestroyDescriptorPool");
++        memory->buffer = std::make_unique<Graphics::DeviceBuffer>(context, static_cast<std::size_t>(size), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
++        const VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1};
++        VkDescriptorPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
++        poolInfo.maxSets = 1;
++        poolInfo.poolSizeCount = 1;
++        poolInfo.pPoolSizes = &poolSize;
++        check(DeviceFunction<PFN_vkCreateDescriptorPool>("vkCreateDescriptorPool")(device, &poolInfo, nullptr, &memory->pool), "vkCreateDescriptorPool workgroup memory");
++        VkDescriptorSetAllocateInfo allocation{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
++        allocation.descriptorPool = memory->pool;
++        allocation.descriptorSetCount = 1;
++        allocation.pSetLayouts = &workgroupMemoryLayout;
++        check(DeviceFunction<PFN_vkAllocateDescriptorSets>("vkAllocateDescriptorSets")(device, &allocation, &memory->set), "vkAllocateDescriptorSets workgroup memory");
++        const VkDescriptorBufferInfo described{memory->buffer->Handle(), 0, size};
++        VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
++        write.dstSet = memory->set;
++        write.dstBinding = 0;
++        write.descriptorCount = 1;
++        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
++        write.pBufferInfo = &described;
++        DeviceFunction<PFN_vkUpdateDescriptorSets>("vkUpdateDescriptorSets")(device, 1, &write, 0, nullptr);
++        workgroupMemory = std::move(memory);
++        return workgroupMemory;
++    }
++
+     void Upload(std::span<const std::byte> pixels) {
+         APS5_LOG_OUT("Upload pixels=%zu uploadSize=%llu buffer=%p memory=%p mapping=%p", pixels.size(), static_cast<unsigned long long>(uploadSize), reinterpret_cast<void*>(uploadBuffer), reinterpret_cast<void*>(uploadMemory), uploadMapping);
+         if (uploadSize < pixels.size()) {
+@@ -563,6 +627,8 @@
+             Graphics::ClearImageMirrors(device);
+             Graphics::ClearHostImports(device);
+             patternBuffers.clear();
++            workgroupMemory.reset();
++            if (workgroupMemoryLayout != VK_NULL_HANDLE) reinterpret_cast<PFN_vkDestroyDescriptorSetLayout>(deviceProc(device, "vkDestroyDescriptorSetLayout"))(device, workgroupMemoryLayout, nullptr);
+             descriptorCache.reset();
+             emptyBuffer.reset();
+             samplerCache.reset();
+@@ -1288,6 +1354,7 @@
+     state->colorTransfer = std::make_unique<Graphics::GpuColorTransfer>(graphicsContext());
+     state->descriptorCache = std::make_unique<Graphics::DescriptorCache>(graphicsContext());
+     state->samplerCache = std::make_unique<Graphics::SamplerCache>();
++    state->CreateWorkgroupMemoryLayout();
+     state->recorder = std::make_unique<Graphics::Recorder>(graphicsContext(), state->timelineSemaphores);
+     state->recorder->Activate();
+     // Programs are lazy; the exact opt-in leaves the ordinary path unchanged.
+@@ -3387,6 +3454,8 @@
+         outcome.cpuReason = 1;
+         Graphics::Recorder::CountSync(2);
+         recorder.Sync();
++    } else if (record.shader->program->workgroupMemoryDwords != 0) {
++        outcome.cpuReason = 8;
+     } else if (labelPending() || std::any_of(state->copiedWriters->begin(), state->copiedWriters->end(), [&](const auto& writer) { return writer->WritesOverlap(arguments, 12); })
+                || std::any_of(Graphics::DrawCopiedWriters()->begin(), Graphics::DrawCopiedWriters()->end(), [&](const auto& writer) { return writer->WritesOverlap(arguments, 12); })) {
+         outcome.cpuReason = 2;
+@@ -3510,6 +3579,11 @@
+     }
+     context.Resolved(&Graphics::DeviceFunctions::cmdBindPipeline, "vkCmdBindPipeline")(commands, VK_PIPELINE_BIND_POINT_COMPUTE, record.objects->pipeline);
+     resources.Bind(commands, VK_PIPELINE_BIND_POINT_COMPUTE, record.objects->layout);
++    if (const auto dwords = record.shader->program->workgroupMemoryDwords; dwords != 0) {
++        auto memory = state->WorkgroupMemoryFor(context, record.x, record.y, record.z, dwords);
++        context.Resolved(&Graphics::DeviceFunctions::cmdBindDescriptorSets, "vkCmdBindDescriptorSets")(commands, VK_PIPELINE_BIND_POINT_COMPUTE, record.objects->layout, ShaderRecompiler::WorkgroupMemoryDescriptorSet, 1, &memory->set, 0, nullptr);
++        recorder.Keep(std::move(memory));
++    }
+     if (record.pushStages != 0) {
+         context.Resolved(&Graphics::DeviceFunctions::cmdPushConstants, "vkCmdPushConstants")(commands, record.objects->layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, Graphics::PipelinePushConstantBytes, record.pushBytes->data());
+     }
+@@ -3723,11 +3797,11 @@
+         moduleInfo.pCode = shader.spirv.data();
+         check(state->DeviceFunction<PFN_vkCreateShaderModule>("vkCreateShaderModule")(state->device, &moduleInfo, nullptr, &objects->module), "vkCreateShaderModule");
+         timing.Mark("validate_shader_module");
+-        const auto setLayout = resources->Layout();
++        const std::array<VkDescriptorSetLayout, 2> setLayouts{resources->Layout(), shader.workgroupMemoryDwords != 0 ? state->workgroupMemoryLayout : VK_NULL_HANDLE};
+         const VkPushConstantRange push{VK_SHADER_STAGE_COMPUTE_BIT, 0, Graphics::PipelinePushConstantBytes};
+         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+-        layoutInfo.setLayoutCount = 1;
+-        layoutInfo.pSetLayouts = &setLayout;
++        layoutInfo.setLayoutCount = shader.workgroupMemoryDwords != 0 ? ShaderRecompiler::WorkgroupMemoryDescriptorSet + 1 : 1;
++        layoutInfo.pSetLayouts = setLayouts.data();
+         layoutInfo.pushConstantRangeCount = pushStages != 0 ? 1 : 0;
+         layoutInfo.pPushConstantRanges = pushStages != 0 ? &push : nullptr;
+         check(state->DeviceFunction<PFN_vkCreatePipelineLayout>("vkCreatePipelineLayout")(state->device, &layoutInfo, nullptr, &objects->layout), "vkCreatePipelineLayout");
+diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
+--- a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
+@@ -80,6 +80,7 @@
+     require(sameBindings(left.bindings, right.bindings), prefix + "bindings differ");
+     require(left.pushConstants == right.pushConstants, prefix + "push constants differ");
+     require(left.specialization == right.specialization, prefix + "specialization constants differ");
++    require(left.workgroupMemoryDwords == right.workgroupMemoryDwords, prefix + "workgroup memory stride differs");
+     require(left.poisonedSrtReads == right.poisonedSrtReads, prefix + "poisoned SRT read counts differ");
+     require(left.vertexAttributes.size() == right.vertexAttributes.size(), prefix + "vertex attribute count differs");
+     for (std::size_t i = 0; i < left.vertexAttributes.size(); ++i) {
+@@ -140,6 +141,7 @@
+     result.bdaAbiVersion = 3;
+     result.memoryOffsetDword = 7;
+     result.hostSubgroupSize = 32;
++    result.workgroupMemoryDwords = 32769u;
+     result.vertexInputs = {{1, 4, 2}, {5, 2, 0}};
+     result.vertexInputPatches = {{1, 20, {7, 8, 9}}, {5, 40, {10, 11, 12}}};
+     result.specialization = {{512, 4}, {516, 0x3f800000u}, {517, 0}};
+diff --git a/core/libs/prx/libSceAgcDriver/tests/execution/LdsBeyondDeviceLimit.cpp b/core/libs/prx/libSceAgcDriver/tests/execution/LdsBeyondDeviceLimit.cpp
+new file mode 100644
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/tests/execution/LdsBeyondDeviceLimit.cpp
+@@ -0,0 +1,227 @@
++#include "prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/Draw.hpp"
++#include "Recompiler.hpp"
++#include "VulkanTestDevice.hpp"
++#include <algorithm>
++#include <array>
++#include <cstdint>
++#include <cstdio>
++#include <functional>
++#include <iostream>
++#include <span>
++#include <stdexcept>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++namespace {
++
++using AgcDriver::Graphics::Require;
++using ShaderRecompiler::ShaderStage;
++
++constexpr std::uint32_t Threads = 64;
++constexpr std::uint32_t Results = 16;
++constexpr std::uint32_t Checked = 12;
++constexpr std::uint32_t MaxGroups = 16;
++constexpr std::uint32_t AboveLimitBytes = 4096;
++constexpr std::uint32_t BelowLimitBytes = 512;
++constexpr std::uint32_t Untouched = 0xdeadbeefu;
++constexpr std::uint32_t OpTypeInt = 21;
++constexpr std::uint32_t OpTypeFloat = 22;
++constexpr std::uint32_t OpTypeVector = 23;
++constexpr std::uint32_t OpTypeArray = 28;
++constexpr std::uint32_t OpTypeStruct = 30;
++constexpr std::uint32_t OpTypePointer = 32;
++constexpr std::uint32_t OpConstant = 43;
++constexpr std::uint32_t OpVariable = 59;
++constexpr std::uint32_t StorageClassWorkgroup = 4;
++alignas(256) std::array<std::uint32_t, Threads * 4> Input{};
++alignas(256) std::array<std::uint32_t, MaxGroups * Threads * Results> Output{};
++alignas(256) std::array<std::uint32_t, 4> IndirectGroups{};
++
++alignas(256) constexpr std::array<std::uint32_t, 69> Code{
++    0x34020084, 0xe0381000, 0x80000401, 0x7e100208, 0x7e3e0209, 0x343e3e82, 0x4a103f08, 0x7e40020a,
++    0x34404083, 0x4a104108, 0x34121090, 0x4a121300, 0x4a1412ff, 0x10000000, 0x7e160280, 0x7e180280,
++    0x7e1a0281, 0x7e1e0281, 0x7e200280, 0xbf8c0000, 0xd9340000, 0x00000b06, 0xd834000c, 0x00000b06,
++    0xd8340000, 0x00000904, 0xd8340000, 0x00000a05, 0xd8340000, 0x00000907, 0xbf8c0000, 0xbf8a0000,
++    0xd880000c, 0x28000d06, 0xd9800000, 0x29000f06, 0x3a260884, 0x3a2a0aff, 0x00000080, 0x363608ff,
++    0xfffffff8, 0xbf8c0000, 0xbf8a0000, 0xd8d80000, 0x2b000013, 0xd8d80000, 0x2c000015, 0xd8d80000,
++    0x2d000007, 0xd8d8000c, 0x2e000006, 0xd9d80000, 0x2f000006, 0xd9d80000, 0x3100001b, 0xd8d80000,
++    0x33000005, 0x343c1086, 0x4a3c3d00, 0x343c3c86, 0xbf8c0000, 0xe0781000, 0x8001281e, 0xe0781010,
++    0x80012c1e, 0xe0781020, 0x8001301e, 0xbf8c0000, 0xbf810000,
++};
++
++constexpr const char* Names[Checked] = {
++    "ds_add_rtn_u32 result", "ds_add_rtn_u64 result low", "ds_add_rtn_u64 result high", "neighbour's word above the limit",
++    "other wave's word below the limit", "out-of-range read", "final 32-bit counter", "final 64-bit counter low",
++    "final 64-bit counter high", "ds_read_b64 above the limit, low", "ds_read_b64 above the limit, high", "own word below the limit",
++};
++
++std::array<std::uint32_t, 4> BufferDescriptor(const void* data, std::uint32_t bytes) {
++    const auto address = reinterpret_cast<std::uintptr_t>(data);
++    return {static_cast<std::uint32_t>(address), static_cast<std::uint32_t>((address >> 32u) & 0xffffu), bytes, 0x31016facu};
++}
++
++std::string Hex(std::uint32_t value) {
++    char text[16];
++    std::snprintf(text, sizeof(text), "0x%08x", value);
++    return text;
++}
++
++std::uint64_t WorkgroupBytes(std::span<const std::uint32_t> words) {
++    std::unordered_map<std::uint32_t, std::span<const std::uint32_t>> types;
++    std::unordered_map<std::uint32_t, std::uint32_t> constants;
++    std::vector<std::uint32_t> pointers;
++    for (std::size_t at = 5; at < words.size();) {
++        const auto count = words[at] >> 16u;
++        Require(count != 0u && at + count <= words.size(), "lds beyond the device limit: malformed SPIR-V at word " + std::to_string(at));
++        const auto instruction = words.subspan(at, count);
++        const auto opcode = instruction[0] & 0xffffu;
++        if (opcode == OpTypeInt || opcode == OpTypeFloat || opcode == OpTypeVector || opcode == OpTypeArray || opcode == OpTypeStruct || opcode == OpTypePointer) types[instruction[1]] = instruction;
++        if (opcode == OpConstant) constants[instruction[2]] = instruction[3];
++        if (opcode == OpVariable && instruction[3] == StorageClassWorkgroup) pointers.push_back(instruction[1]);
++        at += count;
++    }
++    const std::function<std::uint64_t(std::uint32_t)> size = [&](std::uint32_t id) -> std::uint64_t {
++        const auto type = types.find(id);
++        Require(type != types.end(), "lds beyond the device limit: a Workgroup variable has a type the test does not size");
++        const auto& definition = type->second;
++        switch (definition[0] & 0xffffu) {
++        case OpTypeInt:
++        case OpTypeFloat:
++            return definition[2] / 8u;
++        case OpTypeVector:
++            return size(definition[2]) * definition[3];
++        case OpTypeArray: {
++            const auto length = constants.find(definition[3]);
++            Require(length != constants.end(), "lds beyond the device limit: a Workgroup array has a length that is not a constant");
++            return size(definition[2]) * length->second;
++        }
++        case OpTypeStruct: {
++            std::uint64_t bytes = 0;
++            for (const auto member : definition.subspan(2)) bytes += size(member);
++            return bytes;
++        }
++        default:
++            throw std::runtime_error("lds beyond the device limit: a Workgroup variable has a type the test does not size");
++        }
++    };
++    std::uint64_t total = 0;
++    for (const auto pointer : pointers) {
++        const auto type = types.find(pointer);
++        Require(type != types.end() && (type->second[0] & 0xffffu) == OpTypePointer, "lds beyond the device limit: a Workgroup variable is not a pointer");
++        total += size(type->second[3]);
++    }
++    return total;
++}
++
++ShaderRecompiler::RecompileResult Compile(std::uint32_t waveSize, std::uint32_t ldsBytes, const ShaderRecompiler::SpirvTarget& target) {
++    std::vector<std::uint32_t> userData(8, 0u);
++    const auto input = BufferDescriptor(Input.data(), static_cast<std::uint32_t>(Input.size() * 4u));
++    const auto output = BufferDescriptor(Output.data(), static_cast<std::uint32_t>(Output.size() * 4u));
++    std::copy(input.begin(), input.end(), userData.begin());
++    std::copy(output.begin(), output.end(), userData.begin() + 4);
++    const std::array<ShaderRecompiler::MemoryRegion, 1> memory{{{reinterpret_cast<std::uintptr_t>(Code.data()), std::as_bytes(std::span(Code))}}};
++    const ShaderRecompiler::ShaderComputeStageInfo compute{{Threads, 1, 1}, ldsBytes / 4u, {true, true, true}, false, 1};
++    ShaderRecompiler::RecompileRequest request{
++        {ShaderStage::Compute, reinterpret_cast<std::uintptr_t>(Code.data()), Code, 0, {}},
++        {waveSize, 0, userData, compute, std::nullopt, std::nullopt, memory},
++        target,
++        {0, 0, 0, 128}
++    };
++    request.useCache = false;
++    return ShaderRecompiler::Recompile(request);
++}
++
++std::uint32_t Group(std::uint32_t x, std::uint32_t y, std::uint32_t z) {
++    return (z << 3u) | (y << 2u) | x;
++}
++
++void Run(AgcDriver::VulkanDevice& device, std::uint32_t waveSize, const ShaderRecompiler::SpirvTarget& target, std::uint32_t groupsX, std::uint32_t groupsY, std::uint32_t groupsZ, bool indirect, const std::string& run) {
++    const auto limit = target.maxWorkgroupSharedMemoryBytes;
++    Require(limit % 8u == 0u && limit >= 2048u, "lds beyond the device limit: unexpected maxComputeSharedMemorySize " + std::to_string(limit));
++    const auto fits = [&](const ShaderRecompiler::RecompileResult& compiled, const std::string& what) {
++        const auto bytes = WorkgroupBytes(compiled.spirv.Words());
++        Require(bytes <= limit, "lds beyond the device limit " + run + ": " + what + " declares " + std::to_string(bytes) + " bytes of Workgroup memory, over the device's " + std::to_string(limit));
++    };
++    const auto within = Compile(waveSize, limit - BelowLimitBytes, target);
++    Require(within.workgroupMemoryDwords == 0u, "lds beyond the device limit " + run + ": LDS below the device limit left workgroup memory");
++    fits(within, "LDS below the device limit");
++    const auto atLimit = Compile(waveSize, limit, target);
++    Require(atLimit.workgroupMemoryDwords == limit / 4u + 1u, "lds beyond the device limit " + run + ": LDS at the device limit gave " + std::to_string(atLimit.workgroupMemoryDwords) + " device memory dwords per workgroup");
++    fits(atLimit, "LDS at the device limit");
++    const auto bytes = limit + AboveLimitBytes;
++    for (std::uint32_t tid = 0; tid < Threads; ++tid) {
++        Input[tid * 4u + 0u] = limit + tid * 4u;
++        Input[tid * 4u + 1u] = 1024u + tid * 4u;
++        Input[tid * 4u + 2u] = bytes - 16u;
++        Input[tid * 4u + 3u] = bytes + tid * 4u;
++    }
++    Output.fill(Untouched);
++    const auto result = Compile(waveSize, bytes, target);
++    Require(result.workgroupMemoryDwords == bytes / 4u + 1u, "lds beyond the device limit " + run + ": " + std::to_string(bytes) + " bytes of LDS gave " + std::to_string(result.workgroupMemoryDwords) + " device memory dwords per workgroup");
++    fits(result, "LDS above the device limit");
++    if (indirect) {
++        IndirectGroups = {groupsX, groupsY, groupsZ, 0u};
++        const auto outcome = device.DispatchIndirect(result, reinterpret_cast<std::uintptr_t>(IndirectGroups.data()), {}, reinterpret_cast<std::uintptr_t>(Code.data()));
++        Require(outcome.cpuReason == 8, "lds beyond the device limit " + run + ": the indirect group counts were not read on the CPU (reason " + std::to_string(outcome.cpuReason) + ")");
++    } else {
++        device.Dispatch(result, groupsX, groupsY, groupsZ, {}, reinterpret_cast<std::uintptr_t>(Code.data()));
++    }
++    device.WaitIdle();
++    std::vector<bool> dispatched(MaxGroups, false);
++    for (std::uint32_t z = 0; z < groupsZ; ++z) {
++        for (std::uint32_t y = 0; y < groupsY; ++y) {
++            for (std::uint32_t x = 0; x < groupsX; ++x) dispatched[Group(x, y, z)] = true;
++        }
++    }
++    for (std::uint32_t group = 0; group < MaxGroups; ++group) {
++        const std::string where = "lds beyond the device limit " + run + ", group " + std::to_string(group);
++        std::vector<std::uint32_t> counter32;
++        std::vector<std::uint32_t> counter64;
++        for (std::uint32_t tid = 0; tid < Threads; ++tid) {
++            const auto* lane = &Output[(group * Threads + tid) * Results];
++            if (!dispatched[group]) {
++                Require(std::all_of(lane, lane + Results, [](std::uint32_t word) { return word == Untouched; }), where + ": lane " + std::to_string(tid) + " of a group that was not dispatched was written");
++                continue;
++            }
++            const auto value = [&](std::uint32_t laneId) { return (group << 16u) | laneId; };
++            const std::array<std::uint32_t, Checked> expected{
++                lane[0], lane[1], 0u, value(tid ^ 1u),
++                value(tid ^ 32u) + 0x10000000u, 0u, Threads, Threads,
++                0u, value(tid & ~1u), value(tid | 1u), value(tid) + 0x10000000u,
++            };
++            for (std::uint32_t index = 0; index < Checked; ++index) {
++                Require(lane[index] == expected[index], where + ": lane " + std::to_string(tid) + " " + Names[index] + " is " + Hex(lane[index]) + ", expected " + Hex(expected[index]));
++            }
++            counter32.push_back(lane[0]);
++            counter64.push_back(lane[1]);
++        }
++        if (!dispatched[group]) continue;
++        std::sort(counter32.begin(), counter32.end());
++        std::sort(counter64.begin(), counter64.end());
++        for (std::uint32_t tid = 0; tid < Threads; ++tid) {
++            Require(counter32[tid] == tid && counter64[tid] == tid, where + ": the LDS atomics returned " + Hex(counter32[tid]) + " / " + Hex(counter64[tid]) + " as their " + std::to_string(tid) + "th smallest old value");
++        }
++    }
++}
++
++}
++
++int main() {
++    try {
++        const auto device = OpenVulkanTestDevice();
++        if (!device) return VulkanTestSkipped;
++        Run(*device, 32, device->Target(), 3, 2, 1, false, "wave32 3x2");
++        Run(*device, 32, device->Target(), 4, 2, 1, false, "wave32 4x2");
++        Run(*device, 64, device->Target(), 3, 2, 1, false, "wave64 3x2");
++        Run(*device, 64, device->ComputeTarget(32), 4, 2, 1, false, "wave64 split 4x2");
++        Run(*device, 64, device->Target(), 2, 2, 2, false, "wave64 2x2x2");
++        Run(*device, 32, device->Target(), 2, 2, 2, true, "wave32 indirect 2x2x2");
++        std::puts("lds beyond the device limit tests passed");
++        return 0;
++    } catch (const std::exception& error) {
++        std::cerr << error.what() << '\n';
++        return 1;
++    }
++}
+diff --git a/core/shader/recompiler/Deserialize.cpp b/core/shader/recompiler/Deserialize.cpp
+--- a/core/shader/recompiler/Deserialize.cpp
++++ b/core/shader/recompiler/Deserialize.cpp
+@@ -167,6 +167,7 @@
+         translateOptions.userDataBaseRegister = request.context.userDataBaseRegister;
+         translateOptions.userDataCount = static_cast<std::uint32_t>(request.context.userData.size());
+         translateOptions.scratchDwords = request.context.compute.has_value() ? request.context.compute->scratchDwords : 0u;
++        translateOptions.sharedMemoryBytes = request.context.compute.has_value() && static_cast<std::uint64_t>(request.context.compute->ldsSizeDwords) * 4u + 4u > request.target.maxWorkgroupSharedMemoryBytes ? request.context.compute->ldsSizeDwords * 4u : 0u;
+         translateOptions.inputInfo = inputInfo;
+ 
+         InstructionTranslator translator;
+diff --git a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ShaderInfo.hpp b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ShaderInfo.hpp
+--- a/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ShaderInfo.hpp
++++ b/core/shader/recompiler/IntermediateRepresentation/include/IntermediateRepresentation/IrMetadata/ShaderInfo.hpp
+@@ -39,6 +39,10 @@
+     bool operator==(const ShaderInfo& other) const = default;
+ };
+ 
++[[nodiscard]] inline std::uint32_t WorkgroupMemoryStrideDwords(const ShaderInfo& info) {
++    return info.sharedMemoryBytes == 0u ? 0u : info.sharedMemoryBytes / 4u + 1u;
++}
++
+ }
+ 
+ #endif
+diff --git a/core/shader/recompiler/Recompiler.cpp b/core/shader/recompiler/Recompiler.cpp
+--- a/core/shader/recompiler/Recompiler.cpp
++++ b/core/shader/recompiler/Recompiler.cpp
+@@ -95,6 +95,12 @@
+     return BuildShaderStageInputInfo(toShaderStageKind(request.shader.stage), request.context, HostSubgroupSize(request), mesh, tessellation);
+ }
+ 
++std::uint32_t DeviceMemoryLdsBytes(const RecompileRequest& request) {
++    if (!request.context.compute.has_value()) return 0u;
++    const auto bytes = static_cast<std::uint64_t>(request.context.compute->ldsSizeDwords) * 4u;
++    return bytes + 4u > request.target.maxWorkgroupSharedMemoryBytes ? static_cast<std::uint32_t>(bytes) : 0u;
++}
++
+ }
+ 
+ IrProgram PrepareResourceProgram(const RecompileRequest& request) {
+@@ -121,6 +127,7 @@
+     translateOptions.userDataBaseRegister = request.context.userDataBaseRegister;
+     translateOptions.userDataCount = static_cast<std::uint32_t>(request.context.userData.size());
+     translateOptions.scratchDwords = request.context.compute.has_value() ? request.context.compute->scratchDwords : 0u;
++    translateOptions.sharedMemoryBytes = DeviceMemoryLdsBytes(request);
+     translateOptions.fragmentShaderBarycentricEnabled = request.target.fragmentShaderBarycentricEnabled;
+     translateOptions.floatMode = request.context.floatMode;
+     translateOptions.inputInfo = inputInfo;
+@@ -679,6 +686,7 @@
+     }
+     BindingAllocationResult bindings;
+     DescriptorBindingBuilder{}.Populate(bindings, variant.bindings, *bindingPlan, variant.info.userDataBase, snapshot, partialThreads(request));
++    result.workgroupMemoryDwords = WorkgroupMemoryStrideDwords(variant.info.info);
+     result.bindings = std::move(bindings.bindings);
+     result.pushConstants = std::move(bindings.pushConstants);
+     result.poisonedSrtReads = static_cast<std::uint32_t>(snapshot.srtPoison.size());
+diff --git a/core/shader/recompiler/Recompiler.hpp b/core/shader/recompiler/Recompiler.hpp
+--- a/core/shader/recompiler/Recompiler.hpp
++++ b/core/shader/recompiler/Recompiler.hpp
+@@ -274,6 +274,7 @@
+ inline constexpr std::uint32_t MeshArgumentFirstIndexDword = 4;
+ inline constexpr std::uint32_t MeshArgumentBytes = 20;
+ inline constexpr std::uint32_t MeshIndexBufferUserWord = 4;
++inline constexpr std::uint32_t WorkgroupMemoryDescriptorSet = 1;
+ 
+ struct GraphicsDrawParameters {
+     std::uint64_t indexAddress;
+@@ -476,6 +477,7 @@
+ 
+ struct RecompileResult : CompiledShaderArtifact, ShaderInvocation {
+     bool cacheHit = false;
++    std::uint32_t workgroupMemoryDwords = 0;
+     [[nodiscard]] std::uint64_t PipelineVariantId() const { return specializationId != 0 ? specializationId : variantId; }
+ };
+ 
+diff --git a/core/shader/recompiler/ShaderDiskCache.cpp b/core/shader/recompiler/ShaderDiskCache.cpp
+--- a/core/shader/recompiler/ShaderDiskCache.cpp
++++ b/core/shader/recompiler/ShaderDiskCache.cpp
+@@ -66,7 +66,7 @@
+ #if defined(__linux__) && defined(__x86_64__) && defined(__GLIBCXX__)
+ static_assert(sizeof(CompiledShaderArtifact) == 184, "CompiledShaderArtifact changed: update the artifact encoder");
+ static_assert(sizeof(ShaderInvocation) == 112, "ShaderInvocation changed: update the invocation encoder");
+-static_assert(sizeof(RecompileResult) == 296, "RecompileResult changed: update EncodeResult and DecodeResult");
++static_assert(sizeof(RecompileResult) == 304, "RecompileResult changed: update EncodeResult and DecodeResult");
+ static_assert(sizeof(DescriptorBinding) == 496, "DescriptorBinding changed: update the binding encoder");
+ static_assert(sizeof(VertexAttribute) == 32, "VertexAttribute changed: update the attribute encoder");
+ static_assert(sizeof(VertexInput) == 16, "VertexInput changed: update the vertex input encoder");
+@@ -902,12 +902,14 @@
+     Writer writer(out);
+     encodeArtifact(writer, result);
+     encodeInvocation(writer, result);
++    writer.Value(result.workgroupMemoryDwords);
+ }
+ 
+ bool DecodeResult(std::span<const std::byte> bytes, RecompileResult& result) {
+     Reader reader(bytes);
+     decodeArtifact(reader, result);
+     decodeInvocation(reader, result);
++    reader.Value(result.workgroupMemoryDwords);
+     result.cacheHit = false;
+     return reader.Done() && result.runtimeAbiVersion == RuntimeAbi::Version;
+ }
+diff --git a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterHelpers.hpp b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterHelpers.hpp
+--- a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterHelpers.hpp
++++ b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterHelpers.hpp
+@@ -101,6 +101,9 @@
+ std::uint32_t EmitShaderDataDwordLoad(SpirvEmitterState& state, std::uint32_t dwordIndex);
+ void EmitMemoryOffsets(SpirvEmitterState& state);
+ std::uint32_t LdsDwordCount(const SpirvEmitterState& state);
++bool LdsInDeviceMemory(const SpirvEmitterState& state);
++std::uint32_t LdsMemorySemantics(const SpirvEmitterState& state);
++void EmitLdsBufferBase(SpirvEmitterState& state);
+ std::uint32_t EmitLdsLockPointer(SpirvEmitterState& state);
+ MemoryResourceAccess PrepareMemoryResourceAccess(SpirvEmitterState& state, const MemoryInfo& mem);
+ std::uint32_t EmitMemoryElementIndex(SpirvEmitterState& state, const MemoryResourceAccess& access, std::uint32_t rawIndex);
+@@ -223,10 +226,10 @@
+ template<typename TFunction>
+ std::uint32_t AtomicUpdateTyped(SpirvEmitterState& state, std::uint32_t pointer, ResourceKind kind, std::uint32_t type, TFunction&& function) {
+     const auto scope = kind == ResourceKind::Lds ? spv::ScopeWorkgroup : spv::ScopeDevice;
+-    const auto memory = [&]() {
++    const auto memory = [&]() -> std::uint32_t {
+         switch (kind) {
+         case ResourceKind::Lds:
+-            return spv::MemorySemanticsWorkgroupMemoryMask;
++            return LdsMemorySemantics(state);
+         case ResourceKind::Image:
+             return spv::MemorySemanticsImageMemoryMask;
+         default:
+diff --git a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterState.hpp b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterState.hpp
+--- a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterState.hpp
++++ b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvEmitterState.hpp
+@@ -134,6 +134,9 @@
+     std::uint32_t shaderDataStorageVariable = 0;
+     std::uint32_t flattenedSrtVariable = 0;
+     std::uint32_t ldsVariable = 0;
++    std::uint32_t ldsBufferVariable = 0;
++    std::uint32_t ldsBufferBase = 0;
++    std::uint32_t numWorkgroupsVariable = 0;
+     std::array<std::uint32_t, 2> scratchVariable {};
+     std::array<std::uint32_t, ImageBindingCount> imageVariables {};
+     std::uint32_t samplerVariable = 0;
+diff --git a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvMemory/SpirvBufferAccess.hpp b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvMemory/SpirvBufferAccess.hpp
+--- a/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvMemory/SpirvBufferAccess.hpp
++++ b/core/shader/recompiler/SpirvBackend/include/SpirvBackend/SpirvMemory/SpirvBufferAccess.hpp
+@@ -11,6 +11,9 @@
+ std::uint32_t EmitShaderDataDwordLoad(SpirvEmitterState& state, std::uint32_t dwordIndex);
+ void EmitMemoryOffsets(SpirvEmitterState& state);
+ std::uint32_t LdsDwordCount(const SpirvEmitterState& state);
++bool LdsInDeviceMemory(const SpirvEmitterState& state);
++std::uint32_t LdsMemorySemantics(const SpirvEmitterState& state);
++void EmitLdsBufferBase(SpirvEmitterState& state);
+ std::uint32_t EmitLdsLockPointer(SpirvEmitterState& state);
+ MemoryResourceAccess PrepareMemoryResourceAccess(SpirvEmitterState& state, const MemoryInfo& mem);
+ std::uint32_t EmitMemoryElementIndex(SpirvEmitterState& state, const MemoryResourceAccess& access, std::uint32_t rawIndex);
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvFlowEmitter.cpp
+@@ -735,7 +735,7 @@
+             } else if (access != SharedAccess::None) {
+                 const bool writes = access != SharedAccess::Read;
+                 if (ldsWritten || (writes && ldsRead)) {
+-                    state.module.AddFunction(spv::OpControlBarrier, ConstantU32(state, state.waveLdsScope), ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask));
++                    state.module.AddFunction(spv::OpControlBarrier, ConstantU32(state, state.waveLdsScope), ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireReleaseMask | LdsMemorySemantics(state)));
+                     ldsWritten = false;
+                     ldsRead = false;
+                 }
+@@ -832,7 +832,7 @@
+ void EmitBarrier(SpirvEmitterState& state) {
+     const bool tessellation = state.program.Resources().stage == IrShaderStage::TessellationControl;
+     const auto memoryScope = tessellation ? spv::ScopeInvocation : spv::ScopeWorkgroup;
+-    const auto semantics = tessellation ? spv::MemorySemanticsMaskNone : spv::MemorySemanticsAcquireReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask;
++    const std::uint32_t semantics = tessellation ? static_cast<std::uint32_t>(spv::MemorySemanticsMaskNone) : spv::MemorySemanticsAcquireReleaseMask | LdsMemorySemantics(state);
+     state.module.AddFunction(spv::OpControlBarrier, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, memoryScope), ConstantU32(state, semantics));
+ }
+ 
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvBufferAccess.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvBufferAccess.cpp
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvBufferAccess.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvBufferAccess.cpp
+@@ -65,9 +65,45 @@
+     return state.requirements.functionLdsDwords != 0u ? state.requirements.functionLdsDwords : FunctionLdsDwordLimit;
+ }
+ 
++bool LdsInDeviceMemory(const SpirvEmitterState& state) {
++    return state.program.Info().sharedMemoryBytes != 0u;
++}
++
++std::uint32_t LdsMemorySemantics(const SpirvEmitterState& state) {
++    return spv::MemorySemanticsWorkgroupMemoryMask | (LdsInDeviceMemory(state) ? spv::MemorySemanticsUniformMemoryMask : 0u);
++}
++
++void EmitLdsBufferBase(SpirvEmitterState& state) {
++    if (!LdsInDeviceMemory(state)) {
++        return;
++    }
++    if (state.ldsBufferVariable == 0u || state.numWorkgroupsVariable == 0u) {
++        FailEmit("device memory LDS was not declared before function emission");
++    }
++    if (ShaderWorkgroupInput(state) == nullptr || state.program.Resources().stage != IrShaderStage::Compute || state.program.Info().sharedMemoryBytes != LdsDwordCount(state) * 4u) {
++        FailEmit("device memory LDS does not match the compute program's LDS size");
++    }
++    const auto groups = [&](std::uint32_t component) {
++        const auto pointer = state.module.AllocateId();
++        const auto value = state.module.AllocateId();
++        state.module.AddFunction(spv::OpAccessChain, TypePointer(state, spv::StorageClassInput, TypeU32(state)), pointer, state.numWorkgroupsVariable, ConstantU32(state, component));
++        state.module.AddFunction(spv::OpLoad, TypeU32(state), value, pointer);
++        return value;
++    };
++    const auto group = [&](std::uint32_t component) { return EmitInputComponentU32(state, StageInputKind::WorkgroupId, component); };
++    const auto plane = EmitAddU32(state, EmitBinaryU32(state, spv::OpIMul, group(2u), groups(1u)), group(1u));
++    const auto linear = EmitAddU32(state, EmitBinaryU32(state, spv::OpIMul, plane, groups(0u)), group(0u));
++    state.ldsBufferBase = EmitBinaryU32(state, spv::OpIMul, linear, ConstantU32(state, WorkgroupMemoryStrideDwords(state.program.Info())));
++}
++
+ std::uint32_t EmitLdsLockPointer(SpirvEmitterState& state) {
+     if (!state.requirements.ldsLock) {
+         FailEmit("LDS lock was not requested by the program analysis");
++    }
++    if (LdsInDeviceMemory(state)) {
++        const auto pointer = state.module.AllocateId();
++        state.module.AddFunction(spv::OpAccessChain, TypeStorageBufferElementPointer(state), pointer, state.ldsBufferVariable, ConstantU32(state, 0u), EmitAddU32(state, state.ldsBufferBase, ConstantU32(state, LdsDwordCount(state))));
++        return pointer;
+     }
+     EnsureLdsStorage(state);
+     const auto pointer = state.module.AllocateId();
+@@ -80,6 +116,14 @@
+     access.kind = mem.kind;
+     switch (mem.kind) {
+     case ResourceKind::Lds:
++        if (LdsInDeviceMemory(state)) {
++            if (state.ldsBufferVariable == 0u || state.ldsBufferBase == 0u) {
++                FailEmit("device memory LDS was not prepared at function entry");
++            }
++            access.objectPointer = state.ldsBufferVariable;
++            access.length = ConstantU32(state, LdsDwordCount(state));
++            return access;
++        }
+         EnsureLdsStorage(state);
+         access.objectPointer = state.ldsVariable;
+         access.length = ConstantU32(state, LdsDwordCount(state));
+@@ -125,6 +169,9 @@
+ }
+ 
+ std::uint32_t EmitMemoryElementPointer(SpirvEmitterState& state, const MemoryResourceAccess& access, std::uint32_t index) {
++    if (access.kind == ResourceKind::Lds && LdsInDeviceMemory(state)) {
++        return EmitStorageBufferElementPointer(state, access, EmitAddU32(state, state.ldsBufferBase, index), TypeStorageBufferElementPointer(state));
++    }
+     if (access.kind == ResourceKind::Lds || access.kind == ResourceKind::Scratch) {
+         const auto pointer = state.module.AllocateId();
+         const std::uint32_t storageClass = access.kind == ResourceKind::Scratch ? spv::StorageClassFunction : ShaderWorkgroupInput(state) != nullptr ? spv::StorageClassWorkgroup : spv::StorageClassFunction;
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvEmitterHelpers.cpp
+@@ -170,6 +170,15 @@
+         })) {
+             addBuiltin(StageInputKind::WorkgroupId, 3u, "gl_WorkGroupID");
+         }
++    }
++    if (LdsInDeviceMemory(state)) {
++        if (std::none_of(state.inputs.begin(), state.inputs.end(), [](const SpirvInputBinding& input) {
++            return input.kind == StageInputKind::WorkgroupId;
++        })) {
++            state.inputs.push_back(SpirvInputBinding {{StageInputKind::WorkgroupId, 0u, 3u, "gl_WorkGroupID", false}});
++        }
++        state.numWorkgroupsVariable = DefineInterfaceVariable(state, TypeU32Vector(state, 3u), spv::StorageClassInput, "gl_NumWorkGroups");
++        state.module.AddAnnotation(spv::OpDecorate, state.numWorkgroupsVariable, spv::DecorationBuiltIn, spv::BuiltInNumWorkgroups);
+     }
+     const bool pixelStage = state.program.Resources().stage == IrShaderStage::Pixel;
+     for (auto& input : state.inputs) {
+@@ -398,6 +407,13 @@
+         }
+         }
+     }
+-}
+-
+-}
++    if (LdsInDeviceMemory(state)) {
++        state.ldsBufferVariable = state.module.DefineGlobalVariable(TypePointer(state, spv::StorageClassStorageBuffer, StorageBufferBlockType(state)), spv::StorageClassStorageBuffer);
++        state.module.AddName(state.ldsBufferVariable, "workgroup_memory");
++        state.module.AddAnnotation(spv::OpDecorate, state.ldsBufferVariable, spv::DecorationDescriptorSet, WorkgroupMemoryDescriptorSet);
++        state.module.AddAnnotation(spv::OpDecorate, state.ldsBufferVariable, spv::DecorationBinding, 0u);
++        state.module.AddAnnotation(spv::OpDecorate, state.ldsBufferVariable, spv::DecorationCoherent);
++    }
++}
++
++}
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvMemoryInstructions.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvMemoryInstructions.cpp
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvMemoryInstructions.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvMemory/SpirvMemoryInstructions.cpp
+@@ -562,7 +562,7 @@
+         const auto operation = [&]() {
+             const auto old = EmitAtomicOperation(ctx, inst, pointer, scope);
+             if (lds) {
+-                const std::uint32_t semantics = spv::MemorySemanticsAcquireReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask;
++                const std::uint32_t semantics = spv::MemorySemanticsAcquireReleaseMask | LdsMemorySemantics(state);
+                 state.module.AddFunction(spv::OpMemoryBarrier, ConstantU32(state, scope), ConstantU32(state, semantics));
+             } else {
+                 EmitDeviceAtomicMemoryBarrier(state);
+@@ -675,7 +675,7 @@
+     const auto& mem = SharedMemory(ctx, inst);
+     return EmitAtomicAccess(ctx, inst, mem, [&](std::uint32_t pointer) {
+         const auto old = AtomicUpdate(state, pointer, mem.kind, [&](std::uint32_t current) { return replacement(state, current); });
+-        const std::uint32_t semantics = spv::MemorySemanticsAcquireReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask;
++        const std::uint32_t semantics = spv::MemorySemanticsAcquireReleaseMask | LdsMemorySemantics(state);
+         state.module.AddFunction(spv::OpMemoryBarrier, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, semantics));
+         return old;
+     });
+@@ -884,14 +884,14 @@
+     state.module.AddFunction(spv::OpBranch, spinBody);
+     EmitLabel(state, spinBody);
+     const auto previous = state.module.AllocateId();
+-    state.module.AddFunction(spv::OpAtomicCompareExchange, TypeU32(state), previous, lock, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireMask | spv::MemorySemanticsWorkgroupMemoryMask), ConstantU32(state, spv::MemorySemanticsMaskNone), ConstantU32(state, 1u), ConstantU32(state, 0u));
++    state.module.AddFunction(spv::OpAtomicCompareExchange, TypeU32(state), previous, lock, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireMask | LdsMemorySemantics(state)), ConstantU32(state, spv::MemorySemanticsMaskNone), ConstantU32(state, 1u), ConstantU32(state, 0u));
+     const auto acquired = Binary(state, spv::OpIEqual, TypeBool(state), previous, ConstantU32(state, 0u));
+     state.module.AddFunction(spv::OpBranchConditional, acquired, critical, spinCont);
+     EmitLabel(state, spinCont);
+     state.module.AddFunction(spv::OpBranch, spinHeader);
+     EmitLabel(state, critical);
+     const auto old = update();
+-    state.module.AddFunction(spv::OpAtomicStore, lock, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask), ConstantU32(state, 0u));
++    state.module.AddFunction(spv::OpAtomicStore, lock, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsReleaseMask | LdsMemorySemantics(state)), ConstantU32(state, 0u));
+     const auto criticalExit = state.currentLabel;
+     state.module.AddFunction(spv::OpBranch, servedMerge);
+     EmitLabel(state, servedMerge);
+diff --git a/core/shader/recompiler/SpirvBackend/src/SpirvModuleEmitter.cpp b/core/shader/recompiler/SpirvBackend/src/SpirvModuleEmitter.cpp
+--- a/core/shader/recompiler/SpirvBackend/src/SpirvModuleEmitter.cpp
++++ b/core/shader/recompiler/SpirvBackend/src/SpirvModuleEmitter.cpp
+@@ -949,9 +949,10 @@
+             state.module.AddFunction(spv::OpVariable, TypePointer(state, spv::StorageClassFunction, TypeU32(state)), lane.scratchU32Variable, spv::StorageClassFunction);
+         }
+     }
++    EmitLdsBufferBase(state);
+     if (state.requirements.ldsLock) {
+         state.module.AddFunction(spv::OpStore, EmitLdsLockPointer(state), ConstantU32(state, 0u));
+-        state.module.AddFunction(spv::OpControlBarrier, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireReleaseMask | spv::MemorySemanticsWorkgroupMemoryMask));
++        state.module.AddFunction(spv::OpControlBarrier, ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::ScopeWorkgroup), ConstantU32(state, spv::MemorySemanticsAcquireReleaseMask | LdsMemorySemantics(state)));
+     }
+     if (state.gdsVariable != 0u) {
+         state.gdsLength = state.module.AllocateId();
+diff --git a/core/shader/recompiler/Translation/include/Translation/InstructionTranslator.hpp b/core/shader/recompiler/Translation/include/Translation/InstructionTranslator.hpp
+--- a/core/shader/recompiler/Translation/include/Translation/InstructionTranslator.hpp
++++ b/core/shader/recompiler/Translation/include/Translation/InstructionTranslator.hpp
+@@ -30,6 +30,7 @@
+     std::uint32_t userDataBaseRegister = 0;
+     std::uint32_t userDataCount = 64;
+     std::uint32_t scratchDwords = 0;
++    std::uint32_t sharedMemoryBytes = 0;
+     std::uint64_t shaderHash = 0;
+     bool fragmentShaderBarycentricEnabled = false;
+     std::optional<ShaderFloatMode> floatMode;
+diff --git a/core/shader/recompiler/Translation/src/InstructionTranslator.cpp b/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
+--- a/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
++++ b/core/shader/recompiler/Translation/src/InstructionTranslator.cpp
+@@ -379,6 +379,7 @@
+     program.Resources().userDataBase = options.userDataBaseRegister;
+     program.Resources().userDataCount = options.userDataCount;
+     program.Info().scratchDwords = options.scratchDwords;
++    program.Info().sharedMemoryBytes = options.sharedMemoryBytes;
+     if (options.embeddedFetch != nullptr) {
+         program.Info().vertexOffsetSgpr = options.embeddedFetch->vertexOffsetSgpr;
+         program.Info().instanceOffsetSgpr = options.embeddedFetch->instanceOffsetSgpr;
+diff --git a/docs/dev/ARCHITECTURE.md b/docs/dev/ARCHITECTURE.md
+--- a/docs/dev/ARCHITECTURE.md
++++ b/docs/dev/ARCHITECTURE.md
+@@ -67,3 +67,4 @@
+ 
+ - [`Recompiler.cpp`](../../core/shader/recompiler/Recompiler.cpp) runs the stages in this order. With `ANYPS5_ENABLE_SPIRV_TOOLS`, the SPIR-V is also validated and optimized with SPIRV-Tools.
+ - `ShaderRecompiler::Recompile` keeps compiled variants in memory, and `ShaderDiskCache` stores them on disk so later runs reuse them.
++- A compute shader whose LDS plus its lock dword exceeds the host's `maxComputeSharedMemorySize` is not given a `Workgroup` array. `Recompile` sets `ShaderInfo::sharedMemoryBytes` for it and the SPIR-V backend addresses the LDS in a coherent storage buffer at descriptor set 1 (`WorkgroupMemoryDescriptorSet`), with a slice of `RecompileResult::workgroupMemoryDwords` per workgroup, indexed by `WorkgroupID` and `NumWorkGroups`. `VulkanDevice` keeps one such buffer, sized from the dispatch dimensions, and binds it after the resource set; programs that fit keep using shared memory.
+diff --git a/docs/dev/TechnicalDebt.md b/docs/dev/TechnicalDebt.md
+--- a/docs/dev/TechnicalDebt.md
++++ b/docs/dev/TechnicalDebt.md
+@@ -2,6 +2,7 @@
+ 
+ ### Build
+ 
++- [Compute LDS beyond the device's shared-memory limit](../../core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp) (libSceAgcDriver) lives in a coherent storage buffer with one slice of `LDS bytes / 4 + 1` dwords per workgroup (the last dword is the atomic lock), shared by all such dispatches and grown in 1 MiB steps up to `maxStorageBufferRange`; a dispatch whose slices do not fit throws. It is slower than shared memory and its cost was not measured. An indirect dispatch of such a program always reads its group counts on the CPU. Its results are pinned against the in-limit semantics in `agc_driver_lds_beyond_device_limit`, not measured on hardware.
+ - Building on Windows requires a specific version of mingw - MinGW-w64 GCC 15.2.0 (`winlibs-gcc15`, `x86_64-ucrt-posix-seh`)
+ - Even compiled prx libraries on Windows require nearby (static linking of these dependencies causes conflicts):
+   - libgcc_s_seh-1.dll

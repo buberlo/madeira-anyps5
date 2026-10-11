@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "date": "2026-10-11",
+  "status": "native58_installed_with_accessible_data_preserved_not_launched",
+  "build": 58,
+  "device": {
+    "model": "iPad Air 13-inch (M2)",
+    "os": "iPadOS 27.0.1"
+  },
+  "signedReceiptSha256": "5d39ce81a46b331d0b1f72991f1f356da436443f858422e7299834c12d98dcef",
+  "nativeMachOUuid": "4BA5691B-213B-3BAD-9747-9542CC2642E1",
+  "fexRuntimeSha256": "a7d7f381aea5472c8542fb0601c5916b8d70e03ca56ce62d809801392e79089d",
+  "installationResultSha256": "5c160571ae917c27df4c9352a2703564b074ba56c55175fa1dffbd11f15d9f99",
+  "installationBindingSha256": "e52cdbde1b8452274693e9feeace15eecda398c85d7269f874e3bdc508ef4b0f",
+  "sameBundleIdentity": true,
+  "freshCompleteAccessibleDataReadBeforeAndAfter": true,
+  "protectedDataPreserved": true,
+  "exactOrdinarySystemFilePolicySatisfied": true,
+  "opaqueMetadataPreserved": true,
+  "opaqueContentsVerified": false,
+  "installedExecutableIndependentlyRead": false,
+  "allOwnedOperationsJoined": true,
+  "jitVerified": false,
+  "continuing50Qualified": false,
+  "full803Qualified": false,
+  "allEightCpuPhasesQualified": false,
+  "newMiniGolfPackageImported": false,
+  "gpuQualified": false,
+  "gamePlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Same-bundle Native58 install and accessible-data preservation only. No launch, JIT, CPU, GPU or gameplay claim. Private file inventories and diagnostics remain local."
+}

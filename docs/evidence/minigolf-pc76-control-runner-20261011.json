@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "date": "2026-10-11",
+  "status": "qualification_failed_on_concurrent_cache_inventory",
+  "qualificationReceiptSha256": "8c27e60a4848905163cc300ef4e0f73f1f47f2a07e0b7ecd34ec99cc37961f3f",
+  "productionDriverSha256": "54b71b606cf695bbf5becca96c734d46b4ed2399924087153735ce3946eba7ac",
+  "productionLibrariesReusedUnchanged": 47,
+  "actualPublicShaderCasesPassed": 538,
+  "completePrivateRequestReplaysPassedThisAttempt": 3,
+  "publicWrongDriverControlPassed": true,
+  "wrongExpectedDriver": {
+    "existingByteIdenticalPE": true,
+    "distinctFileIdentity": true,
+    "loaded": false,
+    "maximumBytes": 33554432
+  },
+  "failure": "The live output-size walk raced an atomic rename of an owned shader-cache temporary file. It raised FileNotFoundError and interrupted qualification before the remaining probes.",
+  "ownedWinePrefixStopAndWaitExitCodes": [0, 0],
+  "fullQualificationPassed": false,
+  "gpuExecuted": false,
+  "deviceExecuted": false,
+  "miniGolfPlayable": false,
+  "githubActionsUsed": false,
+  "privateShaderBytesOrGameAssetsIncluded": false,
+  "boundary": "Runner failure, not evidence of a shader regression. The attempt stays failed; any repair must retain hard output/disk bounds and rerun the complete qualification."
+}

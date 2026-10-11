@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "status": "windows_reference_incomplete_application_control_refusal",
+  "platform": "native_windows",
+  "currentUpstream": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "activePatchCount": 11,
+  "preparedGameFileCount": 180,
+  "rawHleModuleCount": 47,
+  "localHostTestCases": 54,
+  "remotePayloadHashesVerified": true,
+  "remotePrerequisitesPassed": 3,
+  "remotePrerequisitesRequired": 27,
+  "passedPrerequisites": [
+    "windows_exception_tests",
+    "exception_personality_tests",
+    "guest_raise_exception_tests"
+  ],
+  "explicitExceptionDeliveriesVerified": 803,
+  "asyncAvxModesVerified": [
+    "preserve",
+    "mutate",
+    "reset-avx"
+  ],
+  "asyncVectorChecksEach": 64,
+  "nextFixture": "guest_memory_tests",
+  "failure": "Application Control policy blocked the next owned child constructor; exact policy/API not captured.",
+  "defaultExceptionModeExecuted": false,
+  "gpuExecuted": false,
+  "gameExecuted": false,
+  "screenshotsCaptured": false,
+  "ownReferenceStopped": true,
+  "listenerClosed": true,
+  "referenceScriptExitZeroAloneIsAcceptance": false,
+  "evidenceZipSha256": "f097d5e918a8ee5bf71d7cbf359d785d43c8029a4e68d0a66fac59ae3d2fc205",
+  "transferReportSha256": "327c1bfb7c49569275bfb3f4b8b0d6e0c586eb1050e6f58bf13f2cf30748717f",
+  "sourceRunnerSha256": "43d5686e339a9b8b34ed2baad8e03e0715a8d17e6b25d3e50dbde426f18d948e",
+  "privatePathsOrAssetsPublished": false,
+  "iPadAcceptance": false,
+  "gameplayQualified": false
+}

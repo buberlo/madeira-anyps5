@@ -146,5 +146,70 @@ class HostContracts(unittest.TestCase):
             self.assertEqual(results['savedata_memory_growth_read_failure']['status'], 'skipped')
 
 
+class AdditionalContracts(unittest.TestCase):
+    def test_selection_requires_an_actual_uncommented_literal_test_declaration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            directory = source / 'core/libs'
+            directory.mkdir(parents=True)
+            (directory / 'CMakeLists.txt').write_text(
+                'add_test_executable(guest_extra_tests tests/Extra.cpp)\n'
+                '# add_test_executable(guest_comment_tests tests/Comment.cpp)\n'
+                '#[[add_test_executable(guest_block_tests tests/Block.cpp)]]\n'
+                'add_executable(guest_arbitrary_tests Arbitrary.cpp)\n')
+            self.assertEqual(build.choose_additional_tests(source, ['guest_extra_tests']), ['guest_extra_tests'])
+            for names in (['guest_comment_tests'], ['guest_block_tests'], ['guest_arbitrary_tests'],
+                          ['../guest_extra_tests'], ['guest_extra_tests;evil'],
+                          ['guest_extra_tests', 'guest_extra_tests'], [build.TESTS[0]]):
+                with self.subTest(names=names), self.assertRaises(ValueError):
+                    build.choose_additional_tests(source, names)
+
+    def test_inventory_preserves_registered_fixture_and_environment_wrapped_cases(self):
+        inventory = {'tests': [
+            {'name': 'guest_extra', 'command': ['Z:\\build\\tests\\guest_extra_tests.exe', 'fixture.prx']},
+            {'name': 'guest_extra_second', 'command': ['cmake.exe', '-E', 'env', 'FLAG=1',
+                                                      'Z:/build/tests/guest_extra_tests.exe', 'second']},
+            {'name': 'unrelated', 'command': ['Z:/build/tests/unrelated_tests.exe']}]}
+        self.assertEqual(build.additional_ctest_inventory(['guest_extra_tests'], json.dumps(inventory)),
+                         {'guest_extra': 'guest_extra_tests', 'guest_extra_second': 'guest_extra_tests'})
+        with self.assertRaises(ValueError):
+            build.additional_ctest_inventory(['guest_missing_tests'], json.dumps(inventory))
+        inventory['tests'].append(inventory['tests'][0])
+        with self.assertRaises(ValueError):
+            build.additional_ctest_inventory(['guest_extra_tests'], json.dumps(inventory))
+
+    def test_results_reject_skip_failure_and_missing_or_duplicate_cases(self):
+        expected = {'guest_extra': 'guest_extra_tests', 'guest_extra_second': 'guest_extra_tests'}
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / 'result.xml'
+            report.write_text('<testsuite><testcase name="guest_extra"/><testcase name="guest_extra_second"/></testsuite>')
+            self.assertEqual(set(build.additional_ctest_results(expected, report)), set(expected))
+            for cases in ('<testcase name="guest_extra"><skipped/></testcase><testcase name="guest_extra_second"/>',
+                          '<testcase name="guest_extra"><failure/></testcase><testcase name="guest_extra_second"/>',
+                          '<testcase name="guest_extra"/>',
+                          '<testcase name="guest_extra"/><testcase name="guest_extra"/>'):
+                report.write_text('<testsuite>' + cases + '</testsuite>')
+                with self.assertRaises(ValueError):
+                    build.additional_ctest_results(expected, report)
+
+    @unittest.skipUnless(shutil.which('ctest'), 'A native CTest executable is required')
+    def test_exact_ctest_file_runs_fixture_arguments_and_excludes_unselected_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            python = sys.executable.replace('\\', '/')
+            (directory / 'CTestTestfile.cmake').write_text(
+                'add_test(guest_extra "' + python + '" "-c" "import sys; assert sys.argv[1] == \'fixture\'" "fixture")\n'
+                'add_test(guest_extra_second "' + python + '" "-c" "raise SystemExit(0)")\n'
+                'add_test(unrelated "' + python + '" "-c" "raise SystemExit(1)")\n')
+            selected = directory / 'selected.txt'
+            selected.write_text('guest_extra\nguest_extra_second\n')
+            report = directory / 'result.xml'
+            subprocess.run(['ctest', '--test-dir', str(directory), '--tests-from-file', str(selected),
+                            '--no-tests=error', '--output-on-failure', '--output-junit', str(report)],
+                           check=True, capture_output=True, text=True, timeout=10)
+            expected = {'guest_extra': 'guest_extra_tests', 'guest_extra_second': 'guest_extra_tests'}
+            self.assertEqual(set(build.additional_ctest_results(expected, report)), set(expected))
+
+
 if __name__ == '__main__':
     unittest.main()

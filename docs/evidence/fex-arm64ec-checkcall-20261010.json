@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-10",
+  "status": "source_native_contracts_and_fresh_ARM64EC_DLL_qualified_not_device_executed",
+  "baseCommit": "14c92681f4d62cf84d901460e0358de09c8847a7",
+  "upstreamPullRequest": "https://github.com/FEX-Emu/FEX/pull/6021",
+  "upstreamHeadCommit": "3a2b1c0b438fed5062bebff0c5f7c8e21879fe48",
+  "localPatch": "patches/fex/0003-arm64ec-checkcall-lut-bounds.patch",
+  "change": {
+    "sizeLoad": "ldr w17: load the actual 32-bit table size",
+    "invalidIndexBranch": "b.hs: reject an index equal to the table size",
+    "stateOrSerializerABIChanged": false
+  },
+  "nativeTests": {
+    "actualExtractedAssembly": true,
+    "host": "ARM64 macOS",
+    "casesPassed": 20,
+    "sizeAlignmentModuloEight": [
+      0,
+      4
+    ],
+    "coverage": [
+      "empty table",
+      "first entry",
+      "last entry",
+      "index equals size",
+      "index exceeds size",
+      "below-base address",
+      "large offset",
+      "nonzero adjacent bytes",
+      "guard page"
+    ],
+    "oldWidthMutationGuardPageFault": true,
+    "oldInclusiveBoundMutationGuardPageFault": true,
+    "COFFFourByteAlignmentLinks": true,
+    "COFFOldEightByteLoadRejectedAsMisaligned": true,
+    "receiptSha256": "6e851302fe36712bc79ed7fb0ae768284de3a43c5e5df19b840baa154065f73c"
+  },
+  "productionBuild": {
+    "freshObjects": 187,
+    "parallelJobs": 2,
+    "directLinkInputs": 77,
+    "actualObjectDisassemblyContainsFix": true,
+    "exportsUnchanged": 30,
+    "importBlocksUnchanged": 12,
+    "DLLBytes": 5865472,
+    "DLLSha256": "802182272911e6439b2438dfe75f7ffc12c1091ad6905782d650198bee6355c9",
+    "receiptSha256": "c69a475a8443e3551f331fa086d46020207b07d1e45372c76b5a5184720eb72a"
+  },
+  "nativeArchiveReuse": {
+    "archiveCount": 7,
+    "allNative55HashesUnchanged": true,
+    "frozenSourceFiles": 6971,
+    "unchangedSourceFiles": 6970,
+    "onlyChangedSource": "Source/Windows/ARM64EC/Module.S",
+    "proofSha256": "ac6cc38fec37d867862c61b26e8506b2324f5d62176c14564394fbd4d0c44ec2"
+  },
+  "installed": false,
+  "deviceExecuted": false,
+  "miniGolfFailureCauseEstablished": false,
+  "performanceImprovementEstablished": false,
+  "githubActionsUsed": false,
+  "boundary": "Native extraction proves this lookup contract, not Windows ARM64EC or iPad execution. The full DLL is compiled and linked with its actual object inspected. A newly signed host and device runtime probes remain separate."
+}

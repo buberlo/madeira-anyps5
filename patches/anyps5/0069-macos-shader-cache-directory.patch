@@ -1,0 +1,28 @@
+diff --git a/core/shader/recompiler/ShaderDiskCache.cpp b/core/shader/recompiler/ShaderDiskCache.cpp
+--- a/core/shader/recompiler/ShaderDiskCache.cpp
++++ b/core/shader/recompiler/ShaderDiskCache.cpp
+@@ -11,6 +11,8 @@
+ #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
++#elif defined(__APPLE__)
++#include <mach-o/dyld.h>
+ #endif
+ #include "ShaderCacheVersion.hpp"
+ #include <algorithm>
+@@ -53,7 +55,15 @@
+     const char* directory = std::getenv("ANYPS5_SHADER_CACHE_DIR");
+     if (directory != nullptr && *directory != '\0') return std::filesystem::path(directory);
+     std::error_code error;
++#ifdef __APPLE__
++    std::uint32_t size = 0;
++    if (_NSGetExecutablePath(nullptr, &size) != -1 || size == 0) return {};
++    std::vector<char> path(size);
++    if (_NSGetExecutablePath(path.data(), &size) != 0) return {};
++    const auto executable = std::filesystem::weakly_canonical(std::filesystem::path(path.data()), error);
++#else
+     const auto executable = std::filesystem::read_symlink("/proc/self/exe", error);
++#endif
+     if (error) return {};
+     return executable.parent_path() / "shader_cache";
+ #endif

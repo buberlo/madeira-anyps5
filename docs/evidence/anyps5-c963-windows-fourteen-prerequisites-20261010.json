@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "status": "fourteen_native_windows_prerequisites_executed_five_gpu_positives_passed_reference_incomplete",
+  "date": "2026-10-10",
+  "anyps5Commit": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "titleId": "PPSA03647",
+  "version": "01.000.000",
+  "verifiedPayloadFiles": 256,
+  "verifiedGameFiles": 181,
+  "requiredPrerequisites": 16,
+  "recordedPrerequisites": 14,
+  "recordedNativeExitZeroCases": [
+    "windows_exception_tests",
+    "exception_personality_tests",
+    "guest_raise_exception_tests",
+    "guest_memory_tests",
+    "guest_raise_exception_default_tests",
+    "raw_log_output_tests",
+    "agc_unused_barycentric_tests",
+    "agc_actual_driver_public_tests",
+    "physical-gpu",
+    "gpu-agc_driver_prepared_graphics",
+    "gpu-agc_driver_prepared_shaders",
+    "gpu-agc_driver_prepared_shaders_indirect",
+    "gpu-agc_driver_prepared_shaders_uncached",
+    "gpu-agc_driver_prepared_shaders_debug"
+  ],
+  "gpuDevice": {
+    "name": "AMD Radeon 780M Graphics",
+    "vendorId": 4098,
+    "deviceId": 5567,
+    "driver": "31.0.21029.6002"
+  },
+  "preparedGpuPositiveCases": [
+    {
+      "name": "gpu-agc_driver_prepared_graphics",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false,
+      "stdoutDiscarded": 0,
+      "stderrDiscarded": 0,
+      "exactPositiveSummaryCount": 1,
+      "executableSha256": "754904cb7889c7ef3f144694e35bfe3721714417b6e0c057141cbbeb663afd96"
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false,
+      "stdoutDiscarded": 0,
+      "stderrDiscarded": 0,
+      "exactPositiveSummaryCount": 1,
+      "executableSha256": "c2ea0e879910040facf3daa26cf54283daa81a6b7c9ad300c67e9b7e80e602ac"
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_indirect",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false,
+      "stdoutDiscarded": 0,
+      "stderrDiscarded": 0,
+      "exactPositiveSummaryCount": 1,
+      "executableSha256": "c2ea0e879910040facf3daa26cf54283daa81a6b7c9ad300c67e9b7e80e602ac"
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_uncached",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false,
+      "stdoutDiscarded": 0,
+      "stderrDiscarded": 0,
+      "exactPositiveSummaryCount": 1,
+      "executableSha256": "c2ea0e879910040facf3daa26cf54283daa81a6b7c9ad300c67e9b7e80e602ac"
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_debug",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false,
+      "stdoutDiscarded": 0,
+      "stderrDiscarded": 0,
+      "exactPositiveSummaryCount": 1,
+      "executableSha256": "c2ea0e879910040facf3daa26cf54283daa81a6b7c9ad300c67e9b7e80e602ac"
+    }
+  ],
+  "readerFailure": "The debug-positive case passed its native result and exact summary; broad skipped matching rejects ordinary enabled performance-statistic lines.",
+  "unexecutedPrerequisites": [
+    "gpu-agc_driver_prepared_shaders_debug_failure",
+    "null-pixel-materialization"
+  ],
+  "expectedNegativeQualified": false,
+  "gameStarted": false,
+  "renderedCourseVerified": false,
+  "iPadExecutionQualified": false,
+  "smartAppControlRestoredAndVisuallyVerified": true,
+  "githubActions": false,
+  "rawEvidenceSha256": "85a2c0738644118a74fce48c5806e2d353fcfbd298cdfdf26123feb390907dea",
+  "transferReportSha256": "e4c466cd7b2bce0551d2594cfc756e42bf790622aa1151e78e9e70472eaaf41f",
+  "referenceSha256": "91f748a77fc459bac205337c3d5411ab9c2dbe88796115f0c8e247b6f4cd0b4c",
+  "readerRuntimeOrGameProfileChanged": false,
+  "nativeAmdFixtureInterpolationDistinctFromAppleGameProfile": true,
+  "scope": "Native CPU and five prepared-GPU positive prerequisites; negative registration, null pixel and game execution remain open."
+}

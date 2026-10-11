@@ -1,0 +1,297 @@
+{
+  "schema": 1,
+  "status": "twenty_six_native_windows_prerequisites_passed_game_new_interpolation_guard_pc76_not_playable",
+  "date": "2026-10-10",
+  "referenceRun": 10,
+  "anyps5Commit": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceFreezeSha256": "2a22a2c23457e3b5c3685664b9908cb2a909bddb87a6a599b1ce6e58b7821f1c",
+  "shaderCache": {
+    "schema": 22,
+    "sourceVersion": "0x409d82e2083d0bae",
+    "interpolationPolicy": "center-ij-unused-m0-trace-mandatory-dag-nsa-v3"
+  },
+  "titleId": "PPSA03647",
+  "version": "01.000.000",
+  "verifiedPayloadFiles": 268,
+  "verifiedGameFiles": 181,
+  "requiredPrerequisites": 26,
+  "nativePrerequisites": [
+    {
+      "name": "windows_exception_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "exception_personality_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_raise_exception_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_memory_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "guest_raise_exception_default_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "raw_log_output_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "agc_unused_barycentric_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "agc_actual_driver_public_tests",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "physical-gpu",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_graphics",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_indirect",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_uncached",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_debug",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "gpu-agc_driver_prepared_shaders_debug_failure",
+      "status": "passed_expected_registration_rejection",
+      "exitCode": 1,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "null-pixel-materialization",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-01",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-02",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-03",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-04",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-05",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-06",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-07",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-08",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "full-private-09",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    },
+    {
+      "name": "original-registration-preparation",
+      "status": "passed",
+      "exitCode": 0,
+      "ownProcessJoined": true,
+      "timedOut": false
+    }
+  ],
+  "gpuDevice": {
+    "name": "AMD Radeon 780M Graphics",
+    "vendorId": 4098,
+    "deviceId": 5567,
+    "driver": "31.0.21029.6002"
+  },
+  "hostOs": {
+    "name": "Windows 11 Pro",
+    "version": "10.0.26300"
+  },
+  "preparedGpuPositiveCases": 5,
+  "expectedRegistrationRejectionCases": 1,
+  "expectedRegistrationRejectionExitCode": 1,
+  "everyGpuSelectionMatchesPhysicalAmdDevice": true,
+  "nativePublicCompilerCases": {
+    "standalone": 484,
+    "actualProductionPrx": 484,
+    "sameOrderedNames": true
+  },
+  "nativeExceptionDeliveries": {
+    "explicitAvx": 803,
+    "default": 701,
+    "privateRxEach": 1,
+    "nativeWaitCasesEach": 20
+  },
+  "nativeNullPixelCases": 12,
+  "nativeNullPixelGpuExecution": false,
+  "gameStarted": true,
+  "gameSeconds": 7.1236738,
+  "gameExitCode": -1073740791,
+  "gameExitHex": "0xC0000409",
+  "captureHelperExitCode": 0,
+  "captureStatus": "not_captured",
+  "captureReason": "Own game exited during capture",
+  "ownedGameImageCaptured": false,
+  "captureHelperExitDoesNotProveImage": true,
+  "renderedCourseVerified": false,
+  "gameplayVerified": false,
+  "iPadExecutionQualified": false,
+  "ownGameTreeJoined": true,
+  "ownReferenceTreeJoined": true,
+  "listenerClosed": true,
+  "returnedLogMemberCount": 60,
+  "rawEvidenceSha256": "35842dde452d7dc64741b25096bece9d6cdbdd04fee0da95e62568a11fe46552",
+  "transferReportSha256": "6becfe8395abff39c8f0c4216cdc5b38f71f08845cb7454d889e27184be03fff",
+  "listenerLifetimeReceiptSha256": "fe1c46ed21c1df105c04da1c9588c0ff4e78822043f33e20efd18c62413bd7f3",
+  "sealedPacketReceiptSha256": "2ac07dfac4b68b10d06ad6b5b77ea7f4898b112392e9634efb12818d4f570951",
+  "securityRestorationVerifiedByThisReceipt": true,
+  "githubActionsUsed": false,
+  "privateAssetsIncluded": false,
+  "rawShaderDiagnosticsIncluded": false,
+  "privateDataFileHashesPublished": false,
+  "gameVulkanInitializationObserved": true,
+  "gameProfileFixedFunctionInterpolationRestored": true,
+  "actualSwapchain": [
+    837,
+    471
+  ],
+  "actualSwapchainImages": 3,
+  "shaderProgramCounter": 76,
+  "firstGameException": "Strict fixed-function interpolation validation rejected a new program at pc=76",
+  "serializedRequestVersion": 15,
+  "previousPc0FailureObserved": false,
+  "loaderApplicationControlFailureObserved": false,
+  "privateNewShaderRequestRetainedLocally": true,
+  "securityRestorationEvidenceSha256": "8ef4f24d254e36fe9e2044e01d19f0afaa636cd4bfd63370e4956156e35422f4",
+  "securityRestoration": {
+    "rootWindowsSecurityUiAndUacConfirmed": true,
+    "uiOnWindowsClockMinute": "16:42",
+    "independentRegistryValue": 1,
+    "registryWindowsClockMinute": "16:42",
+    "exactActionUtcSecondsEstablished": false,
+    "otherSecurityProtectionsChanged": false,
+    "networkSettingsChanged": false
+  },
+  "requestedWindow": [
+    1920,
+    1080
+  ],
+  "completed120SecondRun": false,
+  "previousPc72FailureObserved": false,
+  "previousPc112FailureObserved": false,
+  "fullRuntimeRequests": 9,
+  "nineFullRequestsFreshlyReplayedOnWindows": true,
+  "fullRuntimeRequestsGpuExecuted": false,
+  "registrationPreparation": {
+    "prepareAndGetArtifactPassed": true,
+    "exactNullSrtCaptureRejected": true,
+    "fullMaterializationPassed": false,
+    "gpuExecuted": false
+  },
+  "directRequestSnapshotCount": 0,
+  "completeShaderCaptureProven": false,
+  "inlinePrivateRequestRetainedLocally": true,
+  "independentReturnedEvidenceAuditSha256": "69478321e82e25ce2dbf45e9790c51df8f922e7df4d0526f804e4fb061cc8c01"
+}

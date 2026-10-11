@@ -1,0 +1,429 @@
+diff --git a/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
+--- a/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
++++ b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
+@@ -1,5 +1,9 @@
+ #include "UnusedBarycentricProof.hpp"
+ #include "ControlFlow/GraphBuilder.hpp"
++#include "RdnaDecoder/RdnaInstructionDecoder.hpp"
++#include "RdnaDecoder/RdnaImageOpDecoder.hpp"
++#include <tuple>
++#include <iterator>
+ #pragma once
+ #include "ControlFlow/ControlFlowGraph.hpp"
+ #include "Optimization/ShaderStageInputInfo.hpp"
+@@ -10,6 +14,7 @@
+ #include <set>
+ #include <stdexcept>
+ 
++#include "OptionalInterpolationGroupsProof.hpp"
+ namespace ShaderRecompiler {
+ 
+ // The existing native interpolation lowering drops P1 and replaces P2 with an
+@@ -80,8 +85,220 @@
+         discardBegin = c.instructionBegin;
+         return true;
+     }();
++    // A uniform SCC branch may skip one straight-line arithmetic block and
++    // rejoin before later interpolation. Both incoming paths must retain every
++    // original I/J word, and no partial interpolation may cross the branch.
++    std::size_t skipBegin = decoded.instructions.size(), skipEnd = skipBegin;
++    const bool skipContinuation = [&] {
++        if (cfg.blocks.size() != 3u || cfg.unsupported || cfg.irreducible ||
++            !cfg.backEdges.empty() || !cfg.naturalLoops.empty()) return false;
++        std::vector<const BasicBlock*> blocks;
++        for (const auto& block : cfg.blocks) blocks.push_back(&block);
++        std::sort(blocks.begin(), blocks.end(), [](const auto* a, const auto* b) { return a->instructionBegin < b->instructionBegin; });
++        const auto& a = *blocks[0]; const auto& b = *blocks[1]; const auto& c = *blocks[2];
++        if (a.id != cfg.entryBlock || a.id == b.id || a.id == c.id || b.id == c.id ||
++            a.instructionBegin != 0u || !a.instructionEnd || a.instructionEnd != b.instructionBegin ||
++            b.instructionBegin >= b.instructionEnd || b.instructionEnd != c.instructionBegin ||
++            c.instructionBegin >= c.instructionEnd || c.instructionEnd != decoded.instructions.size() ||
++            !a.predecessors.empty() || b.predecessors != std::vector<std::uint32_t>{a.id} ||
++            std::set<std::uint32_t>(c.predecessors.begin(), c.predecessors.end()) != std::set<std::uint32_t>{a.id,b.id} ||
++            c.predecessors.size() != 2u || a.successors.size() != 2u ||
++            std::set<std::uint32_t>(a.successors.begin(), a.successors.end()) != std::set<std::uint32_t>{b.id,c.id} ||
++            b.successors != std::vector<std::uint32_t>{c.id} || !c.successors.empty() ||
++            a.terminator.kind != TerminatorKind::ConditionalBranch ||
++            a.terminator.trueBlock != c.id || a.terminator.falseBlock != b.id ||
++            b.terminator.kind != TerminatorKind::Branch || b.terminator.condition != BranchCondition::Always ||
++            b.terminator.trueBlock != c.id || b.terminator.falseBlock != InvalidControlFlowId ||
++            c.terminator.kind != TerminatorKind::Return ||
++            decoded.instructions[c.instructionEnd-1u].op != RdnaOpcode::SEndpgm) return false;
++        const auto& branch = decoded.instructions[a.instructionEnd-1u];
++        const auto condition = branch.op == RdnaOpcode::SCbranchScc0 ? BranchCondition::SccZero :
++                               branch.op == RdnaOpcode::SCbranchScc1 ? BranchCondition::SccNonZero : BranchCondition::Unknown;
++        if (condition == BranchCondition::Unknown || a.terminator.condition != condition ||
++            branch.family != RdnaInstructionFamily::SOPP || branch.wordCount != 1u || branch.sourceCount != 0u ||
++            branch.opcodeId != (branch.op == RdnaOpcode::SCbranchScc0 ? 4u : 5u) ||
++            branch.source0.kind != RdnaOperandKind::LiteralConstant || branch.source0.value > 0x7fffu ||
++            branch.rawWords[0] != (0xbf800000u | (branch.opcodeId << 16u) | branch.source0.value) ||
++            branch.programCounter + 4u + branch.source0.value * 4u != decoded.instructions[c.instructionBegin].programCounter) return false;
++        skipBegin = b.instructionBegin; skipEnd = b.instructionEnd;
++        return true;
++    }();
++    // The original proof requires mandatory interpolation groups. The additional
++    // proof admits complete optional groups with path-safe output definitions
++    // and an immutable common M0 source. Both retain original I/J in every
++    // pre-return block. Pairs must complete within a block. The single terminal
++    // block may finally consume/overwrite I/J after its last complete group.
++    // Dynamic/indexed or partial footprints cannot hide reads of original
++    // I/J. This gate remains active even after the last pair, until full-word
++    // writes have killed every raw VGPR and no P1 result remains pending.
++    bool optionalInterpolationGroups = false; // Assigned only after fresh instruction/CFG validation.
++    const auto mandatoryDagFootprintAdmitted = [&](const RdnaInstruction& i, bool entry, std::size_t index) {
++                const auto noPartial = [](const RdnaOperand& o) {
++                    return !o.negateHi && !o.opSel && !o.opSelHi && !o.dpp && !o.dpp8 &&
++                           !o.sdwaSext && o.sdwaSel==6u; // SDWA DWORD selection defines the full word.
++                };
++                bool admitted=false;
++                switch(i.op) {
++                case RdnaOpcode::VMovB32:case RdnaOpcode::VAddF32:case RdnaOpcode::VSubF32:case RdnaOpcode::VSubrevF32:
++                case RdnaOpcode::VMulF32:case RdnaOpcode::VMadF32:case RdnaOpcode::VMacF32:case RdnaOpcode::VFmaF32:
++                case RdnaOpcode::VRcpF32:case RdnaOpcode::VRsqF32:case RdnaOpcode::VLogF32:case RdnaOpcode::VExpF32:
++                case RdnaOpcode::VMinF32:case RdnaOpcode::VMaxF32:case RdnaOpcode::VMin3F32:case RdnaOpcode::VCndmaskB32:
++                case RdnaOpcode::VCmpLtF32:case RdnaOpcode::VCmpGtF32:case RdnaOpcode::VCmpNeqF32:
++                case RdnaOpcode::VCubemaF32:case RdnaOpcode::VCubescF32:case RdnaOpcode::VCubetcF32:case RdnaOpcode::VCubeidF32:
++                case RdnaOpcode::VMadakF32:
++                    admitted=(i.family==RdnaInstructionFamily::VOP1 || i.family==RdnaInstructionFamily::VOP2 ||
++                              i.family==RdnaInstructionFamily::VOP3 || i.family==RdnaInstructionFamily::VOPC) &&
++                             !i.is64Bit && i.dataDwordCount==1u && i.sourceCount>=1u && i.sourceCount<=4u;
++                    break;
++                case RdnaOpcode::SLoadDword:case RdnaOpcode::SLoadDwordx2:case RdnaOpcode::SLoadDwordx4:
++                case RdnaOpcode::SLoadDwordx8:case RdnaOpcode::SLoadDwordx16:
++                case RdnaOpcode::SBufferLoadDword:case RdnaOpcode::SBufferLoadDwordx2:case RdnaOpcode::SBufferLoadDwordx4:
++                case RdnaOpcode::SBufferLoadDwordx8:case RdnaOpcode::SBufferLoadDwordx16:
++                    admitted=i.family==RdnaInstructionFamily::SMEM && i.dataDwordCount &&
++                             ((i.destination.kind==RdnaOperandKind::ScalarRegister && i.destination.reg<106u && i.dataDwordCount<=106u-i.destination.reg) ||
++                              (optionalInterpolationGroups && ((i.destination.kind==RdnaOperandKind::VccLo && i.dataDwordCount<=2u) ||
++                               (i.destination.kind==RdnaOperandKind::VccHi && i.dataDwordCount==1u))));
++                    break;
++                case RdnaOpcode::SMovB32:case RdnaOpcode::SMovB64:case RdnaOpcode::SAndB64:
++                    admitted=i.family==RdnaInstructionFamily::SOP1 || i.family==RdnaInstructionFamily::SOP2; break;
++                case RdnaOpcode::SWqmB64:
++                    admitted=entry && std::none_of(decoded.instructions.begin(),decoded.instructions.begin()+index,[](const auto& x){return x.op==RdnaOpcode::VInterpP1F32 || x.destination.kind==RdnaOperandKind::VectorRegister;}); break;
++                case RdnaOpcode::SWaitcnt:case RdnaOpcode::SNop:case RdnaOpcode::SInstPrefetch:case RdnaOpcode::STtracedata:
++                case RdnaOpcode::SCbranchScc0:case RdnaOpcode::SCbranchScc1:case RdnaOpcode::SCbranchVccz:case RdnaOpcode::SCbranchVccnz:
++                    admitted=i.family==RdnaInstructionFamily::SOPP; break;
++                case RdnaOpcode::VInterpP1F32:case RdnaOpcode::VInterpP2F32:
++                    admitted=i.family==RdnaInstructionFamily::VINTRP; break;
++                case RdnaOpcode::ImageSample:
++                    admitted=i.family==RdnaInstructionFamily::MIMG && i.imageNsaDwordCount<=3u &&
++                             !i.imageA16 && !i.imageD16 && !i.imageR128 &&
++                             ((i.opcodeId==0x20u && i.imageSampleFlags==0u) ||
++                              (i.opcodeId==0x24u && i.imageSampleFlags==RdnaImageSampleFlagLod)) &&
++                             (i.rawWords[0]&0x10000u)==0u && i.dataDwordCount>=1u && i.dataDwordCount<=4u &&
++                             i.imageAddressComponents>=2u && i.imageAddressComponents<=4u; break;
++                default: break;
++                }
++                if(!optionalInterpolationGroups && i.destination.kind==RdnaOperandKind::M0 && (!entry || std::any_of(decoded.instructions.begin(),decoded.instructions.begin()+index,[](const auto& x){return x.op==RdnaOpcode::VInterpP1F32;}))) return false;
++                if((i.destination.kind==RdnaOperandKind::ExecLo || i.destination.kind==RdnaOperandKind::ExecHi ||
++                    i.destination2.kind==RdnaOperandKind::ExecLo || i.destination2.kind==RdnaOperandKind::ExecHi) && i.op!=RdnaOpcode::SWqmB64) return false;
++                return admitted && noPartial(i.destination) && noPartial(i.destination2) &&
++                       noPartial(i.source0) && noPartial(i.source1) && noPartial(i.source2) && noPartial(i.source3);
++    };
++    const bool mandatoryDagContinuation = [&] {
++        if (cfg.blocks.size() < 4u || cfg.blocks.size() > 64u || decoded.code.empty() ||
++            decoded.code.size() > 4096u || cfg.unsupported || cfg.irreducible ||
++            !cfg.backEdges.empty() || !cfg.naturalLoops.empty()) return false;
++        const auto operandEqual = [](const auto& a, const auto& b) {
++            return std::tie(a.kind,a.value,a.signedVal,a.reg,a.sdwaSel,a.sdwaDstUnused,a.omod,
++                a.dppCtrl,a.dppRowMask,a.dppBankMask,a.explicitSdwaDst,a.sdwaSext,a.dppFetchInactive,
++                a.dppBoundCtrl,a.opSel,a.opSelHi,a.negate,a.negateHi,a.absolute,a.clamp,a.dpp,a.dpp8) ==
++                std::tie(b.kind,b.value,b.signedVal,b.reg,b.sdwaSel,b.sdwaDstUnused,b.omod,
++                b.dppCtrl,b.dppRowMask,b.dppBankMask,b.explicitSdwaDst,b.sdwaSext,b.dppFetchInactive,
++                b.dppBoundCtrl,b.opSel,b.opSelHi,b.negate,b.negateHi,b.absolute,b.clamp,b.dpp,b.dpp8);
++        };
++        const auto fresh = RdnaInstructionDecoder{}.Decode(decoded.code);
++        if (fresh.instructions.size() != decoded.instructions.size()) return false;
++        for (std::size_t n=0; n<decoded.instructions.size(); ++n) {
++            const auto& a=decoded.instructions[n]; const auto& b=fresh.instructions[n];
++            if (std::tie(a.op,a.programCounter,a.branchOffset,a.memoryOffset,a.dataDwordCount,a.clampResult,a.is64Bit,
++                a.exportTarget,a.exportEnableMask,a.exportIsCompressed,a.exportIsLast,a.imageOpcodeId,a.imageDmask,
++                a.imageDimension,a.imageR128,a.imageGlc,a.imageSlc,a.imageA16,a.imageD16,a.imageNsaDwordCount,
++                a.imageNsaVectorRegisters,a.wordCount,a.rawWords,a.family,a.opcodeId,a.sourceCount,a.secondaryOffset,
++                a.dataComponents,a.dataBits,a.dataFormat,a.numberFormat,a.imageSampleFlags,a.imageAddressComponents,
++                a.memorySegment,a.dataSigned,a.typed,a.formatted,a.gds,a.glc,a.dlc,a.slc,a.idxen,a.offen,a.branchTarget,a.exportValidMask,a.unsupportedReason) !=
++                std::tie(b.op,b.programCounter,b.branchOffset,b.memoryOffset,b.dataDwordCount,b.clampResult,b.is64Bit,
++                b.exportTarget,b.exportEnableMask,b.exportIsCompressed,b.exportIsLast,b.imageOpcodeId,b.imageDmask,
++                b.imageDimension,b.imageR128,b.imageGlc,b.imageSlc,b.imageA16,b.imageD16,b.imageNsaDwordCount,
++                b.imageNsaVectorRegisters,b.wordCount,b.rawWords,b.family,b.opcodeId,b.sourceCount,b.secondaryOffset,
++                b.dataComponents,b.dataBits,b.dataFormat,b.numberFormat,b.imageSampleFlags,b.imageAddressComponents,
++                b.memorySegment,b.dataSigned,b.typed,b.formatted,b.gds,b.glc,b.dlc,b.slc,b.idxen,b.offen,b.branchTarget,b.exportValidMask,b.unsupportedReason) ||
++                !operandEqual(a.destination,b.destination) || !operandEqual(a.destination2,b.destination2) ||
++                !operandEqual(a.source0,b.source0) || !operandEqual(a.source1,b.source1) ||
++                !operandEqual(a.source2,b.source2) || !operandEqual(a.source3,b.source3)) return false;
++        }
++        const auto rebuilt = GraphBuilder{}.Build(fresh);
++        if (rebuilt.unsupported || rebuilt.irreducible || rebuilt.entryBlock != cfg.entryBlock ||
++            rebuilt.blocks.size() != cfg.blocks.size()) return false;
++        std::vector<const BasicBlock*> blocks;
++        for (const auto& block : cfg.blocks) blocks.push_back(&block);
++        std::sort(blocks.begin(),blocks.end(),[](const auto* a,const auto* b){return a->instructionBegin<b->instructionBegin;});
++        std::map<std::uint32_t,std::size_t> order;
++        for (std::size_t n=0;n<blocks.size();++n) if (!order.emplace(blocks[n]->id,n).second) return false;
++        if (blocks.front()->id != cfg.entryBlock || blocks.front()->instructionBegin != 0u ||
++            blocks.back()->instructionEnd != decoded.instructions.size()) return false;
++        std::vector<std::set<std::uint32_t>> dominators(blocks.size());
++        std::set<std::uint32_t> interpolationBlocks;
++        for (std::size_t n=0;n<blocks.size();++n) {
++            const auto& block=*blocks[n];
++            const auto found=std::find_if(rebuilt.blocks.begin(),rebuilt.blocks.end(),[&](const auto& b){return b.id==block.id;});
++            if (found==rebuilt.blocks.end() || block.instructionBegin>=block.instructionEnd ||
++                (n && blocks[n-1]->instructionEnd!=block.instructionBegin) ||
++                std::tie(block.startProgramCounter,block.endProgramCounter,block.instructionBegin,block.instructionEnd,
++                    block.predecessors,block.successors,block.terminator.kind,block.terminator.condition,
++                    block.terminator.trueBlock,block.terminator.falseBlock) !=
++                std::tie(found->startProgramCounter,found->endProgramCounter,found->instructionBegin,found->instructionEnd,
++                    found->predecessors,found->successors,found->terminator.kind,found->terminator.condition,
++                    found->terminator.trueBlock,found->terminator.falseBlock) ||
++                block.terminator.indirectPcSgpr!=InvalidControlFlowId || block.terminator.indirectSelectorCode!=InvalidControlFlowId ||
++                !block.terminator.indirectTargets.empty() || !block.terminator.indirectTargetProgramCounters.empty() ||
++                !block.terminator.indirectSelectorValues.empty() || !block.terminator.indirectSelectorTargets.empty() ||
++                block.terminator.gotoVariable!=InvalidControlFlowId || block.terminator.gotoValue!=-1 || block.terminator.loopHeader) return false;
++            if (!n) { if (!block.predecessors.empty()) return false; }
++            else {
++                if (block.predecessors.empty()) return false;
++                bool first=true;
++                std::set<std::uint32_t> unique;
++                for (const auto pred:block.predecessors) {
++                    const auto it=order.find(pred);
++                    if (it==order.end() || it->second>=n || !unique.insert(pred).second) return false;
++                    if (first) { dominators[n]=dominators[it->second]; first=false; }
++                    else {
++                        std::set<std::uint32_t> meet;
++                        std::set_intersection(dominators[n].begin(),dominators[n].end(),dominators[it->second].begin(),dominators[it->second].end(),std::inserter(meet,meet.end()));
++                        dominators[n]=std::move(meet);
++                    }
++                }
++            }
++            dominators[n].insert(block.id);
++            for (const auto next:block.successors) {
++                const auto it=order.find(next); if(it==order.end() || it->second<=n) return false;
++            }
++            const auto& tail=decoded.instructions[block.instructionEnd-1u];
++            if (n+1u==blocks.size()) {
++                if (!block.successors.empty() || block.terminator.kind!=TerminatorKind::Return || tail.op!=RdnaOpcode::SEndpgm) return false;
++            } else if (block.terminator.kind==TerminatorKind::ConditionalBranch) {
++                const auto condition=tail.op==RdnaOpcode::SCbranchScc0?BranchCondition::SccZero:
++                    tail.op==RdnaOpcode::SCbranchScc1?BranchCondition::SccNonZero:
++                    tail.op==RdnaOpcode::SCbranchVccz?BranchCondition::VccZero:
++                    tail.op==RdnaOpcode::SCbranchVccnz?BranchCondition::VccNonZero:BranchCondition::Unknown;
++                if (condition==BranchCondition::Unknown || block.terminator.condition!=condition || block.successors.size()!=2u ||
++                    block.terminator.falseBlock!=blocks[n+1u]->id || tail.family!=RdnaInstructionFamily::SOPP || tail.wordCount!=1u ||
++                    tail.source0.kind!=RdnaOperandKind::LiteralConstant || tail.source0.value>0x7fffu ||
++                    tail.programCounter+4u+tail.source0.value*4u!=cfg.FindBlock(block.terminator.trueBlock).startProgramCounter) return false;
++            } else if (block.terminator.kind!=TerminatorKind::Branch || block.terminator.condition!=BranchCondition::Always ||
++                       block.successors!=std::vector<std::uint32_t>{blocks[n+1u]->id} ||
++                       block.terminator.trueBlock!=blocks[n+1u]->id || block.terminator.falseBlock!=InvalidControlFlowId ||
++                       tail.op==RdnaOpcode::SBranch) return false;
++        }
++        // The optional proof never examines supplied instruction/CFG metadata
++        // until every fresh raw field, range, edge and terminator matches.
++        optionalInterpolationGroups = ProveOptionalInterpolationGroups(decoded,cfg);
++        for (std::size_t n=0;n<blocks.size();++n) {
++            const auto& block=*blocks[n];
++            for (auto k=block.instructionBegin;k<block.instructionEnd;++k) {
++                const auto& i=decoded.instructions[k];
++                if (i.op==RdnaOpcode::VInterpP1F32 || i.op==RdnaOpcode::VInterpP2F32 || i.op==RdnaOpcode::VInterpMovF32) interpolationBlocks.insert(block.id);
++                if (n+1u==blocks.size()) continue; // Existing final-block liveness rules apply below.
++                if(!mandatoryDagFootprintAdmitted(i,n==0u,k)) return false;
++            }
++        }
++        // A terminal group is required. Every earlier group must dominate it
++        // unless the supplemental path-definition/common-M0 proof succeeded.
++        if (!interpolationBlocks.contains(blocks.back()->id)) return false;
++        for (const auto id:interpolationBlocks) if (!dominators.back().contains(id) && !optionalInterpolationGroups) return false;
++        return true;
++    }();
+     const BasicBlock* entry = nullptr;
+-    if (cfg.blocks.size() != 1u && !discardContinuation) {
++    if (cfg.blocks.size() != 1u && !discardContinuation && !skipContinuation && !mandatoryDagContinuation) {
+         // Other control flow still requires a complete unconditional prefix.
+         const auto found = std::find_if(cfg.blocks.begin(), cfg.blocks.end(), [&](const auto& b) { return b.id == cfg.entryBlock; });
+         if (cfg.unsupported || cfg.irreducible || found == cfg.blocks.end() ||
+@@ -97,7 +314,60 @@
+     for (const auto& i : decoded.instructions) {
+         pc = i.programCounter;
+         const auto index = static_cast<std::size_t>(&i - decoded.instructions.data());
++        if (mandatoryDagContinuation) {
++            const auto block=std::find_if(cfg.blocks.begin(),cfg.blocks.end(),[&](const auto& b){return index>=b.instructionBegin&&index<b.instructionEnd;});
++            if(block==cfg.blocks.end()) fail();
++            if(!optionalInterpolationGroups && (i.destination.kind==RdnaOperandKind::M0 || i.destination2.kind==RdnaOperandKind::M0) &&
++               (block->id!=cfg.entryBlock || std::any_of(decoded.instructions.begin(),decoded.instructions.begin()+index,[](const auto& x){return x.op==RdnaOpcode::VInterpP1F32 || x.op==RdnaOpcode::VInterpP2F32;}))) fail();
++            if((!live.empty() || !pending.empty()) && !mandatoryDagFootprintAdmitted(i,block->id==cfg.entryBlock,index)) fail();
++            // VMAC/FMAC additionally reads its destination accumulator. The
++            // decoder's explicit sources alone cannot prove a raw full-word kill.
++            if(i.op==RdnaOpcode::VMacF32 && i.destination.kind==RdnaOperandKind::VectorRegister && live.contains(i.destination.reg)) fail();
++
++            if(index==block->instructionBegin && (!pending.empty() || (index && (live!=originalRaw || rawWritten)))) fail();
++            // Before the single terminal suffix, no path may consume raw I/J.
++            if(block->instructionEnd!=decoded.instructions.size() && rawWritten) fail();
++        }
+         if (discardContinuation && index >= discardBegin) break; // Proven no-input terminating exit.
++        if (skipContinuation && (index == skipBegin || index == skipEnd) &&
++            (!pending.empty() || live != originalRaw || rawWritten)) fail();
++        if (skipContinuation && index >= skipBegin && index < skipEnd) {
++            // Only exact whole-word ALU footprints and a plain wait counter
++            // occur on the optional arm. No EXEC changes, side effects,
++            // partial writes, cross-lane reads, memory or nested branches.
++            std::optional<UnusedBarycentricProof::Effects> effects;
++            const bool alu = i.family == RdnaInstructionFamily::VOP1 || i.family == RdnaInstructionFamily::VOP2 ||
++                             i.family == RdnaInstructionFamily::VOP3 || i.family == RdnaInstructionFamily::VOP3P;
++            if (alu) effects = UnusedBarycentricProof::EffectsFor(i);
++            if (i.op == RdnaOpcode::VMaxF32) {
++                UnusedBarycentricProof::Effects maxEffects;
++                if (i.family == RdnaInstructionFamily::VOP2 && i.opcodeId == 0x10u && i.wordCount == 1u &&
++                    i.sourceCount == 2u && !i.is64Bit && !i.clampResult && i.dataDwordCount == 1u &&
++                    i.source0.kind == RdnaOperandKind::IntegerInlineConstant && i.source0.value == 0u &&
++                    i.source0.signedVal == 0 && i.source1.kind == RdnaOperandKind::VectorRegister &&
++                    i.destination.kind == RdnaOperandKind::VectorRegister &&
++                    i.source1.reg < 256u && i.destination.reg < 256u &&
++                    i.rawWords[0] == ((0x10u << 25u) | (i.destination.reg << 17u) | (i.source1.reg << 9u) | 128u) &&
++                    UnusedBarycentricProof::EmptySecond(i.destination2) &&
++                    UnusedBarycentricProof::EmptySecond(i.source2) && UnusedBarycentricProof::EmptySecond(i.source3) &&
++                    UnusedBarycentricProof::Read(maxEffects,i.source0,1u) &&
++                    UnusedBarycentricProof::Read(maxEffects,i.source1,1u) &&
++                    UnusedBarycentricProof::VectorWrite(maxEffects,i.destination,1u)) effects = maxEffects;
++            }
++            const bool wait = i.op == RdnaOpcode::SWaitcnt && i.family == RdnaInstructionFamily::SOPP &&
++                i.opcodeId == 0x0cu && i.wordCount == 1u && i.sourceCount == 1u &&
++                i.source0.kind == RdnaOperandKind::LiteralConstant && i.source0.value <= 0xffffu && plain(i.source0) &&
++                i.rawWords[0] == (0xbf8c0000u | i.source0.value) &&
++                UnusedBarycentricProof::EmptySecond(i.destination) && UnusedBarycentricProof::EmptySecond(i.destination2) &&
++                UnusedBarycentricProof::EmptySecond(i.source1) && UnusedBarycentricProof::EmptySecond(i.source2) &&
++                UnusedBarycentricProof::EmptySecond(i.source3);
++            if (wait) effects = UnusedBarycentricProof::Effects{};
++            if (!effects || effects->mask != UnusedBarycentricProof::MaskEffect::None || !effects->scalarWrites.empty()) fail();
++            for (const auto& ranges : {effects->reads,effects->writes})
++                for (const auto& range : ranges)
++                    for (const auto reg : originalRaw)
++                        if (reg >= range.base && reg - range.base < range.count) fail();
++        }
+         if (entry && index >= entry->instructionEnd && (!live.empty() || !pending.empty())) fail();
+         if (i.op == RdnaOpcode::VInterpMovF32) fail(); // Requires original vertex values.
+         if (i.op == RdnaOpcode::VInterpP1F32 || i.op == RdnaOpcode::VInterpP2F32) {
+@@ -198,8 +468,16 @@
+             if (source.kind != RdnaOperandKind::VectorRegister) continue;
+             for (const auto reg : live) if (reg >= source.reg && reg - source.reg < width) fail();
+         }
+-        for (const auto reg : i.imageNsaVectorRegisters) {
+-            if (i.imageNsaDwordCount != 0u && live.contains(reg)) fail();
++        if (i.imageNsaDwordCount != 0u) {
++            // The backend reads the base VGPR and exactly addressDwords-1
++            // encoded NSA words. Unused encoded bytes and array padding are
++            // not reads; neither may hide an active raw I/J register.
++            if (i.family!=RdnaInstructionFamily::MIMG || i.imageNsaDwordCount>3u ||
++                i.imageAddressComponents>13u) fail();
++            const auto count=GetRdnaImageAddressDwordCount(i.imageSampleFlags,i.imageAddressComponents);
++            if (!count || count>13u || count>1u+i.imageNsaDwordCount*4u) fail();
++            for (std::uint32_t n=0;n+1u<count;++n)
++                if (live.contains(i.imageNsaVectorRegisters[n])) fail();
+         }
+         // Memory decoders record the written vector width. ALU destinations
+         // forget just their first register; ambiguous wider writes reject later.
+diff --git a/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp b/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp
+new file mode 100644
+--- /dev/null
++++ b/core/shader/recompiler/Translation/include/Translation/OptionalInterpolationGroupsProof.hpp
+@@ -0,0 +1,89 @@
++#pragma once
++#include <optional>
++namespace ShaderRecompiler {
++// This supplements the fresh-decoded forward-DAG checks in the caller. A
++// conditional group cannot export a partial P1 or lose the skipped-path value.
++inline bool ProveOptionalInterpolationGroups(const RdnaProgram& decoded,
++                                             const ControlFlowGraph& cfg) {
++    std::vector<const BasicBlock*> blocks;
++    for (const auto& b:cfg.blocks) blocks.push_back(&b);
++    std::sort(blocks.begin(),blocks.end(),[](auto* a,auto* b){return a->instructionBegin<b->instructionBegin;});
++    if(blocks.size()<4u || blocks.size()>64u || cfg.unsupported || cfg.irreducible || !cfg.backEdges.empty() || !cfg.naturalLoops.empty()) return false;
++    // Fresh decoding/graph identity is checked by the caller. Reject malformed
++    // ranges before this supplemental proof indexes an untrusted graph.
++    if(blocks.front()->id!=cfg.entryBlock || blocks.front()->instructionBegin!=0u || blocks.back()->instructionEnd!=decoded.instructions.size()) return false;
++    std::set<std::uint32_t> blockIds;
++    for(std::size_t b=0;b<blocks.size();++b){const auto& block=*blocks[b];
++        if(!blockIds.insert(block.id).second || block.instructionBegin>=block.instructionEnd || block.instructionEnd>decoded.instructions.size() || (b&&blocks[b-1u]->instructionEnd!=block.instructionBegin)) return false;
++    }
++    std::set<std::uint32_t> results;
++    std::size_t first=decoded.instructions.size(),last=0;
++    std::optional<std::uint32_t> stableM0;
++    const auto plain=[](const RdnaOperand& o){return !o.negate&&!o.negateHi&&!o.absolute&&!o.clamp&&!o.omod&&!o.opSel&&!o.opSelHi&&!o.dpp&&!o.dpp8&&!o.explicitSdwaDst&&!o.sdwaSext&&o.sdwaSel==6u;};
++    for(std::size_t n=0;n<decoded.instructions.size();++n){const auto& i=decoded.instructions[n];
++        if(i.op==RdnaOpcode::VInterpP1F32 || i.op==RdnaOpcode::VInterpP2F32){
++            if(i.destination.kind!=RdnaOperandKind::VectorRegister) return false;
++            results.insert(i.destination.reg);first=std::min(first,n);last=n;
++        }
++    }
++    if(first==decoded.instructions.size()) return false;
++    // The first group's exact M0 assignment chooses one original SGPR. Any
++    // later group may reassert it, but no path may redefine that SGPR before
++    // the final group. Initial metadata M0 is not an interpolation assignment.
++    for(std::size_t n=0;n<first;++n){const auto& i=decoded.instructions[n];if(i.destination.kind==RdnaOperandKind::M0){
++        stableM0.reset();if(i.op==RdnaOpcode::SMovB32 && i.family==RdnaInstructionFamily::SOP1 && i.source0.kind==RdnaOperandKind::ScalarRegister && i.source0.reg<106u && plain(i.source0)&&plain(i.destination)) stableM0=i.source0.reg;
++    }}
++    if(!stableM0) return false;
++    for(std::size_t n=0;n<=last;++n){const auto& i=decoded.instructions[n];
++        for(const auto* o:{&i.destination,&i.destination2})if(o->kind==RdnaOperandKind::ScalarRegister){
++            const auto width=std::max(i.dataDwordCount,i.is64Bit?2u:1u);
++            if(*stableM0>=o->reg && *stableM0-o->reg<width) return false;
++        }
++        if(i.destination2.kind==RdnaOperandKind::M0) return false;
++        if(n>=first && i.destination.kind==RdnaOperandKind::M0 &&
++           (i.op!=RdnaOpcode::SMovB32 || i.family!=RdnaInstructionFamily::SOP1 || i.source0.kind!=RdnaOperandKind::ScalarRegister || i.source0.reg!=*stableM0 || !plain(i.source0)||!plain(i.destination))) return false;
++    }
++    // EXEC remains fixed throughout the active groups: the scalar CFG branch
++    // selects one path for that wave's active lanes. At a merge, definitions
++    // intersect while potential interpolated values union. Thus a skipped
++    // group's destination needs initialization only when subsequently read.
++    struct State{std::set<std::uint32_t> defined,mayInterpolation;bool m0=false;};std::map<std::uint32_t,State> ends;
++    for(std::size_t b=0;b<blocks.size();++b){const auto& block=*blocks[b];State state;
++        if(b){if(block.predecessors.empty())return false;bool initial=true;
++            for(auto id:block.predecessors){auto f=ends.find(id);if(f==ends.end())return false;
++                if(initial){state=f->second;initial=false;}else{std::set<std::uint32_t> meet;std::set_intersection(state.defined.begin(),state.defined.end(),f->second.defined.begin(),f->second.defined.end(),std::inserter(meet,meet.end()));state.defined=std::move(meet);state.m0=state.m0&&f->second.m0;state.mayInterpolation.insert(f->second.mayInterpolation.begin(),f->second.mayInterpolation.end());}
++            }
++        }
++        std::map<std::uint32_t,std::tuple<std::uint32_t,std::uint32_t,std::uint32_t>> pending;
++        for(std::size_t k=block.instructionBegin;k<block.instructionEnd;++k){const auto& i=decoded.instructions[k];
++            if(i.destination.kind==RdnaOperandKind::M0){if(!pending.empty())return false;state.m0=i.op==RdnaOpcode::SMovB32 && i.source0.kind==RdnaOperandKind::ScalarRegister && i.source0.reg==*stableM0 && plain(i.source0)&&plain(i.destination);}
++            if(i.op==RdnaOpcode::VInterpP1F32){if(!state.m0 || pending.contains(i.destination.reg))return false;pending.emplace(i.destination.reg,std::tuple{i.source0.reg,i.source1.value,i.source2.value});continue;}
++            if(i.op==RdnaOpcode::VInterpP2F32){auto f=pending.find(i.destination.reg);if(!state.m0 || f==pending.end() || std::get<0>(f->second)+1u!=i.source0.reg || std::get<1>(f->second)!=i.source1.value || std::get<2>(f->second)!=i.source2.value)return false;pending.erase(f);state.defined.insert(i.destination.reg);state.mayInterpolation.insert(i.destination.reg);continue;}
++            const auto read=[&](std::uint32_t reg,std::uint32_t count){if(reg>=256u||!count||count>256u-reg)return false;for(auto r:results)if(r>=reg&&r-reg<count&&(pending.contains(r)||(state.mayInterpolation.contains(r)&&!state.defined.contains(r))))return false;return true;};
++            const bool alu=i.family==RdnaInstructionFamily::VOP1 || i.family==RdnaInstructionFamily::VOP2 || i.family==RdnaInstructionFamily::VOP3 || i.family==RdnaInstructionFamily::VOP3P || i.family==RdnaInstructionFamily::VOPC;
++            const bool output=i.family==RdnaInstructionFamily::EXP && i.op==RdnaOpcode::Exp;
++            const bool image=i.family==RdnaInstructionFamily::MIMG && i.op==RdnaOpcode::ImageSample;
++            if(alu && !UnusedBarycentricProof::EffectsFor(i)){
++                switch(i.op){case RdnaOpcode::VMovB32:case RdnaOpcode::VAddF32:case RdnaOpcode::VSubF32:case RdnaOpcode::VMulF32:case RdnaOpcode::VRcpF32:case RdnaOpcode::VSubrevF32:case RdnaOpcode::VMacF32:case RdnaOpcode::VMinF32:case RdnaOpcode::VMaxF32:case RdnaOpcode::VMin3F32:case RdnaOpcode::VMadakF32:case RdnaOpcode::VMadF32:case RdnaOpcode::VFmaF32:case RdnaOpcode::VCndmaskB32:case RdnaOpcode::VCmpLtF32:case RdnaOpcode::VCmpGtF32:case RdnaOpcode::VCmpNeqF32:case RdnaOpcode::VRsqF32:case RdnaOpcode::VLogF32:case RdnaOpcode::VExpF32:case RdnaOpcode::VCubemaF32:case RdnaOpcode::VCubescF32:case RdnaOpcode::VCubetcF32:case RdnaOpcode::VCubeidF32:break;default:return false;}
++            }
++            if(image){const auto count=GetRdnaImageAddressDwordCount(i.imageSampleFlags,i.imageAddressComponents);if(!count||count>13u||i.imageNsaDwordCount>3u||i.imageA16||i.imageD16)return false;
++                if(i.source0.kind!=RdnaOperandKind::VectorRegister || !read(i.source0.reg,i.imageNsaDwordCount?1u:count))return false;
++                if(i.imageNsaDwordCount){if(count>1u+i.imageNsaDwordCount*4u)return false;for(std::uint32_t n=0;n+1u<count;++n)if(!read(i.imageNsaVectorRegisters[n],1u))return false;}
++            }else{
++                unsigned n=0;for(const auto* o:{&i.source0,&i.source1,&i.source2,&i.source3}){const auto channel=i.exportIsCompressed?(n<2u?3u<<(n*2u):0u):1u<<n;++n;if(output&&!(i.exportEnableMask&channel))continue;
++                    if(o->kind==RdnaOperandKind::VectorRegister && (!alu&&!output || !read(o->reg,output?1u:i.is64Bit?2u:1u)))return false;
++                    if(o->dpp||o->dpp8)return false;
++                }
++            }
++            if(i.op==RdnaOpcode::VMacF32 && i.destination.kind==RdnaOperandKind::VectorRegister && !read(i.destination.reg,1u))return false;
++            if((i.destination.kind==RdnaOperandKind::ExecLo||i.destination.kind==RdnaOperandKind::ExecHi||i.destination2.kind==RdnaOperandKind::ExecLo||i.destination2.kind==RdnaOperandKind::ExecHi) &&
++               !(b==0u&&k<first&&i.op==RdnaOpcode::SWqmB64) && !(b+1u==blocks.size()&&k>last&&i.op==RdnaOpcode::SMovB64&&i.source0.kind==RdnaOperandKind::ScalarRegister))return false;
++            const auto write=[&](const RdnaOperand& o,std::uint32_t count){if(o.kind!=RdnaOperandKind::VectorRegister)return true;if(o.negateHi||o.opSel||o.opSelHi||o.dpp||o.dpp8||o.sdwaSext||o.sdwaSel!=6u||o.reg>=256u||!count||count>256u-o.reg)return false;for(auto r:results)if(r>=o.reg&&r-o.reg<count){if(pending.contains(r))return false;state.defined.insert(r);state.mayInterpolation.erase(r);}return true;};
++            const auto count=image?i.dataDwordCount:i.is64Bit?2u:1u;
++            if(!write(i.destination,count)||!write(i.destination2,1u))return false;
++        }
++        if(!pending.empty() || !ends.emplace(block.id,std::move(state)).second)return false;
++    }
++    return true;
++}
++}
+diff --git a/core/shader/recompiler/CMakeLists.txt b/core/shader/recompiler/CMakeLists.txt
+--- a/core/shader/recompiler/CMakeLists.txt
++++ b/core/shader/recompiler/CMakeLists.txt
+@@ -206,7 +206,7 @@
+     string(TOUPPER "${CMAKE_BUILD_TYPE}" shaderCacheBuildType)
+     # Keep disk format 22; changes to this local strict interpolation proof
+     # receive a distinct source identity, including its exact admitted effects.
+-    set(shaderCacheLocalInterpolationPolicy "center-ij-unused-m0-trace-v1")
++    set(shaderCacheLocalInterpolationPolicy "center-ij-unused-m0-trace-optional-groups-v4")
+     set(shaderCacheExtra "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION} ${CMAKE_BUILD_TYPE} spirv-tools=${ANYPS5_ENABLE_SPIRV_TOOLS} ${CMAKE_SYSTEM_PROCESSOR} flags=${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${shaderCacheBuildType}} interpolation-policy=${shaderCacheLocalInterpolationPolicy}")
+     set(shaderCacheReviewedNames
+             BuildPreparedShaderKey

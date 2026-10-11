@@ -1,0 +1,71 @@
+{
+  "status": "built_signed_verified_not_installed",
+  "appBuild": "59",
+  "bundleID": "com.buberlo.anyps5ipad",
+  "architecture": "arm64",
+  "appMachOBytes": 32328576,
+  "appMachOSha256": "6134b1acfcd40feedc2796674f138a5f8ff00d31824310c7a5168b1712ef6b3a",
+  "uuid": "3839DED6-DC05-37C9-802E-644DE7256D13",
+  "dsymUuidMatches": true,
+  "allFourCorrectedMslHelperLiteralsPresent": true,
+  "embeddedPEComponents": {
+    "ntdll.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 1572864,
+      "machine": "0x8664",
+      "sha256": "5c87f2726f5f36a1a72a23ad9283616d21b963650385525a03e9e63bc97c9614"
+    },
+    "vulkan-1.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 655360,
+      "machine": "0x8664",
+      "sha256": "c3db118a995543fce40abae156f008f2cfc67eacf486263817ee67da0a094a15"
+    },
+    "winevulkan.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 917504,
+      "machine": "0x8664",
+      "sha256": "458e1368de5d568674436307e74c80fd248ed94708d76468e6b3316260e1f7a4"
+    },
+    "xtajit64.dll": {
+      "arm64ec_code_map": true,
+      "bytes": 5885952,
+      "machine": "0x8664",
+      "sha256": "a7d7f381aea5472c8542fb0601c5916b8d70e03ca56ce62d809801392e79089d"
+    }
+  },
+  "freshNativeFexArchiveCount": 0,
+  "freshNativeFexObjectCount": 0,
+  "reusedNativeFexArchiveCount": 7,
+  "freshNativeWineObjectCount": 2,
+  "native58RollbackPreserved": true,
+  "native58RollbackSigningReceiptSha256": "5d39ce81a46b331d0b1f72991f1f356da436443f858422e7299834c12d98dcef",
+  "deepStrictCodesignVerified": true,
+  "hostProfile": {
+    "cOptimization": 2,
+    "configuration": "Debug",
+    "debugInformation": "dwarf-with-dsym",
+    "swiftOptimization": "-O"
+  },
+  "inputReceiptSha256": "bf4b7ca13c6bea2b3e7a709e263b701434c33f04aa6e3c01e09ef78b3fbac278",
+  "appFileHashesSha256": "a4ec222f93b4aacf24108270001b2f7efff3b27f338b2da3e171586e8c2927e8",
+  "buildLogSha256": "4162738b7aa64f5e699cec6573c6ed3e50e9acef7f5716ae50d995d2bf191bb9",
+  "ownershipSamplerReviewSha256": "c7b13ea1095813c1a611ac0471ce9a5b694d06bb482afffae356beb0886c34ee",
+  "diagnosticOnly": true,
+  "installed": false,
+  "launched": false,
+  "deviceTested": false,
+  "deviceOperations": false,
+  "full803Qualified": false,
+  "cpuEightQualified": false,
+  "runtimeAccepted": false,
+  "gamePlayable": false,
+  "githubActionsUsed": false,
+  "boundary": "Local diagnostic59 compile/link/sign only: narrowly modified native ownership sampler; unchanged Native58 FEX and remaining runtime components. No installation, JIT, CPU, GPU, userdata preservation or gameplay acceptance.",
+  "schema": 1,
+  "date": "2026-10-11",
+  "signedBuildReceiptSha256": "63776e4f3ba7a0ec2d0b796e75603d5243f6db318d0e7d794877b737bdb62f37",
+  "nativeOwnershipControls": 32,
+  "retainedArchiveObjectCount": 35,
+  "privateDiagnosticsOrAssetsIncluded": false
+}

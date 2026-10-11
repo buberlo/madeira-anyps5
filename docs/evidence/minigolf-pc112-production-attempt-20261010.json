@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "pc112_actual_production_abi_and_public484_oldnine_passed_tenth_runtime_descriptor_evaluation_failed",
+  "canonicalCandidatePromoted": false,
+  "sourceFreezeSha256": "9985f4b27eb2ea89af80ff019c62d1608850390f0ff2a5158847420251857d73",
+  "qualificationReceiptSha256": "4fa47aaec78371b4c8884f2d4a78dc4aceb757cdd1e8530a20daf848c10a71eb",
+  "priorFailedAbiReceiptPreserved": true,
+  "productionAbi": {
+    "exportCount": 3725,
+    "allNamesOrdinalsForwardersEqualPrevious": true,
+    "importsEqualPrevious": true,
+    "localAliasOrdinal": 3392,
+    "relocationFreeAliasBytes": 1216,
+    "aliasMachineCodeSha256": "57f6e938711de23fcce081d9ea2d10df0b72da740dc70b100b9c7ba64e239a55",
+    "exactMachineCodeEqualPrevious": true,
+    "onlyObservedCompilerPrivateAutoexportsHidden": 8,
+    "previousFiveExclusionsRetained": true
+  },
+  "shaderCache": {
+    "formatVersion": 22,
+    "identity": "0x409d82e2083d0bae",
+    "policyTag": "center-ij-unused-m0-trace-mandatory-dag-nsa-v3"
+  },
+  "publicOrderedCases": 484,
+  "previousNineCompleteRequestsPassed": true,
+  "previousNineSpirvAndBindingLayoutsByteIdentical": true,
+  "tenthCompleteRequest": {
+    "originalCanonicalRoundtripEqual": true,
+    "originalSerializationEqual": true,
+    "codeWords": 596,
+    "memoryRegions": 2,
+    "userDataWords": 30,
+    "interpolationGuardPassed": true,
+    "failureStage": "SrtWalker::EvaluateRuntimeSources, descriptor source 0 dword 0",
+    "materializedOutputEstablished": false,
+    "logSha256": "fd3df2cb7aedbcf6161c53e3e5c70a748f9ad9204a5bbd8154fb6f34ad55b187",
+    "failureCommandExitCode": 1,
+    "capturePurpose": "Shader registration and preparation, before live draw inputs exist",
+    "allThirtyUserDataWordsZero": true,
+    "containsLiveSrtMemory": false,
+    "interpretation": "Correct rejection of absent live runtime inputs; no materialization proof"
+  },
+  "null12AndFullHost53ReachedInThisAttempt": false,
+  "ownWineserverWaitExitCode": 0,
+  "freshWindowsPackageCreated": false,
+  "ipadInstalled": false,
+  "gpuExecuted": false,
+  "courseDisplayed": false,
+  "gamePlayable": false,
+  "rawShadersOrGameAssetsIncluded": false,
+  "githubActionsUsed": false
+}

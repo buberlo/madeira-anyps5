@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "date": "2026-10-10",
+  "status": "nine_native_windows_prerequisites_passed_first_prepared_graphics_positive_summary_reader_rejected_cache_warning_no_game",
+  "upstream": "c963432db05f8b35c62e212b3a36494501522fe2",
+  "sourceFreezeSha256": "35fbabf1a3e80f489f3c3c5f09eebeca7e620b1911973eeffe6384db6d783552",
+  "archiveSha256": "a76aec3e4d79ece6c02986241c01cd29e2eb8042e9226722ffc318e7f304e4af",
+  "overlaySha256": "7881cf828821c177679e4e983ee3ba231f9c2b2b805560cc8fb999918dc77482",
+  "manifestSha256": "78b30e929cde160c5ed300610a9e58662bb02666c4abaa01b16dac96a53ee659",
+  "returnedEvidenceSha256": "3cc9de3d6daa8a0b8e1cf43376bd6fe33b12a87f5d724d07e5d1c610690936e3",
+  "transferReportSha256": "a50b0befdcfab5739b2a47906bdeed58cc36403d31b0b50f6910bad60aa14d18",
+  "listenerReceiptSha256": "2b32fde3cd53f6a006690aff33df49f89ad6fbfd3874c2eba751e781ba2a796c",
+  "independentAuditSha256": "174566a410f3a1db7e7a0273fe0b600fe6d572bdf3811990f96945f24e8e5ed7",
+  "securityReviewSha256": "ed0e0567bfeaf996475aea9783c8da1426006c90dea82c62c4f839afe0264018",
+  "verifiedGameFiles": 181,
+  "verifiedPayloadFiles": 256,
+  "requiredPrerequisites": 16,
+  "passedPrerequisites": [
+    {
+      "name": "windows_exception_tests",
+      "exit_code": 0,
+      "executable_sha256": "17790d1ffd67e2ce037112147dd111dd83bb22156bbe25900aad5e1689b1f848",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "exception_personality_tests",
+      "exit_code": 0,
+      "executable_sha256": "5fdca45001e44e4a13f4e1f3fd4821a1af170af1d871b5ebba66d6518cd8a717",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "guest_raise_exception_tests",
+      "exit_code": 0,
+      "executable_sha256": "0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "guest_memory_tests",
+      "exit_code": 0,
+      "executable_sha256": "5a7d3c64e89d4979a9f0874e3740f0b316ebbffba438bf3a4a0320fa1497e713",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "guest_raise_exception_default_tests",
+      "exit_code": 0,
+      "executable_sha256": "0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "raw_log_output_tests",
+      "exit_code": 0,
+      "executable_sha256": "40842a0e1d96a185396da17dea32ec61ddef6b77f20b533c693d3449ae60ba58",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "agc_unused_barycentric_tests",
+      "exit_code": 0,
+      "executable_sha256": "3f3cf9599be52265dafff6ed4b062a7e5abe826ac6e6750b69d083dccc5301c2",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "agc_actual_driver_public_tests",
+      "exit_code": 0,
+      "executable_sha256": "36f5a5da3f87d1868048ec9a793edffb26a7bfacba269918b8b784de7860c76f",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    },
+    {
+      "name": "physical-gpu",
+      "exit_code": 0,
+      "executable_sha256": "df41144a9af0a1a41d3a71bbed249e8c88a23b705cf2701688c56c14a2e74bdf",
+      "own_tree_stopped": true,
+      "timed_out": false,
+      "stdout_discarded": 0,
+      "stderr_discarded": 0
+    }
+  ],
+  "cpuExceptionResults": {
+    "explicitAvxDeliveries": 803,
+    "defaultDeliveries": 701,
+    "privateRxDeliveriesPerMode": 1,
+    "nativeWaitChecksPerMode": 20,
+    "avxVerifiedOnNativeWindows": true
+  },
+  "gpuProbe": {
+    "device": "AMD Radeon 780M Graphics",
+    "driverVersion": "31.0.21029.6002",
+    "deviceCreated": true,
+    "bda8BitReadbackPassed": true,
+    "bc1TextureReadbackPassed": true
+  },
+  "firstPreparedGraphics": {
+    "positiveSummaryObserved": true,
+    "nativeInterpolationFixtureOnly": true,
+    "gameInterpolationProfileUnchanged": true,
+    "exitCodeRecorded": false,
+    "passedGate": false,
+    "readerRejectedExactNoCacheDirectoryWarning": true
+  },
+  "smartAppControl": {
+    "temporaryOffExplicitlyAuthorized": true,
+    "restoredOnAndVisuallyVerified": true
+  },
+  "gameStarted": false,
+  "remainingPrerequisitesQualified": false,
+  "appleFixedInterpolationQualified": false,
+  "iPadGpuQualified": false,
+  "gameplayQualified": false,
+  "listenerClosed": true,
+  "ownReferenceJoined": true,
+  "githubActions": false,
+  "rawLogsIncluded": false,
+  "privatePathsIncluded": false,
+  "boundary": "Nine explicit successful child records are established. Prepared-graphics logs contain the expected success summary, but its candidate row was not recorded before the cache-warning reader rejection. No exit code or full prepared-GPU acceptance is inferred; MiniGolf has not started."
+}

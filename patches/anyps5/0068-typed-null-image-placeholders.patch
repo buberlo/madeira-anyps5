@@ -1,0 +1,882 @@
+diff --git a/core/libs/prx/libSceAgcDriver/CMakeLists.txt b/core/libs/prx/libSceAgcDriver/CMakeLists.txt
+--- a/core/libs/prx/libSceAgcDriver/CMakeLists.txt
++++ b/core/libs/prx/libSceAgcDriver/CMakeLists.txt
+@@ -143,6 +143,7 @@
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/Pipeline.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/PipelineCache.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/Resources.cpp
++        ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/PlaceholderImages.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ColorRenderTarget.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/ColorSampleTransfer.cpp
+         ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/src/GpuColorSampleTiler.cpp
+@@ -464,6 +465,11 @@
+ set_target_properties(agc_unused_barycentric_tests PROPERTIES CXX_EXTENSIONS OFF)
+ configure_windows_unwind(agc_unused_barycentric_tests)
+ 
++add_test_executable(agc_placeholder_images_tests EXCLUDE_FROM_ALL tests/PlaceholderImages.cpp)
++target_include_directories(agc_placeholder_images_tests PRIVATE ${LIBS_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/3rdparty/Vulkan-Headers/include)
++target_link_libraries(agc_placeholder_images_tests PRIVATE shader_recompiler_agc_driver libc)
++set_target_properties(agc_placeholder_images_tests PROPERTIES CXX_EXTENSIONS OFF)
++configure_windows_unwind(agc_placeholder_images_tests)
+ add_test_executable(agc_shader_device_profile_tests EXCLUDE_FROM_ALL tests/ShaderDeviceProfile.cpp Execution/src/ShaderDeviceProfile.cpp)
+ target_include_directories(agc_shader_device_profile_tests PRIVATE ${LIBS_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/3rdparty/Vulkan-Headers/include)
+ target_link_libraries(agc_shader_device_profile_tests PRIVATE shader_recompiler_agc_driver libc)
+@@ -603,6 +609,7 @@
+ 
+ add_test_executable(agc_driver_graphics_tests EXCLUDE_FROM_ALL
+         tests/Graphics.cpp
++        tests/PlaceholderImageRuntime.cpp
+         tests/ColorTargetLayout.cpp
+         tests/ColorTargetSamples.cpp
+         tests/BdaResources.cpp
+@@ -625,6 +632,7 @@
+         Graphics/src/ColorResolve.cpp
+         Graphics/src/ColorResolveFragment.cpp
+         Graphics/src/Resources.cpp
++        Graphics/src/PlaceholderImages.cpp
+         Graphics/src/ColorRenderTarget.cpp
+         Graphics/src/ColorSampleTransfer.cpp
+         Graphics/src/GpuColorSampleTiler.cpp
+@@ -682,6 +690,7 @@
+         tests/BdaContracts.cpp
+         Execution/src/BdaFeatures.cpp
+         Graphics/src/Resources.cpp
++        Graphics/src/PlaceholderImages.cpp
+         Graphics/src/ColorRenderTarget.cpp
+         Graphics/src/ColorSampleTransfer.cpp
+         Graphics/src/GpuColorSampleTiler.cpp
+@@ -758,7 +767,7 @@
+     if(WIN32)
+         set_tests_properties(agc_shader_bindless PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+     endif()
+-    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_shader_disk_cache_tests agc_unused_barycentric_tests agc_shader_device_profile_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests ${agcExecutionTests})
++    foreach(agcTest IN ITEMS agc_shared_write_tests agc_driver_tests agc_shader_memory_tests agc_structurizer_tests agc_spirv_module_tests agc_dpp_write_tests agc_masked_select_tests agc_vop1_control_decode_tests agc_validate_program_tests agc_shader_disk_cache_tests agc_unused_barycentric_tests agc_shader_device_profile_tests agc_placeholder_images_tests agc_shader_control_flow_tests agc_driver_flip_tests agc_driver_pm4_tests agc_driver_graphics_tests agc_driver_bda_device_tests agc_driver_mesh_tests ${agcExecutionTests})
+         if(agcTest STREQUAL "agc_driver_constant_store_tests")
+             continue()
+         endif()
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/include/ShaderDeviceProfile.hpp b/core/libs/prx/libSceAgcDriver/Execution/include/ShaderDeviceProfile.hpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/include/ShaderDeviceProfile.hpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/include/ShaderDeviceProfile.hpp
+@@ -10,7 +10,7 @@
+ 
+ class ShaderDeviceProfile {
+ public:
+-    ShaderDeviceProfile(const ShaderRecompiler::SpirvTarget& target, const VkDeviceCreateInfo& deviceInfo, const VkPhysicalDeviceLimits& limits);
++    ShaderDeviceProfile(const ShaderRecompiler::SpirvTarget& target, const VkDeviceCreateInfo& deviceInfo, const VkPhysicalDeviceLimits& limits, bool typedPlaceholderFallback = false);
+     ShaderDeviceProfile(const ShaderDeviceProfile&) = delete;
+     ShaderDeviceProfile& operator=(const ShaderDeviceProfile&) = delete;
+     ShaderRecompiler::SpirvTarget Target() const { return target; }
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/ShaderDeviceProfile.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/ShaderDeviceProfile.cpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/src/ShaderDeviceProfile.cpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/src/ShaderDeviceProfile.cpp
+@@ -18,7 +18,7 @@
+ 
+ }
+ 
+-ShaderDeviceProfile::ShaderDeviceProfile(const ShaderRecompiler::SpirvTarget& target, const VkDeviceCreateInfo& deviceInfo, const VkPhysicalDeviceLimits& limits) : target(target), limits(limits), capabilities(target.supportedCapabilities.begin(), target.supportedCapabilities.end()) {
++ShaderDeviceProfile::ShaderDeviceProfile(const ShaderRecompiler::SpirvTarget& target, const VkDeviceCreateInfo& deviceInfo, const VkPhysicalDeviceLimits& limits, bool typedPlaceholderFallback) : target(target), limits(limits), capabilities(target.supportedCapabilities.begin(), target.supportedCapabilities.end()) {
+     using Graphics::Require;
+     Require(deviceInfo.pEnabledFeatures != nullptr, "shader device profile requires enabled core features");
+     const auto& core = *deviceInfo.pEnabledFeatures;
+@@ -34,7 +34,7 @@
+     Require(target.bdaAbiVersion == ShaderRecompiler::BdaAbi::Version, "shader device profile has an incompatible BDA ABI");
+     Require(bda != nullptr && bda->bufferDeviceAddress == VK_TRUE && core.shaderInt64 == VK_TRUE, "shader runtime requires enabled bufferDeviceAddress and shaderInt64");
+     Require(bytes != nullptr && bytes->storageBuffer8BitAccess == VK_TRUE, "shader runtime requires enabled storageBuffer8BitAccess");
+-    this->target.imageDescriptorPolicy = ShaderRecompiler::ImageDescriptorPolicyFor(nullDescriptors);
++    this->target.imageDescriptorPolicy = ShaderRecompiler::ImageDescriptorPolicyFor(nullDescriptors, typedPlaceholderFallback);
+     Require(core.vertexPipelineStoresAndAtomics == VK_TRUE && core.fragmentStoresAndAtomics == VK_TRUE, "shader runtime requires enabled graphics stores and atomics");
+     Require(limits.maxPushConstantsSize >= ShaderRecompiler::RuntimeAbi::PushConstantDwords * sizeof(std::uint32_t) && limits.maxBoundDescriptorSets > ShaderRecompiler::RuntimeAbi::DescriptorSet, "shader runtime ABI exceeds device limits");
+     Require(limits.maxStorageBufferRange >= sizeof(ShaderRecompiler::RuntimeAbi::ShaderData), "shader runtime ShaderData exceeds device limits");
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
+--- a/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/src/VulkanDevice.cpp
+@@ -15,6 +15,7 @@
+ #include "prx/libSceAgcDriver/Execution/include/ShaderDeviceProfile.hpp"
+ #include "prx/libSceAgcDriver/Execution/include/PresentationScaler.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/DepthSurface.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/ColorResolve.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/DccMetadata.hpp"
+ #include "prx/libSceAgcDriver/Execution/include/DisplayFormat.hpp"
+@@ -240,6 +241,7 @@
+     bool storageBufferUpdateAfterBind = false;
+     VkPhysicalDeviceDescriptorIndexingPropertiesEXT descriptorIndexingProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT};
+     bool imageInt64Atomics = false;
++    bool storageImageMultisample = false;
+     bool bufferInt64Atomics = false;
+     bool primitiveListRestart = false;
+     bool depthClipControl = false;
+@@ -293,6 +295,7 @@
+     std::unique_ptr<Graphics::StencilSampleProgramCache> stencilSamplePrograms;
+     std::shared_ptr<Graphics::BufferPool> bufferPool;
+     std::unique_ptr<Graphics::Buffer> emptyBuffer;
++    std::unique_ptr<Graphics::PlaceholderImages> placeholderImages;
+     std::unique_ptr<Graphics::TextureCache> textureCache;
+     std::unique_ptr<Graphics::PipelineCache> pipelineCache;
+     std::unique_ptr<Graphics::DescriptorCache> descriptorCache;
+@@ -631,6 +634,7 @@
+             if (workgroupMemoryLayout != VK_NULL_HANDLE) reinterpret_cast<PFN_vkDestroyDescriptorSetLayout>(deviceProc(device, "vkDestroyDescriptorSetLayout"))(device, workgroupMemoryLayout, nullptr);
+             descriptorCache.reset();
+             emptyBuffer.reset();
++            placeholderImages.reset();
+             samplerCache.reset();
+             textureCache.reset();
+             detiler.reset();
+@@ -1126,6 +1130,7 @@
+     state->occlusionQueryPrecise = enabled.occlusionQueryPrecise == VK_TRUE;
+     // Recompiled storage-image access declares no format (the guest descriptor decides it).
+     enabled.shaderStorageImageMultisample = available.shaderStorageImageMultisample;
++    state->storageImageMultisample = enabled.shaderStorageImageMultisample == VK_TRUE;
+     if (enabled.shaderStorageImageMultisample) state->capabilities.push_back(spv::CapabilityStorageImageMultisample);
+     state->capabilities.push_back(spv::CapabilityImageMSArray);
+     enabled.shaderStorageImageWriteWithoutFormat = available.shaderStorageImageWriteWithoutFormat;
+@@ -1301,7 +1306,7 @@
+         deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
+     }
+     std::fprintf(stderr, "[gpu] image descriptor policy=%s nativeNullDescriptor=%u\n",
+-                 robustness2.nullDescriptor == VK_TRUE ? "native-null" : "requires-valid-images", robustness2.nullDescriptor);
++                 robustness2.nullDescriptor == VK_TRUE ? "native-null" : "typed-placeholders", robustness2.nullDescriptor);
+     deviceInfo.pNext = &bdaFeatures;
+     // Portability devices require both the extension and the explicitly enabled
+     // array-image feature; image creation succeeding alone cannot replace this.
+@@ -1331,7 +1336,7 @@
+         deviceInfo.ppEnabledExtensionNames = deviceExtensions.data();
+     }
+     if (state->multisampleArrayImage) state->capabilities.push_back(spv::CapabilityImageMSArray);
+-    auto shaderProfile = std::make_unique<const ShaderDeviceProfile>(buildTarget(), deviceInfo, state->properties.limits);
++    auto shaderProfile = std::make_unique<const ShaderDeviceProfile>(buildTarget(), deviceInfo, state->properties.limits, true);
+     check(state->InstanceFunction<PFN_vkCreateDevice>("vkCreateDevice")(selected, &deviceInfo, nullptr, &state->device), "vkCreateDevice");
+     state->shaderProfile = std::move(shaderProfile);
+     state->DeviceFunction<PFN_vkGetDeviceQueue>("vkGetDeviceQueue")(state->device, family, 0, &state->queue);
+@@ -1355,6 +1360,11 @@
+     state->descriptorCache = std::make_unique<Graphics::DescriptorCache>(graphicsContext());
+     state->samplerCache = std::make_unique<Graphics::SamplerCache>();
+     state->CreateWorkgroupMemoryLayout();
++    if (state->shaderProfile->ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders) {
++        std::unique_lock gpuLock(GuestMemory::GpuMutex(), std::defer_lock);
++        if (!GuestMemory::GpuMutex().HeldByThisThread()) gpuLock.lock();
++        state->placeholderImages = std::make_unique<Graphics::PlaceholderImages>(graphicsContext());
++    }
+     state->recorder = std::make_unique<Graphics::Recorder>(graphicsContext(), state->timelineSemaphores);
+     state->recorder->Activate();
+     // Programs are lazy; the exact opt-in leaves the ordinary path unchanged.
+@@ -2773,6 +2783,9 @@
+     context.sampleLocations = state->sampleLocations;
+     context.sampleLocationProperties = state->sampleLocationProperties;
+     context.nullDescriptors = state->shaderProfile != nullptr && state->shaderProfile->NullDescriptors();
++    context.typedImagePlaceholders = state->shaderProfile != nullptr && state->shaderProfile->ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders;
++    context.placeholderImages = state->placeholderImages.get();
++    context.storageImageMultisample = state->storageImageMultisample;
+     context.bufferInt64Atomics = state->bufferInt64Atomics;
+     context.imageDescriptorPolicy = state->shaderProfile != nullptr ? state->shaderProfile->ImagePolicy() : ShaderRecompiler::ImageDescriptorPolicy::RequiresValidImages;
+     context.primitiveListRestart = state->primitiveListRestart;
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/Context.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/Context.hpp
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/Context.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/Context.hpp
+@@ -28,6 +28,7 @@
+ class DescriptorCache;
+ class SamplerCache;
+ class ShaderResources;
++class PlaceholderImages;
+ 
+ inline void Require(bool condition, const std::string& reason) {
+     if (!condition) throw std::runtime_error("AGC graphics: " + reason);
+@@ -156,6 +157,10 @@
+     VkPhysicalDeviceSampleLocationsPropertiesEXT sampleLocationProperties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLE_LOCATIONS_PROPERTIES_EXT};
+     // Actual enabled Vulkan feature; policy cannot turn unsupported native nulls on.
+     bool nullDescriptors = false;
++    // Explicit fallback capability, separate from the enabled native Vulkan feature.
++    bool typedImagePlaceholders = false;
++    PlaceholderImages* placeholderImages = nullptr;
++    bool storageImageMultisample = false;
+     bool bufferInt64Atomics = false;
+     ShaderRecompiler::ImageDescriptorPolicy imageDescriptorPolicy = ShaderRecompiler::ImageDescriptorPolicy::RequiresValidImages;
+     bool primitiveListRestart = false;
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp
+--- a/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp
+@@ -6,14 +6,16 @@
+ namespace AgcDriver::Graphics {
+ inline void ValidateImageDescriptorPolicy(const Context& context) {
+     Require(ShaderRecompiler::ValidImageDescriptorPolicy(context.imageDescriptorPolicy), "invalid image descriptor policy");
+-    Require(context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicyFor(context.nullDescriptors), "image descriptor policy disagrees with enabled native nullDescriptor");
++    Require(context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicyFor(context.nullDescriptors, context.typedImagePlaceholders), "image descriptor policy disagrees with enabled native nullDescriptor or typed-placeholder capability");
++    Require(!context.typedImagePlaceholders || !context.nullDescriptors, "typed placeholders must not fabricate native-null support");
++    Require(!context.typedImagePlaceholders || context.placeholderImages != nullptr, "typed-placeholder policy requires its actual device provider");
+ }
+ // Validate the compact, selected physical heap, including present zero/padded
+ // entries. Empty/inactive heaps are removed by DescriptorBindingBuilder, not by
+ // treating a zero guest address as inactive here.
+ inline void ValidateGuestImageDescriptors(const Context& context, const ShaderRecompiler::DescriptorBinding& binding, VkShaderStageFlags stages) {
+     ValidateImageDescriptorPolicy(context);
+-    if (binding.kind == ShaderRecompiler::DescriptorKind::Sampler || context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull) return;
++    if (binding.kind == ShaderRecompiler::DescriptorKind::Sampler || context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull || context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders) return;
+     Require(binding.role == ShaderRecompiler::DescriptorRole::GuestImages, "image policy requires a guest image binding");
+     Require(binding.guestDescriptor.size() == static_cast<std::size_t>(binding.count) * 8u, "image policy requires 8-dword guest descriptors");
+     for (std::uint32_t element = 0u; element < binding.count; ++element) {
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp b/core/libs/prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp
+new file mode 100644
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp
+@@ -0,0 +1,92 @@
++#ifndef CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_PLACEHOLDERIMAGES_HPP
++#define CORE_LIBS_PRX_LIBSCEAGCDRIVER_GRAPHICS_INCLUDE_PLACEHOLDERIMAGES_HPP
++
++#include "prx/libSceAgcDriver/Graphics/include/Context.hpp"
++#include "RuntimeAbi.hpp"
++#include <array>
++#include <cstdint>
++
++namespace AgcDriver::Graphics {
++
++inline constexpr std::uint32_t PlaceholderDimensionsPerClass = (ShaderRecompiler::RuntimeAbi::FirstComparisonImageBinding - ShaderRecompiler::RuntimeAbi::FirstImageBinding) / 3u;
++static_assert(ShaderRecompiler::RuntimeAbi::FirstStorageImageBinding == ShaderRecompiler::RuntimeAbi::FirstComparisonImageBinding + PlaceholderDimensionsPerClass);
++static_assert(ShaderRecompiler::RuntimeAbi::ImageBindingCount == 8u * PlaceholderDimensionsPerClass && PlaceholderDimensionsPerClass == 7u);
++
++struct PlaceholderImageShape {
++    VkFormat format;
++    VkFormatFeatureFlags features;
++    VkImageUsageFlags usage;
++    VkImageAspectFlags aspect;
++    VkImageType type;
++    VkImageViewType viewType;
++    VkSampleCountFlagBits samples;
++};
++
++constexpr PlaceholderImageShape PlaceholderImageShapeOf(std::uint32_t heap) {
++    constexpr std::array<VkFormat, 8> formats{VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32_UINT, VK_FORMAT_R32_SINT, VK_FORMAT_D16_UNORM,
++                                              VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT, VK_FORMAT_R64_UINT};
++    constexpr std::array<VkImageType, PlaceholderDimensionsPerClass> types{VK_IMAGE_TYPE_1D, VK_IMAGE_TYPE_1D, VK_IMAGE_TYPE_2D, VK_IMAGE_TYPE_2D,
++                                                                           VK_IMAGE_TYPE_2D, VK_IMAGE_TYPE_2D, VK_IMAGE_TYPE_3D};
++    constexpr std::array<VkImageViewType, PlaceholderDimensionsPerClass> views{VK_IMAGE_VIEW_TYPE_1D, VK_IMAGE_VIEW_TYPE_1D_ARRAY, VK_IMAGE_VIEW_TYPE_2D,
++                                                                               VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D_ARRAY,
++                                                                               VK_IMAGE_VIEW_TYPE_3D};
++    constexpr std::array<VkSampleCountFlagBits, PlaceholderDimensionsPerClass> samples{VK_SAMPLE_COUNT_1_BIT, VK_SAMPLE_COUNT_1_BIT, VK_SAMPLE_COUNT_1_BIT,
++                                                                                       VK_SAMPLE_COUNT_1_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_4_BIT,
++                                                                                       VK_SAMPLE_COUNT_1_BIT};
++    if (heap < ShaderRecompiler::RuntimeAbi::FirstImageBinding || heap >= ShaderRecompiler::RuntimeAbi::FirstImageBinding + ShaderRecompiler::RuntimeAbi::ImageBindingCount)
++        throw std::out_of_range("placeholder shape requires a typed image heap");
++    const auto index = heap - ShaderRecompiler::RuntimeAbi::FirstImageBinding;
++    const auto kind = index / PlaceholderDimensionsPerClass;
++    const auto format = formats[kind];
++    const auto dimension = index % PlaceholderDimensionsPerClass;
++    const bool storage = heap >= ShaderRecompiler::RuntimeAbi::FirstStorageImageBinding;
++    const bool atomic = kind >= 6u;
++    const VkFormatFeatureFlags access = atomic ? VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT
++                                       : storage ? VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
++                                       : VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
++    return {format,
++            static_cast<VkFormatFeatureFlags>(access | VK_FORMAT_FEATURE_TRANSFER_DST_BIT),
++            static_cast<VkImageUsageFlags>((storage ? VK_IMAGE_USAGE_STORAGE_BIT : VK_IMAGE_USAGE_SAMPLED_BIT) | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
++            static_cast<VkImageAspectFlags>(format == VK_FORMAT_D16_UNORM ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
++            types[dimension],
++            views[dimension],
++            samples[dimension]};
++}
++
++// Image creation is checked against the exact enabled feature contract, not merely
++// a successful format query. Unsupported heaps remain absent and fail on first use.
++inline bool PlaceholderImageSupported(const Context& context, const PlaceholderImageShape& shape) {
++    if (shape.samples != VK_SAMPLE_COUNT_1_BIT && shape.viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY && !context.multisampleArrayImage) return false;
++    if (shape.samples != VK_SAMPLE_COUNT_1_BIT && (shape.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0 && !context.storageImageMultisample) return false;
++    if (shape.format == VK_FORMAT_R64_UINT && !context.imageInt64Atomics) return false;
++    if (context.formatProperties == nullptr || context.imageFormatProperties == nullptr) return false;
++    VkFormatProperties properties{};
++    context.formatProperties(context.physical, shape.format, &properties);
++    if ((properties.optimalTilingFeatures & shape.features) != shape.features) return false;
++    VkImageFormatProperties limits{};
++    if (context.imageFormatProperties(context.physical, shape.format, shape.type, VK_IMAGE_TILING_OPTIMAL, shape.usage, 0, &limits) != VK_SUCCESS) return false;
++    return (limits.sampleCounts & shape.samples) != 0 && limits.maxExtent.width >= 1u && limits.maxExtent.height >= 1u && limits.maxExtent.depth >= 1u && limits.maxMipLevels >= 1u && limits.maxArrayLayers >= 1u;
++}
++
++class PlaceholderImages {
++public:
++    explicit PlaceholderImages(const Context& context);
++    ~PlaceholderImages();
++    PlaceholderImages(const PlaceholderImages&) = delete;
++    PlaceholderImages& operator=(const PlaceholderImages&) = delete;
++    VkImageView View(std::uint32_t heap) const;
++
++private:
++    struct Image {
++        VkImage image = VK_NULL_HANDLE;
++        VkDeviceMemory memory = VK_NULL_HANDLE;
++        VkImageView view = VK_NULL_HANDLE;
++    };
++    void release() noexcept;
++    Context context;
++    std::array<Image, ShaderRecompiler::RuntimeAbi::ImageBindingCount> images{};
++};
++
++}
++
++#endif
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/PlaceholderImages.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/PlaceholderImages.cpp
+new file mode 100644
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/PlaceholderImages.cpp
+@@ -0,0 +1,98 @@
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/Resources.hpp"
++#include <string>
++#include <vector>
++
++namespace AgcDriver::Graphics {
++PlaceholderImages::PlaceholderImages(const Context& context) : context(context) {
++    try {
++        std::vector<VkImageMemoryBarrier> toClear;
++        for (std::uint32_t index = 0; index < images.size(); ++index) {
++            const auto shape = PlaceholderImageShapeOf(ShaderRecompiler::RuntimeAbi::FirstImageBinding + index);
++            if (!PlaceholderImageSupported(context, shape)) continue;
++            auto& image = images[index];
++            VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
++            info.imageType = shape.type;
++            info.format = shape.format;
++            info.extent = {1, 1, 1};
++            info.mipLevels = 1;
++            info.arrayLayers = 1;
++            info.samples = shape.samples;
++            info.tiling = VK_IMAGE_TILING_OPTIMAL;
++            info.usage = shape.usage;
++            info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
++            info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
++            Check(context.Function<PFN_vkCreateImage>("vkCreateImage")(context.device, &info, nullptr, &image.image), "vkCreateImage placeholder");
++            VkMemoryRequirements requirements{};
++            context.Function<PFN_vkGetImageMemoryRequirements>("vkGetImageMemoryRequirements")(context.device, image.image, &requirements);
++            VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
++            allocation.allocationSize = requirements.size;
++            allocation.memoryTypeIndex = context.MemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
++            Check(context.Function<PFN_vkAllocateMemory>("vkAllocateMemory")(context.device, &allocation, nullptr, &image.memory), "vkAllocateMemory placeholder");
++            Check(context.Function<PFN_vkBindImageMemory>("vkBindImageMemory")(context.device, image.image, image.memory, 0), "vkBindImageMemory placeholder");
++            VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
++            viewInfo.image = image.image;
++            viewInfo.viewType = shape.viewType;
++            viewInfo.format = shape.format;
++            viewInfo.subresourceRange = {shape.aspect, 0, 1, 0, 1};
++            Check(context.Function<PFN_vkCreateImageView>("vkCreateImageView")(context.device, &viewInfo, nullptr, &image.view), "vkCreateImageView placeholder");
++            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
++            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
++            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
++            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
++            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++            barrier.image = image.image;
++            barrier.subresourceRange = viewInfo.subresourceRange;
++            toClear.push_back(barrier);
++        }
++        if (toClear.empty()) return;
++        CommandBatch batch(context);
++        const auto commands = batch.Handle();
++        const auto pipelineBarrier = context.Function<PFN_vkCmdPipelineBarrier>("vkCmdPipelineBarrier");
++        pipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, static_cast<std::uint32_t>(toClear.size()), toClear.data());
++        std::vector<VkImageMemoryBarrier> toGeneral;
++        for (const auto& barrier : toClear) {
++            if (barrier.subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT) {
++                const VkClearDepthStencilValue zero{0.0f, 0};
++                context.Function<PFN_vkCmdClearDepthStencilImage>("vkCmdClearDepthStencilImage")(commands, barrier.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &barrier.subresourceRange);
++            } else {
++                const VkClearColorValue zero{};
++                context.Function<PFN_vkCmdClearColorImage>("vkCmdClearColorImage")(commands, barrier.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &barrier.subresourceRange);
++            }
++            auto general = barrier;
++            general.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
++            general.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
++            general.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
++            general.newLayout = VK_IMAGE_LAYOUT_GENERAL;
++            toGeneral.push_back(general);
++        }
++        pipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, static_cast<std::uint32_t>(toGeneral.size()), toGeneral.data());
++        batch.SubmitAndWait();
++    } catch (...) {
++        release();
++        throw;
++    }
++}
++
++PlaceholderImages::~PlaceholderImages() {
++    release();
++}
++
++void PlaceholderImages::release() noexcept {
++    for (auto& image : images) {
++        if (image.view) context.Function<PFN_vkDestroyImageView>("vkDestroyImageView")(context.device, image.view, nullptr);
++        if (image.image) context.Function<PFN_vkDestroyImage>("vkDestroyImage")(context.device, image.image, nullptr);
++        if (image.memory) context.Function<PFN_vkFreeMemory>("vkFreeMemory")(context.device, image.memory, nullptr);
++        image = {};
++    }
++}
++
++VkImageView PlaceholderImages::View(std::uint32_t heap) const {
++    const auto index = heap - ShaderRecompiler::RuntimeAbi::FirstImageBinding;
++    Require(heap >= ShaderRecompiler::RuntimeAbi::FirstImageBinding && index < images.size() && images[index].view != VK_NULL_HANDLE,
++            "the device has no placeholder image for typed image heap " + std::to_string(heap));
++    return images[index].view;
++}
++
++}
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/ShaderResources.cpp
+@@ -5,6 +5,7 @@
+ #include "prx/libSceAgcDriver/Graphics/include/DepthSurface.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Recorder.hpp"
+ #include <algorithm>
+ #include <atomic>
+@@ -1339,6 +1340,14 @@
+             images.reserve(imageCount);
+             std::vector<VkWriteDescriptorSet> writes;
+             writes.reserve(bindings.size());
++            const auto absentImage = [this](std::uint32_t binding) {
++                ValidateImageDescriptorPolicy(context);
++                if (context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull)
++                    return VkDescriptorImageInfo{VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL};
++                Require(context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders, "null image allocation requires native-null or typed-placeholder policy");
++                constexpr auto bindingCount = static_cast<std::uint32_t>(ShaderRecompiler::RuntimeAbi::Binding::Count);
++                return VkDescriptorImageInfo{VK_NULL_HANDLE, context.placeholderImages->View(binding % bindingCount), VK_IMAGE_LAYOUT_GENERAL};
++            };
+             for (const auto& binding : bindings) {
+                 VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                 write.dstSet = _set;
+@@ -1357,8 +1366,7 @@
+                         write.pImageInfo = images.data() + images.size();
+                         for (const auto index : binding.imageAllocations) {
+                             if (index == std::numeric_limits<std::size_t>::max()) {
+-                                Require(context.nullDescriptors && context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull, "null image allocation requires enabled native nullDescriptor");
+-                                images.push_back({VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL});
++                                images.push_back(absentImage(binding.layout.binding));
+                             }
+                             else images.push_back({VK_NULL_HANDLE, textureFirstLayer[index] ? textures[index]->FirstLayerView() : textures[index]->View(), textures[index]->Layout()});
+                         }
+@@ -1368,8 +1376,7 @@
+                         write.pImageInfo = images.data() + images.size();
+                         for (const auto index : binding.imageAllocations) {
+                             if (index == std::numeric_limits<std::size_t>::max()) {
+-                                Require(context.nullDescriptors && context.imageDescriptorPolicy == ShaderRecompiler::ImageDescriptorPolicy::NativeNull, "null image allocation requires enabled native nullDescriptor");
+-                                images.push_back({VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL});
++                                images.push_back(absentImage(binding.layout.binding));
+                             }
+                             else images.push_back({VK_NULL_HANDLE, storageAtomic64[index] ? storageTextures[index]->Atomic64View(storageMips[index], storageFirstLayer[index]) : storageAtomic[index] ? storageTextures[index]->AtomicView(storageMips[index], storageFirstLayer[index]) : storageTextures[index]->StorageView(storageMips[index], storageFirstLayer[index]), VK_IMAGE_LAYOUT_GENERAL});
+                         }
+diff --git a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
+--- a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
+@@ -3700,6 +3700,7 @@
+     try {
+         if (argc == 2 && std::string_view(argv[1]) == "--image-descriptor-policy-only") {
+             imageDescriptorPolicyTests();
++            RunPlaceholderImageRuntimeTests();
+             return 0;
+         }
+         if (argc == 2 && std::string_view(argv[1]) == "--descriptor-update-after-bind-only") {
+@@ -3752,6 +3753,7 @@
+         }
+         UnobservedViewportDepthTests();
+         stateTests();
++        RunPlaceholderImageRuntimeTests();
+         RunColorTargetSampleTests();
+         shaderEnginePartitionTests();
+         equivalentStencilClearTests();
+diff --git a/core/libs/prx/libSceAgcDriver/tests/GraphicsTests.hpp b/core/libs/prx/libSceAgcDriver/tests/GraphicsTests.hpp
+--- a/core/libs/prx/libSceAgcDriver/tests/GraphicsTests.hpp
++++ b/core/libs/prx/libSceAgcDriver/tests/GraphicsTests.hpp
+@@ -29,6 +29,7 @@
+     std::function<std::array<std::uint32_t, 3>()> lastSpecialization;
+ };
+ 
++void RunPlaceholderImageRuntimeTests();
+ void RunTextureFormatTests();
+ void RunColorTargetSampleTests();
+ void RunTextureTilingTests();
+diff --git a/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp
+new file mode 100644
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImageRuntime.cpp
+@@ -0,0 +1,100 @@
++#include "GraphicsTests.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp"
++#include "prx/libSceAgcDriver/Execution/include/GuestMemory.hpp"
++#include <algorithm>
++#include <cstring>
++#include <map>
++#include <mutex>
++#include <set>
++#include <stdexcept>
++#include <string>
++#include <vector>
++#include <type_traits>
++
++namespace {
++using namespace AgcDriver::Graphics;
++using ShaderRecompiler::RuntimeAbi::FirstImageBinding;
++using ShaderRecompiler::RuntimeAbi::ImageBindingCount;
++struct Probe {
++    std::uint64_t next = 1u;
++    std::map<VkImage,VkImageCreateInfo> images;
++    std::map<VkImageView,VkImage> views;
++    std::set<VkDeviceMemory> memories;
++    std::map<VkImage,VkImageLayout> layouts;
++    std::set<VkImage> cleared;
++    std::uint32_t submits = 0u, waits = 0u, creates = 0u, failCreate = 0u;
++}* probe = nullptr;
++template<typename T> T New() {
++    const auto value = probe->next++;
++    if constexpr (std::is_pointer_v<T>) return reinterpret_cast<T>(static_cast<std::uintptr_t>(value));
++    else return static_cast<T>(value);
++}
++VKAPI_ATTR void VKAPI_CALL Formats(VkPhysicalDevice,VkFormat,VkFormatProperties* out) { *out={};out->optimalTilingFeatures=~VkFormatFeatureFlags{0}; }
++VKAPI_ATTR VkResult VKAPI_CALL ImageFormats(VkPhysicalDevice,VkFormat,VkImageType,VkImageTiling,VkImageUsageFlags,VkImageCreateFlags,VkImageFormatProperties* out) { *out={{1u,1u,1u},1u,1u,VK_SAMPLE_COUNT_1_BIT|VK_SAMPLE_COUNT_4_BIT,4096u};return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL CreateImage(VkDevice,const VkImageCreateInfo* info,const VkAllocationCallbacks*,VkImage* out) {
++    if (++probe->creates==probe->failCreate) return VK_ERROR_OUT_OF_DEVICE_MEMORY;
++    Require(info->extent.width==1u&&info->extent.height==1u&&info->extent.depth==1u&&info->mipLevels==1u&&info->arrayLayers==1u,"placeholder extent/mips/layers invalid");
++    Require((info->usage&VK_IMAGE_USAGE_TRANSFER_DST_BIT)!=0u&&info->initialLayout==VK_IMAGE_LAYOUT_UNDEFINED,"placeholder clear contract missing");
++    *out=New<VkImage>();probe->images.emplace(*out,*info);probe->layouts[*out]=VK_IMAGE_LAYOUT_UNDEFINED;return VK_SUCCESS;
++}
++VKAPI_ATTR void VKAPI_CALL ImageRequirements(VkDevice,VkImage image,VkMemoryRequirements* out) { Require(probe->images.contains(image),"unknown image requirements");*out={4096u,256u,1u}; }
++VKAPI_ATTR VkResult VKAPI_CALL Allocate(VkDevice,const VkMemoryAllocateInfo* info,const VkAllocationCallbacks*,VkDeviceMemory* out) { Require(info->allocationSize==4096u&&info->memoryTypeIndex==0u,"wrong placeholder memory allocation");*out=New<VkDeviceMemory>();probe->memories.insert(*out);return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL Bind(VkDevice,VkImage image,VkDeviceMemory memory,VkDeviceSize offset) { Require(probe->images.contains(image)&&probe->memories.contains(memory)&&offset==0u,"unbound placeholder memory");return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL CreateView(VkDevice,const VkImageViewCreateInfo* info,const VkAllocationCallbacks*,VkImageView* out) {
++    const auto& image=probe->images.at(info->image);
++    Require(info->format==image.format&&info->subresourceRange.levelCount==1u&&info->subresourceRange.layerCount==1u,"view format/range mismatch");
++    Require((image.imageType==VK_IMAGE_TYPE_1D&&(info->viewType==VK_IMAGE_VIEW_TYPE_1D||info->viewType==VK_IMAGE_VIEW_TYPE_1D_ARRAY))||(image.imageType==VK_IMAGE_TYPE_2D&&(info->viewType==VK_IMAGE_VIEW_TYPE_2D||info->viewType==VK_IMAGE_VIEW_TYPE_2D_ARRAY))||(image.imageType==VK_IMAGE_TYPE_3D&&info->viewType==VK_IMAGE_VIEW_TYPE_3D),"view dimension mismatch");
++    *out=New<VkImageView>();probe->views.emplace(*out,info->image);return VK_SUCCESS;
++}
++VKAPI_ATTR void VKAPI_CALL DestroyView(VkDevice,VkImageView view,const VkAllocationCallbacks*) { Require(probe->views.erase(view)==1u,"duplicate view release"); }
++VKAPI_ATTR void VKAPI_CALL DestroyImage(VkDevice,VkImage image,const VkAllocationCallbacks*) { Require(std::none_of(probe->views.begin(),probe->views.end(),[&](const auto& row){return row.second==image;}),"image released before its view");Require(probe->images.erase(image)==1u,"duplicate image release"); }
++VKAPI_ATTR void VKAPI_CALL Free(VkDevice,VkDeviceMemory memory,const VkAllocationCallbacks*) { Require(probe->memories.erase(memory)==1u,"duplicate memory release"); }
++VKAPI_ATTR VkResult VKAPI_CALL Commands(VkDevice,const VkCommandBufferAllocateInfo*,VkCommandBuffer* out) { *out=New<VkCommandBuffer>();return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL Fence(VkDevice,const VkFenceCreateInfo*,const VkAllocationCallbacks*,VkFence* out) { *out=New<VkFence>();return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL Begin(VkCommandBuffer,const VkCommandBufferBeginInfo*) { return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL End(VkCommandBuffer) { return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL Submit(VkQueue,std::uint32_t,const VkSubmitInfo*,VkFence) { ++probe->submits;return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL Wait(VkDevice,std::uint32_t,const VkFence*,VkBool32,std::uint64_t) { ++probe->waits;return VK_SUCCESS; }
++VKAPI_ATTR VkResult VKAPI_CALL FenceStatus(VkDevice,VkFence) { return VK_SUCCESS; }
++VKAPI_ATTR void VKAPI_CALL FreeCommands(VkDevice,VkCommandPool,std::uint32_t,const VkCommandBuffer*) {}
++VKAPI_ATTR void VKAPI_CALL DestroyFence(VkDevice,VkFence,const VkAllocationCallbacks*) {}
++VKAPI_ATTR void VKAPI_CALL Barriers(VkCommandBuffer,VkPipelineStageFlags,VkPipelineStageFlags,VkDependencyFlags,std::uint32_t,const VkMemoryBarrier*,std::uint32_t,const VkBufferMemoryBarrier*,std::uint32_t count,const VkImageMemoryBarrier* barriers) {
++    for(std::uint32_t i=0;i<count;++i){const auto& b=barriers[i];Require(probe->layouts.at(b.image)==b.oldLayout,"placeholder barrier old layout mismatch");if(b.newLayout==VK_IMAGE_LAYOUT_GENERAL)Require(probe->cleared.contains(b.image)&&b.srcAccessMask==VK_ACCESS_TRANSFER_WRITE_BIT,"placeholder visible before clear");probe->layouts[b.image]=b.newLayout;}
++}
++VKAPI_ATTR void VKAPI_CALL ClearColor(VkCommandBuffer,VkImage image,VkImageLayout layout,const VkClearColorValue* value,std::uint32_t count,const VkImageSubresourceRange* ranges) {
++    Require(probe->layouts.at(image)==layout&&layout==VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL&&count==1u&&ranges->aspectMask==VK_IMAGE_ASPECT_COLOR_BIT,"illegal color placeholder clear");for(auto v:value->uint32)Require(v==0u,"nonzero placeholder clear");Require(probe->images.at(image).format!=VK_FORMAT_D16_UNORM,"depth image cleared as color");probe->cleared.insert(image);
++}
++VKAPI_ATTR void VKAPI_CALL ClearDepth(VkCommandBuffer,VkImage image,VkImageLayout layout,const VkClearDepthStencilValue* value,std::uint32_t count,const VkImageSubresourceRange* ranges) {
++    Require(probe->layouts.at(image)==layout&&layout==VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL&&count==1u&&ranges->aspectMask==VK_IMAGE_ASPECT_DEPTH_BIT&&value->depth==0.f&&value->stencil==0u&&probe->images.at(image).format==VK_FORMAT_D16_UNORM,"illegal depth placeholder clear");probe->cleared.insert(image);
++}
++VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL Proc(VkDevice,const char* name) {
++#define P(n,f) if(std::strcmp(name,n)==0)return reinterpret_cast<PFN_vkVoidFunction>(f)
++    P("vkCreateImage",CreateImage);P("vkGetImageMemoryRequirements",ImageRequirements);P("vkAllocateMemory",Allocate);P("vkBindImageMemory",Bind);P("vkCreateImageView",CreateView);P("vkDestroyImageView",DestroyView);P("vkDestroyImage",DestroyImage);P("vkFreeMemory",Free);P("vkAllocateCommandBuffers",Commands);P("vkCreateFence",Fence);P("vkBeginCommandBuffer",Begin);P("vkEndCommandBuffer",End);P("vkQueueSubmit",Submit);P("vkWaitForFences",Wait);P("vkGetFenceStatus",FenceStatus);P("vkFreeCommandBuffers",FreeCommands);P("vkDestroyFence",DestroyFence);P("vkCmdPipelineBarrier",Barriers);P("vkCmdClearColorImage",ClearColor);P("vkCmdClearDepthStencilImage",ClearDepth);
++#undef P
++    throw std::runtime_error(std::string("unexpected placeholder entry point: ")+name);
++}
++Context MakeContext() { Context c{};c.deviceProc=Proc;c.formatProperties=Formats;c.imageFormatProperties=ImageFormats;c.memory.memoryTypeCount=1u;c.memory.memoryTypes[0].propertyFlags=VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;c.storageImageMultisample=true;c.multisampleArrayImage=true;c.imageInt64Atomics=true;return c; }
++}
++
++void RunPlaceholderImageRuntimeTests() {
++    std::unique_lock lock(AgcDriver::GuestMemory::GpuMutex());
++    Probe state;probe=&state;
++    auto context=MakeContext();
++    {
++        PlaceholderImages images(context);
++        Require(state.images.size()==ImageBindingCount&&state.cleared.size()==ImageBindingCount&&state.submits==1u&&state.waits==1u,"typed images not fully initialized and fence-completed");
++        context.placeholderImages=&images;context.typedImagePlaceholders=true;context.imageDescriptorPolicy=ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders;
++        for(std::uint32_t heap=FirstImageBinding;heap<FirstImageBinding+ImageBindingCount;++heap){const auto view=images.View(heap);const auto image=state.views.at(view);Require(state.layouts.at(image)==VK_IMAGE_LAYOUT_GENERAL,"typed image layout was not published");VkDescriptorImageInfo info{VK_NULL_HANDLE,view,VK_IMAGE_LAYOUT_GENERAL};VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};write.descriptorType=heap<ShaderRecompiler::RuntimeAbi::FirstStorageImageBinding?VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;write.descriptorCount=1u;write.pImageInfo=&info;ValidateImageDescriptorWrites(context,std::span(&write,1u));info.imageView=VK_NULL_HANDLE;bool rejected=false;try{ValidateImageDescriptorWrites(context,std::span(&write,1u));}catch(const std::runtime_error&){rejected=true;}Require(rejected,"typed fallback allowed a bare zero Vulkan view");}
++    }
++    Require(state.images.empty()&&state.views.empty()&&state.memories.empty(),"placeholder release leaked device resources");
++    state=Probe{};state.failCreate=3u;context=MakeContext();bool failed=false;
++    try{PlaceholderImages images(context);}catch(const std::runtime_error&){failed=true;}
++    Require(failed&&state.images.empty()&&state.views.empty()&&state.memories.empty(),"partial placeholder construction leaked resources");
++    state=Probe{};context=MakeContext();context.multisampleArrayImage=false;
++    {
++        PlaceholderImages images(context);bool rejected=false;try{static_cast<void>(images.View(FirstImageBinding+5u));}catch(const std::runtime_error&){rejected=true;}Require(rejected,"unsupported portability MS array heap returned a view");
++    }
++    Require(state.images.empty()&&state.views.empty()&&state.memories.empty(),"unsupported heap teardown leaked resources");
++    probe=nullptr;
++}
+diff --git a/core/libs/prx/libSceAgcDriver/tests/PlaceholderImages.cpp b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImages.cpp
+new file mode 100644
+--- /dev/null
++++ b/core/libs/prx/libSceAgcDriver/tests/PlaceholderImages.cpp
+@@ -0,0 +1,188 @@
++#include "prx/libSceAgcDriver/Graphics/include/PlaceholderImages.hpp"
++#include "IntermediateRepresentation/IrProgram.hpp"
++#include "prx/libSceAgcDriver/Graphics/include/ImageDescriptorValidation.hpp"
++#include <array>
++#include <cstdint>
++#include <exception>
++#include <iostream>
++#include <set>
++#include <stdexcept>
++#include <string>
++
++using namespace ShaderRecompiler;
++
++namespace {
++
++void Require(bool condition, const std::string& message) {
++    if (!condition) throw std::runtime_error(message);
++}
++
++VkImageViewType ViewType(RdnaImageDimension dimension, std::uint32_t nativeSamples) {
++    switch (dimension) {
++        case RdnaImageDimension::Dim1D: return VK_IMAGE_VIEW_TYPE_1D;
++        case RdnaImageDimension::Dim1DArray: return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
++        case RdnaImageDimension::Dim2D: return VK_IMAGE_VIEW_TYPE_2D;
++        case RdnaImageDimension::Dim2DMsaa: return nativeSamples != 0u ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
++        case RdnaImageDimension::Dim2DArray:
++        case RdnaImageDimension::Dim2DMsaaArray: return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
++        case RdnaImageDimension::Dim3D: return VK_IMAGE_VIEW_TYPE_3D;
++        default: throw std::runtime_error("unknown image dimension");
++    }
++}
++
++VkFormat Format(const ImageResource& image) {
++    if (image.depthCompare) return VK_FORMAT_D16_UNORM;
++    if (image.atomic64) return VK_FORMAT_R64_UINT;
++    switch (image.numericClass) {
++        case IrTextureNumericClass::Float: return VK_FORMAT_R8G8B8A8_UNORM;
++        case IrTextureNumericClass::Uint: return VK_FORMAT_R32_UINT;
++        case IrTextureNumericClass::Sint: return VK_FORMAT_R32_SINT;
++        default: throw std::runtime_error("unknown numeric class");
++    }
++}
++
++void CheckEveryHeap() {
++    constexpr std::array dimensions{RdnaImageDimension::Dim1D, RdnaImageDimension::Dim1DArray, RdnaImageDimension::Dim2D, RdnaImageDimension::Dim2DArray,
++                                    RdnaImageDimension::Dim2DMsaa, RdnaImageDimension::Dim2DMsaaArray, RdnaImageDimension::Dim3D};
++    std::set<std::uint32_t> heaps;
++    for (const auto resourceClass : {ImageResourceClass::Sampled, ImageResourceClass::Storage}) {
++        for (const auto numericClass : {IrTextureNumericClass::Float, IrTextureNumericClass::Uint, IrTextureNumericClass::Sint}) {
++            for (const bool depthCompare : {false, true}) {
++                for (const bool atomic : {false, true}) {
++                    for (const bool atomic64 : {false, true}) {
++                        if ((depthCompare && resourceClass == ImageResourceClass::Storage) || (atomic64 && !atomic)) continue;
++                        for (const auto dimension : dimensions) {
++                            for (const std::uint32_t nativeSamples : {0u, 2u, 4u}) {
++                            if (nativeSamples != 0u && dimension != RdnaImageDimension::Dim2DMsaa && dimension != RdnaImageDimension::Dim2DMsaaArray) continue;
++                            ImageResource image;
++                            image.resourceClass = resourceClass;
++                            image.numericClass = numericClass;
++                            image.dimension = dimension;
++                            image.depthCompare = depthCompare;
++                            image.atomic = atomic;
++                            image.atomic64 = atomic64;
++                            image.nativeSamples = nativeSamples;
++                            std::uint32_t heap = 0;
++                            try {
++                                heap = static_cast<std::uint32_t>(DescriptorBindingForImage(image));
++                            } catch (const std::exception&) {
++                                continue;
++                            }
++                            const auto shape = AgcDriver::Graphics::PlaceholderImageShapeOf(heap);
++                            const auto where = " for heap " + std::to_string(heap);
++                            const bool storage = resourceClass == ImageResourceClass::Storage;
++                            const bool multisampled = dimension == RdnaImageDimension::Dim2DMsaa || dimension == RdnaImageDimension::Dim2DMsaaArray;
++                            Require(((shape.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0) == storage && ((shape.usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0) == !storage, "placeholder usage disagrees with the resource class" + where);
++                            Require((shape.aspect == VK_IMAGE_ASPECT_DEPTH_BIT) == depthCompare, "placeholder aspect disagrees with depth comparison" + where);
++                            Require(shape.format == Format(image), "placeholder format disagrees with the numeric class" + where);
++                            Require(shape.viewType == ViewType(dimension, nativeSamples), "placeholder view type disagrees with the dimension" + where);
++                            Require((shape.samples != VK_SAMPLE_COUNT_1_BIT) == multisampled, "placeholder sample count disagrees with multisampling" + where);
++                            Require(((shape.features & VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT) != 0) == atomic, "placeholder format features disagree with atomics" + where);
++                            heaps.insert(heap);
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++    Require(heaps.size() == RuntimeAbi::ImageBindingCount, "not every typed image heap is reachable from an image resource: " + std::to_string(heaps.size()));
++}
++
++VkFormatFeatureFlags queriedFeatures = ~VkFormatFeatureFlags{0};
++VkSampleCountFlags queriedSamples = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT;
++VkResult queriedResult = VK_SUCCESS;
++VkImageFormatProperties queriedLimits{ {1u,1u,1u},1u,1u,queriedSamples,4096u };
++std::uint32_t queryCount = 0u;
++VKAPI_ATTR void VKAPI_CALL FormatProperties(VkPhysicalDevice, VkFormat, VkFormatProperties* properties) {
++    ++queryCount; *properties = {}; properties->optimalTilingFeatures = queriedFeatures;
++}
++VKAPI_ATTR VkResult VKAPI_CALL ImageFormatProperties(VkPhysicalDevice, VkFormat, VkImageType, VkImageTiling, VkImageUsageFlags, VkImageCreateFlags, VkImageFormatProperties* limits) {
++    ++queryCount; *limits = queriedLimits; limits->sampleCounts = queriedSamples; return queriedResult;
++}
++template<typename F> void Rejected(F action, const char* expected) {
++    try { action(); }
++    catch (const std::exception& error) { Require(std::string(error.what()).find(expected) != std::string::npos, "unexpected typed-placeholder rejection"); return; }
++    throw std::runtime_error("invalid typed-placeholder contract accepted");
++}
++void CheckExactDeviceSupport() {
++    using namespace AgcDriver::Graphics;
++    Context context{};
++    context.formatProperties = FormatProperties;
++    context.imageFormatProperties = ImageFormatProperties;
++    context.storageImageMultisample = true;
++    context.multisampleArrayImage = true;
++    context.imageInt64Atomics = true;
++    for (std::uint32_t heap = RuntimeAbi::FirstImageBinding; heap < RuntimeAbi::FirstImageBinding + RuntimeAbi::ImageBindingCount; ++heap) {
++        const auto shape = PlaceholderImageShapeOf(heap);
++        Require(PlaceholderImageSupported(context, shape), "fully supported typed heap rejected");
++        queriedFeatures &= ~VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
++        Require(!PlaceholderImageSupported(context, shape), "missing transfer destination support accepted");
++        queriedFeatures = ~VkFormatFeatureFlags{0};
++        queriedResult = VK_ERROR_FORMAT_NOT_SUPPORTED;
++        Require(!PlaceholderImageSupported(context, shape), "unsupported exact format/usage accepted");
++        queriedResult = VK_SUCCESS;
++        queriedLimits.maxArrayLayers = 0u;
++        Require(!PlaceholderImageSupported(context, shape), "zero array limit accepted");
++        queriedLimits.maxArrayLayers = 1u;
++        if (shape.samples != VK_SAMPLE_COUNT_1_BIT) {
++            queriedSamples = VK_SAMPLE_COUNT_1_BIT;
++            Require(!PlaceholderImageSupported(context, shape), "unsupported actual sample count accepted");
++            queriedSamples = VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT;
++            if (shape.viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY) {
++                context.multisampleArrayImage = false; queryCount = 0u;
++                Require(!PlaceholderImageSupported(context, shape) && queryCount == 0u, "disabled portability MS array queried/accepted");
++                context.multisampleArrayImage = true;
++            }
++            if ((shape.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0u) {
++                context.storageImageMultisample = false; queryCount = 0u;
++                Require(!PlaceholderImageSupported(context, shape) && queryCount == 0u, "disabled storage MS feature queried/accepted");
++                context.storageImageMultisample = true;
++            }
++        }
++        if (shape.format == VK_FORMAT_R64_UINT) {
++            context.imageInt64Atomics = false; queryCount = 0u;
++            Require(!PlaceholderImageSupported(context, shape) && queryCount == 0u, "disabled 64-bit image atomics queried/accepted");
++            context.imageInt64Atomics = true;
++        }
++    }
++    Rejected([] { static_cast<void>(PlaceholderImageShapeOf(0u)); }, "typed image heap");
++    Rejected([] { static_cast<void>(PlaceholderImageShapeOf(static_cast<std::uint32_t>(RuntimeAbi::Binding::Samplers))); }, "typed image heap");
++}
++void CheckPoliciesRemainDistinct() {
++    using namespace AgcDriver::Graphics;
++    Require(ValidImageDescriptorPolicy(ImageDescriptorPolicy::TypedPlaceholders) && !ValidImageDescriptorPolicy(static_cast<ImageDescriptorPolicy>(3u)), "typed fallback policy validation missing");
++    Context valid{};
++    DescriptorBinding binding{};
++    binding.kind = DescriptorKind::SampledImage;
++    binding.role = DescriptorRole::GuestImages;
++    binding.count = 1u;
++    binding.guestDescriptor.resize(8u,0u);
++    Rejected([&] { ValidateGuestImageDescriptors(valid, binding, VK_SHADER_STAGE_FRAGMENT_BIT); }, "zero guest image descriptor");
++    VkDescriptorImageInfo zero{VK_NULL_HANDLE,VK_NULL_HANDLE,VK_IMAGE_LAYOUT_GENERAL};
++    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
++    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE; write.descriptorCount = 1u; write.pImageInfo = &zero;
++    Rejected([&] { ValidateImageDescriptorWrites(valid, std::span(&write,1u)); }, "null Vulkan image view");
++    Context native{}; native.nullDescriptors = true; native.imageDescriptorPolicy = ImageDescriptorPolicy::NativeNull;
++    ValidateGuestImageDescriptors(native,binding,VK_SHADER_STAGE_FRAGMENT_BIT);
++    ValidateImageDescriptorWrites(native,std::span(&write,1u));
++    Context typed{}; typed.typedImagePlaceholders = true; typed.imageDescriptorPolicy = ImageDescriptorPolicy::TypedPlaceholders;
++    Rejected([&] { ValidateGuestImageDescriptors(typed,binding,VK_SHADER_STAGE_FRAGMENT_BIT); }, "actual device provider");
++    typed.nullDescriptors = true;
++    Rejected([&] { ValidateImageDescriptorPolicy(typed); }, "disagrees");
++}
++
++}
++
++int main() {
++    try {
++        CheckEveryHeap();
++        CheckExactDeviceSupport();
++        CheckPoliciesRemainDistinct();
++        std::cout << "placeholder image tests passed\n";
++        return 0;
++    } catch (const std::exception& error) {
++        std::cerr << error.what() << '\n';
++        return 1;
++    }
++}
+diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp
+--- a/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/ShaderDeviceProfile.cpp
+@@ -93,6 +93,18 @@
+         validOnly.robustness.nullDescriptor = VK_TRUE;
+         Require(!frozen.NullDescriptors() && frozen.ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::RequiresValidImages, "all-bound profile borrowed the enabled feature chain");
+     }
++    for (const bool missingChain : {false, true}) {
++        ProfileInput fallback;
++        fallback.robustness.nullDescriptor = VK_FALSE;
++        if (missingChain) fallback.indexing.pNext = nullptr;
++        const AgcDriver::ShaderDeviceProfile frozen(fallback.Target(), fallback.device, fallback.limits, true);
++        Require(!frozen.NullDescriptors() && frozen.ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders && frozen.Target().imageDescriptorPolicy == frozen.ImagePolicy(), "typed fallback fabricated native null support or lost request policy");
++        fallback.robustness.nullDescriptor = VK_TRUE;
++        Require(!frozen.NullDescriptors() && frozen.ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::TypedPlaceholders, "typed fallback borrowed the enabled feature chain");
++    }
++    ProfileInput nativeWithFallback;
++    const AgcDriver::ShaderDeviceProfile nativePreferred(nativeWithFallback.Target(), nativeWithFallback.device, nativeWithFallback.limits, true);
++    Require(nativePreferred.NullDescriptors() && nativePreferred.ImagePolicy() == ShaderRecompiler::ImageDescriptorPolicy::NativeNull, "fallback replaced actual native null support");
+     invalid([](auto& value) { value.core.fragmentStoresAndAtomics = VK_FALSE; }, "graphics stores and atomics");
+     invalid([](auto& value) { value.limits.maxPushConstantsSize = 127u; }, "exceeds device limits");
+     invalid([](auto& value) { value.limits.maxBoundDescriptorSets = 0u; }, "exceeds device limits");
+diff --git a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
+--- a/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/ShaderDiskCache.cpp
+@@ -518,7 +518,7 @@
+     std::set<std::vector<std::uint64_t>> interfaces;
+     std::set<std::uint64_t> sourceMemos;
+     std::set<std::vector<std::byte>> diskKeys;
+-    for (const auto policy : {ImageDescriptorPolicy::RequiresValidImages, ImageDescriptorPolicy::NativeNull}) {
++    for (const auto policy : {ImageDescriptorPolicy::RequiresValidImages, ImageDescriptorPolicy::NativeNull, ImageDescriptorPolicy::TypedPlaceholders}) {
+         sample.request.target.imageDescriptorPolicy = policy;
+         const auto decoded = serializer.Deserialize(serializer.Serialize(sample.request));
+         require(decoded.request.target.imageDescriptorPolicy == policy, "image descriptor policy was lost during request serialization");
+@@ -528,12 +528,12 @@
+         sourceMemos.insert(RecompileCacheKey::ContextHash(sample.request));
+         diskKeys.insert(sample.Key());
+     }
+-    require(interfaces.size() == 2u && sourceMemos.size() == 2u && diskKeys.size() == 2u, "native-null and all-bound policies shared a cache identity");
++    require(interfaces.size() == 3u && sourceMemos.size() == 3u && diskKeys.size() == 3u, "native-null, all-bound and typed-placeholder policies shared a cache identity");
+     sample.request.target.imageDescriptorPolicy = ImageDescriptorPolicy::NativeNull;
+     const auto encoded = serializer.Serialize(sample.request);
+     auto bytes = requestBytes(encoded);
+     require(requestText(bytes) == encoded && bytes.size() >= 12u && bytes[4] == 15u, "serializer fixture does not describe version15");
+-    bytes[bytes.size() - 4u] = 2u;
++    bytes[bytes.size() - 4u] = 3u;
+     bool badDecodedPolicy = false;
+     try { static_cast<void>(serializer.Deserialize(requestText(bytes))); }
+     catch (const std::runtime_error& error) { badDecodedPolicy = std::string(error.what()).find("invalid recompile image descriptor policy") != std::string::npos; }
+@@ -542,7 +542,7 @@
+     bytes[4] = 14u;
+     const auto legacy = serializer.Deserialize(requestText(bytes));
+     require(legacy.request.target.imageDescriptorPolicy == ImageDescriptorPolicy::RequiresValidImages, "version14 request fabricated native-null policy");
+-    sample.request.target.imageDescriptorPolicy = static_cast<ImageDescriptorPolicy>(2u);
++    sample.request.target.imageDescriptorPolicy = static_cast<ImageDescriptorPolicy>(3u);
+     bool rejected = false;
+     try { static_cast<void>(serializer.Serialize(sample.request)); }
+     catch (const std::runtime_error& error) { rejected = std::string(error.what()).find("invalid recompile image descriptor policy") != std::string::npos; }
+diff --git a/core/shader/recompiler/ImageDescriptorPolicy.hpp b/core/shader/recompiler/ImageDescriptorPolicy.hpp
+--- a/core/shader/recompiler/ImageDescriptorPolicy.hpp
++++ b/core/shader/recompiler/ImageDescriptorPolicy.hpp
+@@ -4,15 +4,18 @@
+ namespace ShaderRecompiler {
+ // Host descriptor legality policy. This does not advertise a SPIR-V capability
+ // or emulate null image accesses; shader instructions remain unchanged.
++// TypedPlaceholders is a separate, explicitly enabled host fallback. Its 1x1
++// zero-initialized real images are not Vulkan native-null descriptors.
+ enum class ImageDescriptorPolicy : std::uint32_t {
+     RequiresValidImages = 0u,
+     NativeNull = 1u,
++    TypedPlaceholders = 2u,
+ };
+ inline bool ValidImageDescriptorPolicy(ImageDescriptorPolicy policy) {
+-    return policy == ImageDescriptorPolicy::RequiresValidImages || policy == ImageDescriptorPolicy::NativeNull;
++    return policy == ImageDescriptorPolicy::RequiresValidImages || policy == ImageDescriptorPolicy::NativeNull || policy == ImageDescriptorPolicy::TypedPlaceholders;
+ }
+-inline ImageDescriptorPolicy ImageDescriptorPolicyFor(bool enabledNativeNull) {
+-    return enabledNativeNull ? ImageDescriptorPolicy::NativeNull : ImageDescriptorPolicy::RequiresValidImages;
++inline ImageDescriptorPolicy ImageDescriptorPolicyFor(bool enabledNativeNull, bool enabledTypedPlaceholders = false) {
++    return enabledNativeNull ? ImageDescriptorPolicy::NativeNull : enabledTypedPlaceholders ? ImageDescriptorPolicy::TypedPlaceholders : ImageDescriptorPolicy::RequiresValidImages;
+ }
+ }
+ #endif
+diff --git a/docs/dev/TechnicalDebt.md b/docs/dev/TechnicalDebt.md
+--- a/docs/dev/TechnicalDebt.md
++++ b/docs/dev/TechnicalDebt.md
+@@ -397,3 +397,5 @@
+ - [sceVideodec2CreateDecoder](../../core/libs/prx/libSceVideodec2/Export.cpp) (libSceVideodec2) decodes HEVC (codec type 974921) and VP9 (2382845) through FFmpeg, besides H.264. The tags come from SharpProspero's `Videodec2CodecType` and EVO-PLAYER-PS5's `sce_videodec2.h`, which records them from hardware runs. HEVC input is converted from length-prefixed NAL units to Annex B as for H.264, and VP9 frames are passed through. Output is the same 8-bit NV12 for every codec; a decoder for HEVC Main10 or VP9 Profile 2 is created, but a frame deeper than 8 bits throws, since the console's 10-bit output layout is unknown, and `QueryDecoderMemoryInfo` reports the 8-bit frame size for it. `sceVideodec2GetPictureInfo` and `sceVideodec2GetAvcPictureInfo` throw for HEVC and VP9 pictures, which use other layouts (`SceVideodec2HevcPictureInfo`, `SceVideodec2Vp9PictureInfo`), and `sceVideodec2GetHevcPictureInfo` and `sceVideodec2GetVp9PictureInfo` are not exported
+ - [syslog](../../core/libs/prx/libc/src/Syslog.cpp) (libc) writes each message to `stderr` as `[syslog:<priority>] <message>`, with a newline added when missing, instead of sending it to the console's system log. Priority and facility handling follow FreeBSD's `vsyslog`: `%m` expands to the guest errno's message, unknown bits are reported (as priority 0x23, since FreeBSD passes `LOG_ERR|LOG_CONS|LOG_PERROR|LOG_PID` as the priority) and masked, a missing facility becomes `LOG_USER`, and errno is preserved. `openlog`, `setlogmask` and `closelog` are not implemented, so the identity, options and mask they set are not applied
+ - [sigaction](../../core/libs/prx/libkernel/System/src/Signals.cpp) (libkernel) records the handler, flags and mask of every signal from 1 to 128 and reports them back, following FreeBSD's `sigaction` (`EINVAL` for other signals, and for a handler on `SIGKILL` or `SIGSTOP`); `signal` records its handler with `SA_RESTART`, as FreeBSD's libc does. Only handlers without `SA_SIGINFO` on the signals `signal` already delivers (`SIGINT`, `SIGILL`, `SIGABRT`, `SIGFPE`, `SIGSEGV`, `SIGTERM`) run, the same way `signal` handlers do; their mask and flags are not applied. `SA_SIGINFO` handlers and other signals (`SIGBUS`, `SIGHUP`, ...) are recorded but never called, since that needs FreeBSD's `siginfo_t` and `ucontext_t`; `raise` of an `SA_SIGINFO` handler on a signal `signal` delivers throws instead of terminating, and `raise` of the other signals still returns `EINVAL`
++
++- Typed image placeholders (PR #2015 with local policy integration) are real 1x1 zero-initialized images, distinct from Vulkan native-null descriptors. Sampling and fetches observe the chosen heap format, valid extent and fixed sample count (4 for MS heaps); image size/sample queries, comparison sampling, out-of-range access, storage writes and atomics do not acquire native-null semantics. Storage descriptors in a heap alias its placeholder and writes may survive later draws. A missing format, sample, portability-array or atomic feature leaves that heap unavailable and its first null use fails explicitly. `RequiresValidImages` continues to reject zero guest descriptors and zero Vulkan views; `NativeNull` still requires the actually enabled robustness2 feature. `TypedPlaceholders` has a separate request15/cache22 identity. No bare zero Vulkan image view is used in the fallback.
