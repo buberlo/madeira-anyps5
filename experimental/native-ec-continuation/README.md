@@ -168,3 +168,11 @@ controls are source checks. The snapshot omits private inventories, signing,
 pairing, packages and logs; it requires the unpublished local bindings and is
 not an executable fresh-clone recipe. Actual device results are recorded
 separately from these source snapshots.
+
+The later Native60 preserving update completed on the physical iPad. Complete
+accessible before/after inventories and protected data readback match; opaque
+metadata and the exact system-artifact policy pass. The installer and both
+observers join successfully. Opaque contents and independent installed-binary
+bytes remain outside this acceptance. Original50, full803, all eight CPU phases,
+GPU and MiniGolf gameplay remain pending.
+[Actual preserving installation](../../docs/evidence/native60-preserving-installation-20261012.json).

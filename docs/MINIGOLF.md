@@ -38,19 +38,20 @@ fixtures were corrected for real tiled MSAA backing, upstream stencil clears
 and cross-block XOR coordinates. Production memory/graphics validations stay
 active. No package prepared from older tools is relabelled as this update.
 
-**Native59 remains the installed host.** Its bounded CPU diagnostic recorded
+**The preceding Native59 diagnostic** recorded
 an unhandled read at address 2 with PC/LR=2 after context restoration. The
 observed allocator lock was free; the causative write remains unproved.
 [Actual device observation](evidence/native59-owner-sampler-observation-20261012.json).
 
-Native60 is built and signed with an experimental EC continuation repair and
-matching FEXBridge/translator/native inputs. It deliberately retains the older
-HLE payload to isolate CPU behavior. Its preserving updater refused before
-installation when Native59 reappeared during preflight. No accepted Native60
-installation, Original50 delivery result or MiniGolf execution is claimed.
-The next device steps are a preserving update, the complete original 50-delivery
-probe, all CPU phases, then GPU and game testing.
-[Candidate and build boundaries](../experimental/native-ec-continuation/README.md).
+Native60 is now installed with the experimental EC continuation repair and
+matching FEXBridge/translator/native inputs. It retains the older HLE payload
+to isolate CPU behavior. The completed preserving update verifies accessible
+protected data, opaque metadata and the exact system-artifact policy; opaque
+contents are not claimed read back. Earlier preflight refusals remain retained.
+Original50 delivery, full CPU phases, GPU and MiniGolf execution remain separate
+pending checks.
+[Actual preserving installation](evidence/native60-preserving-installation-20261012.json),
+[candidate and build boundaries](../experimental/native-ec-continuation/README.md).
 
 ## Preceding package and Windows results
 

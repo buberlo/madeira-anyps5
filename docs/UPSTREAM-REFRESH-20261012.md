@@ -113,22 +113,25 @@ are not automatically results of the current seventeen-patch runtime.
 
 ## Physical iPad and MiniGolf
 
-**Native59 remains installed.** Its bounded diagnostic captured an unhandled
+**The preceding Native59 diagnostic** captured an unhandled
 native read with PC/LR equal to 2 after context restoration. The sampled
 allocator lock was free and native critical depth was zero; neither observation
 proves the cause. The collector restores its library and protected metadata,
 closes its own process and releases the device.
 [Actual observation](evidence/native59-owner-sampler-observation-20261012.json).
 
-**Native60 is built and signed, with CPU execution pending.** Its experimental
+**Native60 is installed with CPU execution pending.** Its experimental
 EC continuation candidate compiles 187 ARM64EC objects, 50 fresh native objects
-and nine retained FEXCore members. The app is built against matching FEXBridge
-headers and archives, with its translator bytes, signature, entitlements and
-dSYM identity verified. It retains the older installed HLE payload to isolate
-CPU behavior. The preserving updater refused before installation when Native59
-reappeared during preflight. No successful installation or delivery result is
-inferred from that refusal.
-[Actual native build](evidence/native-ec-continuation-native-build-20261012.json),
+and nine retained FEXCore members. The app uses matching FEXBridge headers and
+archives, verified translator bytes, signature, entitlements and dSYM identity.
+It retains the older HLE payload to isolate CPU behavior. The completed update
+preserves protected accessible data, verifies opaque metadata and accepts only
+the exact system-artifact policy. The installer and both observers join with
+no error. Opaque file contents and independent installed-binary readback are
+not claimed; no CPU-delivery or gameplay result follows from installation.
+Earlier preflight refusals remain preserved.
+[Actual preserving installation](evidence/native60-preserving-installation-20261012.json),
+[actual native build](evidence/native-ec-continuation-native-build-20261012.json),
 [signed app](evidence/native60-local-build-signature-20261012.json),
 [candidate source](../experimental/native-ec-continuation/README.md).
 
