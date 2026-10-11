@@ -1,0 +1,48 @@
+"""Exact historical CPU compiler evidence, separate from signed declarations.
+
+This only authenticates the two frozen records and their lexical link contract.
+The caller must include every returned byte digest in its complete FD/stat replay.
+No external directory, new digest, compiler process or output is admitted here.
+"""
+import hashlib,json,os,re
+from pathlib import Path
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[3]
+PACKAGE_RECEIPT=HERE.parent/'qualified-composition-consumer-proposal/build-8db83dc704d5/package-receipt.json'
+PACKAGE_SHA='84efcc29fee2b772b2b1cadcffbf70a23d2da10bbb23e40eaca9a4b927c8769e'
+DIAGNOSTIC_REVIEW=HERE.parent/'continuing-only-diagnostic-collector-proposal/collector-source-review-freeze.json'
+DIAGNOSTIC_SHA='4750967c13e1d2beb337fb5ede699e11660be0777ac9263a4be647bb21341f47'
+CURRENT_TOOL=ROOT/'build/minigolf-upstream-20261010/native59-device-prep/exact-current-python-observed58-diagnostic-update-proposal/current_tooling.py'
+CURRENT_TOOL_SHA='cf6d2982bfc7b73d6d82b54a8d918e2b8885b355bba434213dc73471ab3be4d7'
+EXTERNAL_COUNT=8587
+
+def need(ok,message):
+ if not ok:raise ValueError(message)
+def seven(st):return (st.st_dev,st.st_ino,st.st_mode,st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+def frozen(path,digest):
+ path=Path(path);need(path==path.resolve() and path.is_relative_to(ROOT) and path.is_file() and not any(p.is_symlink()for p in [path,*path.parents]),'Exact project CPU evidence path')
+ before=seven(path.lstat());hashed=hashlib.sha256()
+ with path.open('rb')as stream:
+  need(seven(os.fstat(stream.fileno()))==before,'Opened CPU evidence identity differs')
+  raw=stream.read();hashed.update(raw)
+  need(seven(os.fstat(stream.fileno()))==before,'CPU evidence changed during read')
+ need(hashed.hexdigest()==digest and seven(path.lstat())==before,'Frozen CPU evidence bytes or identity changed')
+ return json.loads(raw)
+def records(package,review):
+ need(package['status']=='fresh_initial_cpu_fixtures_built_not_device_or_runtime_qualified' and len(package['files'])==63 and package['files']['raw/guest_raise_exception_tests.exe']=='0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02','Exact original63/full803 package required')
+ closure=package['compilerClosure'];need(type(closure)is dict and len(closure)==8589,'Complete frozen8589 compiler closure required')
+ external={}
+ for name,row in closure.items():
+  need(type(name)is str and Path(name).is_absolute() and str(Path(name))==name and type(row)is dict and type(row.get('sha256'))is str and re.fullmatch('[0-9a-f]{64}',row['sha256']) and type(row.get('resolvedPath'))is str and Path(row['resolvedPath']).is_absolute(),'Exact typed compiler row required')
+  if not Path(name).is_relative_to(ROOT):external[name]=row['sha256']
+ need(len(external)==EXTERNAL_COUNT and review['externalCompilerProviders']==external and type(review['externalCompilerSymlinks'])is dict,'Exact independently frozen external compiler set required')
+ need(set(review['externalCompilerSymlinks'])<=set(external),'Unknown frozen compiler link refused')
+ return external
+def frozen_external():
+ package=frozen(PACKAGE_RECEIPT,PACKAGE_SHA);review=frozen(DIAGNOSTIC_REVIEW,DIAGNOSTIC_SHA)
+ external=records(package,review)
+ for name,h in external.items():
+  path=Path(name);row=package['compilerClosure'][name]
+  need(path.is_file() and str(path.resolve())==row['resolvedPath'],'Historical CPU tool lexical/resolved route changed')
+ links={name:{'linkTarget':os.readlink(name),'resolvedPath':str(Path(name).resolve()),'sha256':h}for name,h in external.items()if Path(name).is_symlink()}
+ need(links==review['externalCompilerSymlinks'],'Frozen external CPU tool link contract changed')
+ return external

@@ -11,7 +11,7 @@ class Snapshot(unittest.TestCase):
   for name,digest in manifest['files'].items():
    self.assertEqual(hashlib.sha256((HERE/name).read_bytes()).hexdigest(),digest,name)
  def test_sources_parse_without_importing(self):
-  sources=list(HERE.rglob('*.snapshot'));self.assertEqual(len(sources),60)
+  sources=list(HERE.rglob('*.snapshot'));self.assertEqual(len(sources),68)
   for source in sources:ast.parse(source.read_text(),filename=source.name)
  def test_pending_runtime_tuple(self):
   tree=ast.parse((HERE/'original50/composition.py.snapshot').read_text());values={}

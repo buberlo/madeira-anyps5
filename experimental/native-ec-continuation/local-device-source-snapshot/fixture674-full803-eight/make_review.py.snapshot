@@ -1,0 +1,35 @@
+"""Local source review emitter. Genuine runtime pins gate source freezing."""
+import argparse,importlib.util,json,re,subprocess
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('full60_source_review',HERE/'composition.py');c=importlib.util.module_from_spec(sp);sp.loader.exec_module(c)
+def main():
+ parser=argparse.ArgumentParser(description=__doc__);g=parser.add_mutually_exclusive_group()
+ g.add_argument('--review-draft',action='store_true');g.add_argument('--freeze-source',action='store_true');args=parser.parse_args()
+ if not(args.review_draft or args.freeze_source):
+  print(json.dumps({'status':'inert_full60_source_review','deviceActions':False}));return 0
+ if args.freeze_source:c.require_runtime()
+ paths=c.reviewed_paths()if args.freeze_source else c.draft_paths()
+ values={c.rel(path):c.sha(path)for path in paths}
+ before={name:c.seven_stat(c.regular(c.ROOT/name).stat())for name in values}
+ # Exclusive outputs preserve previous drafts and failed attempts.
+ log=HERE/('offline-source-freeze-tests.log'if args.freeze_source else'offline-draft-tests.log')
+ with log.open('x')as stream:
+  child=subprocess.run([c.s.tool.PYTHON,'-I','-B','-m','unittest','discover','-s',str(HERE),'-p','test_full60.py'],stdout=stream,stderr=subprocess.STDOUT,timeout=60)
+ c.need(child.returncode==0,'Portable full60 controls failed')
+ control_text=log.read_text();matches=re.findall(r'Ran ([0-9]+) tests in ',control_text)
+ c.need(len(matches)==1 and int(matches[0])>0 and control_text.rstrip().endswith('OK'),'Actual portable control count required')
+ c.need(all(c.sha(c.regular(c.ROOT/name))==h for name,h in values.items()) and before=={name:c.seven_stat(c.regular(c.ROOT/name).stat())for name in values},'Full60 source identity changed during controls')
+ c.s.tool.verify_current_python()
+ if args.freeze_source:
+  extra=c.continuing_inputs()
+  for name,h in c.tools().frozen_external().items():c.merge(extra,name,h)
+  install,inputs,unused,payload=c.inspected_install(extra_inputs=extra)
+  union=dict(inputs)
+  for name,h in extra.items():c.merge(union,name,h)
+  c.continuing_claim(install,c.collector_input_map(union),extra)
+ record={'schema':1,'status':c.STATUS if args.freeze_source else 'source_only_full60_draft_actual_install_and_original50_pins_pending','caseCount':int(matches[0]),'files':values,'fingerprints':before,'cpuPackageSourceFreezeSha256':c.FREEZE,'installationReaderSha256':c.INSTALL_READER_SHA,'installationReaderReviewSha256':c.INSTALL_REVIEW_SHA,'actualInstallationPins':{'bindingSha256':c.SEALED_INSTALL_SHA,'resultSha256':c.SEALED_RESULT_SHA,'inputCount':c.SEALED_INPUT_COUNT},'original50Pins':{'compositionSha256':c.CONTINUING_COMPOSITION_SHA,'reviewSha256':c.CONTINUING_REVIEW_SHA,'bindingSha256':c.CONTINUING_BINDING_SHA,'receiptSha256':c.CONTINUING_RECEIPT_SHA},'retainedPendingOriginal50ReviewSha256':c.PENDING50_REVIEW_SHA,'typedCpuCompilerEvidence':{'packageReceiptSha256':c.tools().PACKAGE_SHA,'reviewSha256':c.tools().DIAGNOSTIC_SHA,'externalProviderCount':c.tools().EXTERNAL_COUNT,'signedDeclarationsExpanded':False},'controlsLog':{'path':c.rel(log),'sha256':c.sha(log)},'deviceActions':False,'executionPlanCreated':False,'packageCreated':False,'runtimeExecuted':False,'full803Qualified':False,'cpuEightQualified':False,'gamePlayable':False}
+ destination=c.SOURCE_FREEZE if args.freeze_source else HERE/'draft-source-review.json'
+ with destination.open('x')as stream:json.dump(record,stream,indent=2);stream.write('\n')
+ print(json.dumps({'sourceReview':str(destination),'sha256':c.sha(destination),'runtimePinsPending':not args.freeze_source,'deviceActions':False}));return 0
+if __name__=='__main__':raise SystemExit(main())

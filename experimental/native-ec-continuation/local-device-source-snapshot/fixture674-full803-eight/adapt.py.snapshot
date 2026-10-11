@@ -1,0 +1,29 @@
+"""Held full CPU code: Native60 literals and one explicit prepared-union call."""
+import ast, hashlib
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+PROBE_SHA='8b58720dbbfa2276341a475d9628b4c294f51db6fcc3f1df36df48454d9f7bdb'
+OLD_INSTALL_STATUS='actual_closed_native58_composite_install_bound_not_jit_or_launch_ready'
+NEW_INSTALL_STATUS='actual_closed_native60_preserved_install_bound_not_jit_or_cpu_ready'
+class Literals(ast.NodeTransformer):
+ def visit_Constant(self,n):
+  if type(n.value)is str:n.value={OLD_INSTALL_STATUS:NEW_INSTALL_STATUS,'58':'60'}.get(n.value,n.value.replace('native58','native60').replace('Native58','Native60').replace('accepted58','accepted60').replace('own58','own60'))
+  return n
+class PreparedUnion(ast.NodeTransformer):
+ def __init__(self):self.count=0
+ def visit_Call(self,n):
+  n=self.generic_visit(n)
+  if isinstance(n.func,ast.Attribute) and isinstance(n.func.value,ast.Name) and n.func.value.id=='current' and n.func.attr=='continuing_claim':
+   if n.args or n.keywords:raise ValueError('Exact sole saved Continuing call changed')
+   self.count+=1;n.args=[ast.Name(id='install',ctx=ast.Load()),ast.Name(id='bound',ctx=ast.Load())]
+  return n
+p=HERE/'probe.py';source=p.read_bytes()
+if hashlib.sha256(source).hexdigest()!=PROBE_SHA:raise ValueError('Held full probe bytes changed')
+tree=Literals().visit(ast.parse(source));site=PreparedUnion();tree=site.visit(tree)
+if site.count!=1:raise ValueError('Exact sole prepared Continuing union call required')
+__file__=str(p)
+exec(compile(ast.fix_missing_locations(tree),str(p),'exec'),globals())
+_raw_prepare=prepare
+# Runtime/Original50 pins gate before package replay, UUID allocation or outputs.
+def prepare(*args,**kwargs):
+ module(RUNTIME,'full60_preparation_pin_gate').require_runtime();return _raw_prepare(*args,**kwargs)

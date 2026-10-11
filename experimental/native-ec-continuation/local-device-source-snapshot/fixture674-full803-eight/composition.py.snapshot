@@ -1,0 +1,304 @@
+"""Source-only Native60 full803/eight route; genuine runtime pins remain pending."""
+import argparse,hashlib,importlib.util,json,math,re,sys,os
+from pathlib import Path
+sys.dont_write_bytecode=True
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[3];RECIPE=HERE.parent.parent
+UPDATE=RECIPE/'native60-device-prep/initial-own59-quiescence-ordered-fixture674-preserved-source-update-proposal'
+SUPPORT_SHA='38709eafbd315f16ebc0fc816b913d0aaf762841928ba4d36cdfd140307a0ff8'
+if hashlib.sha256((UPDATE/'support.py').read_bytes()).hexdigest()!=SUPPORT_SHA:raise ValueError('Exact reviewed60 support changed')
+sp=importlib.util.spec_from_file_location('full60_retained_support',UPDATE/'support.py');s=importlib.util.module_from_spec(sp);sp.loader.exec_module(s)
+INSTALL_READER=UPDATE/'binding.py';INSTALL_READER_SHA='39463e706a0b243e6824028c5cce17c73ba215421f201aa59490abd902edf012'
+INSTALL_REVIEW=UPDATE/'source-review-freeze.json';INSTALL_REVIEW_SHA='fc1fe462eef98b845a6f06b71f3e6c0bba9b63c15fda93d5840840b1c4c07c06'
+INSTALL=UPDATE/'installation-binding.json'
+SEALED_INSTALL_SHA='PENDING';SEALED_RESULT_SHA='PENDING';SEALED_INPUT_COUNT=None
+SIGNED58=s.SIGNED;SIGNED58_SHA=s.SIGNED_SHA;EXPECTED_JIT_SHA=s.FEX_SHA
+INSTALL_STATUS=s.STATUS;FREEZE=s.CPU_FREEZE
+STATUS='native60_full803_eight_fixture674_ordered_quiescence_source_only_actual_install_and_original50_pins_pending_not_executed'
+SELECT=HERE.parent/'qualified-reconciliation-consumer-proposal/package-selection.json'
+SOURCE_FREEZE=HERE/'collector-source-review-freeze.json'
+FULL_PREDECESSOR=HERE.parent/'native58-complete-provider-sealed-lineage-full-cpu-collector-proposal'
+FULL_PREDECESSOR_SHA='6e503b1f78b405c52bbce7f92c18676d2f8bb09d597e1701e5e702e2377d5083'
+PENDING50=HERE.parent/'native60-fixture674-ordered-quiescence-original50-runtime-ready-collector-proposal'
+PENDING50_REVIEW_SHA='b7c347a00d163faadbe646bdd69a2afdc08691b1c49acd3f3b9ce329d4fd7126'
+# Planned root successor path is explicit; absence or pending hashes refuse use.
+CONTINUING_PRODUCER=HERE.parent/'native60-fixture674-ordered-quiescence-original50-accepted-runtime-collector-proposal'
+CONTINUING_PROBE=CONTINUING_PRODUCER/'probe.py';CONTINUING_COMPOSITION=CONTINUING_PRODUCER/'composition.py'
+CONTINUING_REVIEW=CONTINUING_PRODUCER/'collector-source-review-freeze.json'
+CONTINUING_BINDING=CONTINUING_PRODUCER/'continuing-binding.json'
+CONTINUING_PROBE_SHA='359979e9964d157c6c43864f6c4debb3f82d7fb7d15edd9985bc036a8d93b25d'
+CONTINUING_COMPOSITION_SHA='PENDING';CONTINUING_REVIEW_SHA='PENDING'
+CONTINUING_BINDING_SHA='PENDING';CONTINUING_RECEIPT_SHA='PENDING'
+CONTINUING_EXE_SHA='34ec640f54c8581ae833e8ff6d5276b9dea456ad5ca699460221e47f87dddb20'
+DECLARATION_ADAPTER=RECIPE/'native58-device-prep/declared-nm-clang-provider-update-proposal/fingerprints.py'
+DECLARATION_ADAPTER_SHA='6ef8f79159353a2a1022ada201b47fd85e39f5e0f153582c51244bb24e604868'
+DECLARATION_REVIEW=DECLARATION_ADAPTER.with_name('source-review-freeze.json');DECLARATION_REVIEW_SHA='ba20f0c1f4a0222ad22633ab981c6d57eed8b8e824fafec759053c1381202858'
+PACKAGE_READER=HERE.parent/'complete-retained-package-provider-proposal/providers.py'
+PACKAGE_READER_SHA='5c4fdab22c359d3a93de5bb5083a42ef55eee333768b76d406ba4be2b272684a'
+PACKAGE_REVIEW=PACKAGE_READER.with_name('source-review-freeze.json');PACKAGE_REVIEW_SHA='42cd040ab35a0bd23ce9c8cc009cdd2636552f57015b41ba914c1d205bb42d7f'
+REQUIRED_EIGHT=('allocator-collisions','memory-4gib','cpu-avx2','protected-store-state','pending-avx-unprotected','pending-avx-protected','guest-exceptions','guest-raise-exception')
+SUPPORTED_PHASES=REQUIRED_EIGHT+('protected-store-cross-page','protected-store-non-temporal')
+LOCAL_FILES=['probe.py','composition.py','adapt.py','launch_query.py','log_contracts.py','original50.py','cpu_tools.py','execution_tool.py','run.py','test_full60.py','make_review.py','README.md']
+def need(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+def sha(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for data in iter(lambda : stream.read(1048576), b''):
+            h.update(data)
+    return h.hexdigest()
+
+def regular(path):
+    p = Path(path).absolute()
+    need(p == p.resolve() and p.is_relative_to(ROOT) and p.is_file() and (not any((x.is_symlink() for x in [p, *p.parents]))), 'Exact unlinked project provider required')
+    return p
+
+def load(path):
+    return json.loads(regular(path).read_text())
+
+def module(path, name):
+    s = importlib.util.spec_from_file_location(name, path)
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    return m
+
+def rel(path):
+    return str(regular(path).relative_to(ROOT))
+
+def ref(path):
+    return {'path': rel(path), 'sha256': sha(path)}
+
+def merge(result, name, digest):
+    need(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest) and (name not in result or result.get(name) == digest), 'Concrete nonconflicting provider required')
+    result[name] = digest
+
+def declaration_adapter():
+    need(re.fullmatch('[0-9a-f]{64}', DECLARATION_ADAPTER_SHA) is not None, 'Reviewed declared-provider adapter remains pending')
+    need(sha(regular(DECLARATION_ADAPTER)) == DECLARATION_ADAPTER_SHA and sha(regular(DECLARATION_REVIEW)) == DECLARATION_REVIEW_SHA, 'Exact declared-provider adapter/review changed')
+    return module(DECLARATION_ADAPTER, 'held_native60_declared_provider_adapter')
+
+def collector_input_map(absolute):
+    adapter = declaration_adapter()
+    declared = reference_declarations(adapter)
+    bound = {}
+    for (name, h) in absolute.items():
+        merge(bound, adapter.input_key(name, h, declared), h)
+    return bound
+
+def current_metadata_source(view, name):
+    need(type(name) is str and (not name.startswith('/')) and ('\\' not in name) and all((x not in ('', '.', '..') for x in name.split('/'))), 'Exact protected metadata path required')
+    record = view['inventory'][name]
+    provider = view['providers'][name]
+    need(record['kind'] == 'file' and provider['bytes'] == record['bytes'] and (provider['sha256'] == record['sha256']), 'Current accepted provider record differs')
+    p = regular(provider['path'])
+    need(p.stat().st_size == record['bytes'] and sha(p) == record['sha256'], 'Current protected metadata bytes changed')
+    return p
+
+def seven_stat(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+def sealed_input_replay(absolute):
+    """Fresh per-file bytes/FD identities, plus the held lexical declaration guards."""
+    adapter = declaration_adapter()
+    declared = reference_declarations(adapter)
+    paths = {}
+    need(type(absolute) is dict and absolute, 'Complete absolute sealed input map required')
+    for (name, h) in absolute.items():
+        need(type(name) is str and Path(name).is_absolute(), 'Exact absolute sealed input spelling required')
+        key = adapter.input_key(name, h, declared)
+        path = adapter.input_path(key, h, declared)
+        need(str(path) == name and name not in paths, 'Sealed input spelling or alias changed')
+        paths[name] = path
+    before = adapter.fingerprints(absolute, declared)
+    stamps = {name: (seven_stat(path.lstat()), seven_stat(path.stat())) for (name, path) in paths.items()}
+    for (name, path) in paths.items():
+        (lexical, leaf) = stamps[name]
+        need(seven_stat(path.lstat()) == lexical and seven_stat(path.stat()) == leaf, 'Sealed provider changed before open')
+        hashed = hashlib.sha256()
+        with path.open('rb') as stream:
+            need(seven_stat(os.fstat(stream.fileno())) == leaf and seven_stat(path.lstat()) == lexical, 'Sealed opened file identity differs')
+            for data in iter(lambda : stream.read(1048576), b''):
+                hashed.update(data)
+            need(seven_stat(os.fstat(stream.fileno())) == leaf, 'Sealed open provider changed during replay')
+        need(hashed.hexdigest() == absolute[name], 'Sealed provider full bytes differ')
+        need(seven_stat(path.lstat()) == lexical and seven_stat(path.stat()) == leaf, 'Sealed provider changed after replay')
+    need(adapter.fingerprints(absolute, declared) == before, 'Sealed lexical/provider closure changed during replay')
+    need(all(((seven_stat(path.lstat()), seven_stat(path.stat())) == stamps[name] for (name, path) in paths.items())), 'Sealed final seven-field input identities differ')
+
+def selected_package(phase='cpu-avx2'):
+    need(phase in SUPPORTED_PHASES, 'Only retained full CPU fixture phases accepted')
+    need(sha(regular(PACKAGE_READER)) == PACKAGE_READER_SHA and sha(regular(PACKAGE_REVIEW)) == PACKAGE_REVIEW_SHA, 'Exact complete retained package provider source/review required')
+    reader = module(PACKAGE_READER, 'complete_retained_original63_definitions')
+    reader.source_contract(PACKAGE_REVIEW, PACKAGE_REVIEW_SHA)
+    resolver = reader.resolver()
+    original = reader.readers(resolver)
+    (selection, package, logical) = original.selected_package(SELECT)
+    physical = resolver.physical_map(logical)
+    need(selection['packageReceipt']['sha256'] == '84efcc29fee2b772b2b1cadcffbf70a23d2da10bbb23e40eaca9a4b927c8769e' and len(package['files']) == 63 and (package['files']['raw/guest_raise_exception_tests.exe'] == '0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02'), 'Exact original84ef/full803 package required; Original50 overlay forbidden')
+    for (name, h) in reader.source_inputs().items():
+        merge(physical, rel(regular(name)), h)
+    merge(physical, rel(regular(PACKAGE_REVIEW)), PACKAGE_REVIEW_SHA)
+    resolver.final()
+    return (selection, package, physical)
+
+def inspected_install(path=INSTALL, extra_inputs=None):
+    """Replay the complete actual60 and explicit Original50/tool union once."""
+    require_install_pins()
+    binding_stamp = seven_stat(regular(path).lstat())
+    need(path == INSTALL and sha(regular(path)) == SEALED_INSTALL_SHA, 'Exact independently accepted sealed60 binding required')
+    r = install_reader()
+    b = load(path)
+    need(b['status'] == INSTALL_STATUS and b['observedBuild'] == '60' and (b['sourceFreezeSha256'] == FREEZE) and (b['acceptedProducerType'] == 'exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update') and (b['signedNative60ReceiptSha256'] == SIGNED58_SHA), 'Exact ordered674 accepted60 sealed scope required')
+    inputs = b['inputs']
+    need(type(inputs) is dict and len(inputs) == SEALED_INPUT_COUNT, 'Complete actual60 sealed installation input map required')
+    result_path = regular(ROOT / b['compositeInstallationResult'])
+    result_stamp = seven_stat(result_path.lstat())
+    need(b['compositeInstallationResultSha256'] == SEALED_RESULT_SHA and inputs.get(str(result_path)) == SEALED_RESULT_SHA and (sha(result_path) == SEALED_RESULT_SHA), 'Exact sealed actual installation result/input required')
+    replay = dict(inputs)
+    if extra_inputs is not None:
+        need(type(extra_inputs) is dict, 'Explicit sealed Original50 input union required')
+        for (name, h) in extra_inputs.items():
+            merge(replay, name, h)
+    sealed_input_replay(replay)
+    result = load(result_path)
+    view = b['collectorProtectedDataView']
+    payload = Path(b['retainedProtectedPayload'])
+    r.installation_claims(b, result, inputs, view, payload)
+    signed58_contract(b, inputs)
+    need(view['providerType'] == 'protected_data_view_with_current_bytes_of_accepted_native60_not_physical_baseline' and type(view.get('providers')) is dict, 'Actual current Native60 per-path providers required')
+    for name in ['Documents/madeira-library.json', 'Documents/madeira.cfg', *[x['root'] + '/private-game-manifest.json' for x in view['activeGames']]]:
+        current_metadata_source(view, name)
+    need(sha(regular(path)) == SEALED_INSTALL_SHA and sha(result_path) == SEALED_RESULT_SHA, 'Sealed binding/result changed after full input replay')
+    need(seven_stat(path.lstat()) == binding_stamp and seven_stat(result_path.lstat()) == result_stamp, 'Sealed binding/result seven-field identity changed')
+    return (b, inputs, view, payload)
+
+def continuing_reader():
+    pins = {CONTINUING_PROBE: CONTINUING_PROBE_SHA, CONTINUING_COMPOSITION: CONTINUING_COMPOSITION_SHA, CONTINUING_REVIEW: CONTINUING_REVIEW_SHA, CONTINUING_BINDING: CONTINUING_BINDING_SHA}
+    need(all((type(h) is str and re.fullmatch('[0-9a-f]{64}', h) for h in [*pins.values(), CONTINUING_RECEIPT_SHA])), 'Actual same-install Native60 Original50 source/review/binding/receipt pins remain pending')
+    for (path, h) in pins.items():
+        need(sha(regular(path)) == h, 'Original50 producer/source/binding identity changed')
+    d = module(CONTINUING_COMPOSITION, 'actual_native60_original50_prerequisite_reader')
+    need(d.HERE == CONTINUING_PRODUCER and d.SOURCE_FREEZE == CONTINUING_REVIEW and (d.INSTALL == INSTALL) and (d.SIGNED58_SHA == SIGNED58_SHA) and (d.FREEZE == FREEZE), 'Original50 producer must bind this same Native60 installation and retained CPU source')
+    d.source_contract(CONTINUING_REVIEW)
+    return d
+
+def continuing_records():
+    """Authenticate the actual deep-verified binding/receipt/plan before input replay."""
+    d = continuing_reader()
+    binding = load(CONTINUING_BINDING)
+    need(binding['schema'] == 1 and binding['status'] == 'actual_native60_continuing50_prerequisite_bound_not_full803_or_gpu' and (binding['acceptedInstallationBindingSha256'] == SEALED_INSTALL_SHA) and (binding['receipt']['sha256'] == CONTINUING_RECEIPT_SHA), 'Exact actual same-install Original50 binding required')
+    path = regular(ROOT / binding['receipt']['path'])
+    need(path.name == 'receipt.json' and path.parent.name == 'execution' and (path.parent.parent.parent == CONTINUING_PRODUCER) and re.fullmatch('plan-[0-9a-f]{32}', path.parent.parent.name) and (sha(path) == CONTINUING_RECEIPT_SHA), 'Exact actual Original50 receipt source and hash required')
+    record = load(path)
+    plan_path = regular(path.parent.parent / 'plan.json')
+    need(type(record['planSha256']) is str and re.fullmatch('[0-9a-f]{64}', record['planSha256']) and (sha(plan_path) == record['planSha256']) and (record['inputHashes'] == load(plan_path)['inputs']), 'Original50 receipt-sealed plan or full input map changed')
+    return (d, binding, path, record, load(plan_path))
+
+def continuing_inputs():
+    (d, binding, path, record, plan) = continuing_records()
+    adapter = declaration_adapter()
+    declared = reference_declarations(adapter)
+    absolute = {}
+    for (name, h) in plan['inputs'].items():
+        merge(absolute, str(adapter.input_path(name, h, declared)), h)
+    stage = path.parent.parent
+    for (item, h) in [(CONTINUING_BINDING, CONTINUING_BINDING_SHA), (path, CONTINUING_RECEIPT_SHA), (stage / 'plan.json', record['planSha256']), (stage / 'original-library.json', plan['originalLibrarySha256']), (stage / 'probe-library.json', plan['probeLibrarySha256']), (stage / 'card.json', plan['cardSha256'])]:
+        merge(absolute, str(regular(item)), h)
+    need(type(record['evidence']) is dict and 0 < len(record['evidence']) <= 256, 'Bounded complete actual Original50 evidence required')
+    for (name, h) in record['evidence'].items():
+        need(type(name) is str and Path(name).name == name and (name not in ('.', '..')), 'Strict Original50 evidence leaf required')
+        merge(absolute, str(regular(path.parent / name)), h)
+    return absolute
+
+def continuing_receipt(path, digest, installation, replayed_inputs=None):
+    need(digest == CONTINUING_RECEIPT_SHA, 'Only explicitly pinned actual Native60 Original50 receipt accepted')
+    d = continuing_reader()
+    adapter = module(HERE / 'original50.py', 'sealed_original50_receipt_definitions')
+    (r, p) = adapter.receipt(d, CONTINUING_COMPOSITION_SHA, path, digest, installation, replayed_inputs)
+    need(r['nativeBuild'] == p['nativeBuild'] == '60' and r['sourceSha256'] == CONTINUING_PROBE_SHA and (r['acceptedInstallationBindingSha256'] == p['acceptedInstallationBindingSha256'] == SEALED_INSTALL_SHA) and (r['acceptedInstallationResultSha256'] == installation['compositeInstallationResultSha256']) and (r['signedNative60ReceiptSha256'] == installation['signedNative60ReceiptSha256']) and (r['fexRuntimeSha256'] == installation['fexRuntimeSha256'] == EXPECTED_JIT_SHA) and (p['packageFiles']['raw/guest_raise_exception_tests.exe'] == CONTINUING_EXE_SHA), 'Original50 cannot carry Native56/57, another install, signed build, JIT or fixture result')
+    return (r, p)
+
+def continuing_claim(installation, replayed_inputs, extra=None):
+    (d, b, path, record, plan) = continuing_records()
+    expected = collector_input_map(continuing_inputs() if extra is None else extra)
+    for (name, h) in expected.items():
+        need(replayed_inputs.get(name) == h, 'Complete actual Original50 binding/plan/evidence missing from replayed union')
+    continuing_receipt(path, CONTINUING_RECEIPT_SHA, installation, replayed_inputs)
+    return {'binding': ref(CONTINUING_BINDING), 'receipt': b['receipt'], 'acceptedInstallationBindingSha256': b['acceptedInstallationBindingSha256']}
+
+def installation_lineage(plan):
+    require_runtime()
+    need(plan['phase'] in SUPPORTED_PHASES, 'Only retained full CPU phases after Original50')
+    b = load(INSTALL)
+    need(sha(INSTALL) == SEALED_INSTALL_SHA and plan['inputs'].get(rel(INSTALL)) == SEALED_INSTALL_SHA and (len(b['inputs']) == SEALED_INPUT_COUNT), 'Complete actual60 accepted binding required')
+    result = ROOT / b['compositeInstallationResult']
+    need(sha(result) == SEALED_RESULT_SHA and plan['inputs'].get(rel(result)) == SEALED_RESULT_SHA and (b['compositeInstallationResultSha256'] == SEALED_RESULT_SHA), 'Exact actual60 result')
+    expected = collector_input_map(b['inputs'])
+    need(all((plan['inputs'].get(n) == h for (n, h) in expected.items())), 'Full accepted60 input subset omitted or changed')
+    need(b['status'] == INSTALL_STATUS and b['observedBuild'] == '60' and (b['acceptedProducerType'] == 'exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update'), 'Typed new60 provenance only')
+    install_reader().installation_claims(b, load(result), b['inputs'], b['collectorProtectedDataView'], Path(b['retainedProtectedPayload']))
+    signed58_contract(b, b['inputs'])
+    need(plan['expectedBundlePath'] == b['observedBundlePath'] and plan['acceptedInstallationBindingSha256'] == SEALED_INSTALL_SHA and (plan['acceptedInstallationResultSha256'] == SEALED_RESULT_SHA) and (plan['signedNative60ReceiptSha256'] == s.SIGNED_SHA) and (plan['fexRuntimeSha256'] == s.FEX_SHA), 'Exact60 signed/FEX/UUID identity')
+def require_install_pins():
+ need(re.fullmatch('[0-9a-f]{64}',SEALED_INSTALL_SHA or '') and re.fullmatch('[0-9a-f]{64}',SEALED_RESULT_SHA or '') and type(SEALED_INPUT_COUNT)is int and SEALED_INPUT_COUNT>0,'Genuine accepted60 installation tuple remains pending')
+def require_runtime():
+ require_install_pins()
+ need(all(type(h)is str and re.fullmatch('[0-9a-f]{64}',h) for h in [CONTINUING_COMPOSITION_SHA,CONTINUING_REVIEW_SHA,CONTINUING_BINDING_SHA,CONTINUING_RECEIPT_SHA]),'Genuine same60 Original50 source/review/binding/receipt pins remain pending')
+def predecessor():
+ need(sha(regular(FULL_PREDECESSOR/'composition.py'))==FULL_PREDECESSOR_SHA,'Held full CPU source changed')
+ return module(FULL_PREDECESSOR/'composition.py','held_full_cpu_definitions_only')
+def install_reader():
+ need(sha(regular(INSTALL_READER))==INSTALL_READER_SHA and sha(regular(INSTALL_REVIEW))==INSTALL_REVIEW_SHA,'Exact fresh60 typed reader/review')
+ return module(INSTALL_READER,'pure_actual60_full_cpu_reader')
+def tools():return module(HERE/'cpu_tools.py','exact_typed_cpu_compiler_providers')
+def reference_declarations(adapter):
+ # CPU tools are a distinct frozen provenance category, never signed declarations.
+ declared=s.declarations(s.SIGNED_SHA)
+ for name,h in tools().frozen_external().items():merge(declared,name,h)
+ return declared
+def verify_input_map(bound):
+ adapter=declaration_adapter();declared=reference_declarations(adapter)
+ absolute={str(adapter.input_path(name,h,declared)):h for name,h in bound.items()}
+ need(len(absolute)==len(bound),'Unique exact provider spelling required')
+ sealed_input_replay(absolute)
+def signed58_contract(binding,concrete_inputs):
+ need(sha(regular(s.SIGNED))==s.SIGNED_SHA and concrete_inputs.get(str(s.SIGNED))==s.SIGNED_SHA and binding['signedNative60ReceiptSha256']==s.SIGNED_SHA,'Actual60 signed source included in accepted install')
+ signed=load(s.SIGNED);path=s.BUILD_DIR/'inputs.json'
+ need(sha(regular(path))==s.PREPARED_SHA and concrete_inputs.get(str(path))==s.PREPARED_SHA,'Actual60 prepared declarations included')
+ s.signed_shape(signed,load(path));need(binding['fexRuntimeSha256']==s.FEX_SHA,'Exact new60 FEX');return signed
+def draft_paths():
+ need(sha(regular(PENDING50/'draft-source-review.json'))==PENDING50_REVIEW_SHA,'Exact preserved pending Original50 review')
+ return sorted({*[HERE/n for n in LOCAL_FILES],*[FULL_PREDECESSOR/n for n in ['probe.py','composition.py','launch_query.py','log_contracts.py','original50.py','test_full_route.py','HOLD.md']],PENDING50/'composition.py',PENDING50/'draft-source-review.json',INSTALL_READER,INSTALL_REVIEW,UPDATE/'support.py',UPDATE/'providers.py',UPDATE/'package.py',UPDATE/'source-relocations.json',DECLARATION_ADAPTER,DECLARATION_REVIEW,PACKAGE_READER,PACKAGE_REVIEW,tools().PACKAGE_RECEIPT,tools().DIAGNOSTIC_REVIEW,tools().CURRENT_TOOL},key=str)
+def reviewed_paths():
+ require_runtime();d=continuing_reader();return sorted({*draft_paths(),CONTINUING_PROBE,CONTINUING_COMPOSITION,CONTINUING_REVIEW,*d.reviewed_paths()},key=str)
+def source_contract(path):
+ require_runtime();need(path==SOURCE_FREEZE,'Exact actual full60 source freeze')
+ f=load(path)
+ need(f['status']==STATUS and f['cpuPackageSourceFreezeSha256']==FREEZE and f['installationReaderSha256']==INSTALL_READER_SHA and f['deviceActions'] is f['executionPlanCreated'] is f['packageCreated'] is False and set(f['files'])=={rel(p)for p in reviewed_paths()},'Exact full60 source scope differs')
+ for name,h in f['files'].items():need(sha(regular(ROOT/name))==h,'Reviewed full60 source changed')
+ need(f['actualInstallationPins']=={'bindingSha256':SEALED_INSTALL_SHA,'resultSha256':SEALED_RESULT_SHA,'inputCount':SEALED_INPUT_COUNT} and f['original50Pins']=={'compositionSha256':CONTINUING_COMPOSITION_SHA,'reviewSha256':CONTINUING_REVIEW_SHA,'bindingSha256':CONTINUING_BINDING_SHA,'receiptSha256':CONTINUING_RECEIPT_SHA},'Exact actual60 and Original50 source pins')
+ s.tool.verify_current_python();return f
+def collector_bindings(proposal_path,runtime_path,install_path,phase='cpu-avx2'):
+ require_runtime();need(phase in SUPPORTED_PHASES,'Only full CPU phases after Original50')
+ source_contract(proposal_path);need(runtime_path==SELECT and install_path==INSTALL,'Exact retained full package/install bindings')
+ extra=continuing_inputs()
+ for name,h in tools().frozen_external().items():merge(extra,name,h)
+ install,absolute,view,payload=inspected_install(extra_inputs=extra)
+ union=dict(absolute)
+ for name,h in extra.items():merge(union,name,h)
+ bound=collector_input_map(union);continuing_claim(install,bound,extra)
+ paths=[proposal_path,*reviewed_paths(),INSTALL,SELECT]
+ selection,pkg,physical=selected_package(phase)
+ need(type(physical)is dict and physical,'Complete original63 physical providers required')
+ for name,h in physical.items():merge(bound,name,h)
+ paths += [ROOT/selection['packageReceipt']['path'],*[ROOT/pkg['package']/n for n in pkg['files']]]
+ for path in paths:merge(bound,rel(regular(path)),sha(path))
+ return install,bound,view,payload
+def plan_lineage(plan):
+ installation_lineage(plan);installation=load(INSTALL)
+ need(plan['continuingPrerequisite']==continuing_claim(installation,plan['inputs']),'Same60 genuine Original50 prerequisite omitted or changed')
+ for name,h in tools().frozen_external().items():need(plan['inputs'].get(name)==h,'Exact full CPU tool closure omitted or changed')
+def main():
+ print(json.dumps({'status':STATUS,'actualInstallPinsPending':SEALED_INSTALL_SHA=='PENDING','original50PinsPending':CONTINUING_RECEIPT_SHA=='PENDING','deviceActions':False,'executionPlanCreated':False,'full803Qualified':False,'cpuEightQualified':False}));return 0
+if __name__=='__main__':raise SystemExit(main())

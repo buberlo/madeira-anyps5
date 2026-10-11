@@ -1,0 +1,226 @@
+"""Portable reject controls; synthetic text and temp files never become proofs."""
+import ast,copy,importlib.util,json,os,tempfile,types,unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+HERE=Path(__file__).resolve().parent
+OLD=HERE.parent/'native58-complete-provider-sealed-lineage-full-cpu-collector-proposal'
+def module(path,name):
+ spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+c=module(HERE/'composition.py','full60_control_composition')
+p=module(HERE/'adapt.py','full60_control_adapter')
+a=module(HERE/'original50.py','full60_control_original50')
+e=module(HERE/'execution_tool.py','full60_control_execution')
+t=module(HERE/'cpu_tools.py','full60_control_tools')
+l=module(HERE/'log_contracts.py','full60_control_parser')
+
+class Route(unittest.TestCase):
+ def test_pending_refuses_before_package_or_outputs(self):
+  before=set(HERE.iterdir())
+  with patch.object(c,'SEALED_INSTALL_SHA','PENDING'),patch.object(c,'SEALED_RESULT_SHA','PENDING'),patch.object(c,'SEALED_INPUT_COUNT',None),patch.object(p,'module',return_value=c),patch.object(p,'package_contract',side_effect=AssertionError('package reached')):
+   with self.assertRaisesRegex(ValueError,'pending'):p.prepare('guest-raise-exception',None,None,None)
+  self.assertEqual(set(HERE.iterdir()),before)
+ def test_actual_install_alone_refuses_missing_original50_before_read(self):
+  with patch.object(c,'SEALED_INSTALL_SHA','1'*64),patch.object(c,'SEALED_RESULT_SHA','2'*64),patch.object(c,'SEALED_INPUT_COUNT',1),patch.object(c,'CONTINUING_RECEIPT_SHA','PENDING'),patch.object(c,'regular',side_effect=AssertionError('file reached')):
+   with self.assertRaisesRegex(ValueError,'Original50.*pending'):c.require_runtime()
+ def test_no_source_freeze_or_plan(self):
+  self.assertFalse(c.SOURCE_FREEZE.exists());self.assertEqual(list(HERE.glob('plan-*')),[])
+ def test_held_online_bytes_budgets_and_phases(self):
+  for name in ['probe.py','launch_query.py','log_contracts.py']:self.assertEqual((HERE/name).read_bytes(),(OLD/name).read_bytes())
+  self.assertEqual(p.BUILD,'60');self.assertEqual((p.TOTAL,p.SETUP,p.CLEANUP,p.MARGIN,p.MAX_LOG),(330,120,90,60,8<<20))
+  self.assertEqual(p.EXECUTABLES['guest-raise-exception'],('raw/guest_raise_exception_tests.exe',[],120))
+  self.assertEqual(c.REQUIRED_EIGHT,('allocator-collisions','memory-4gib','cpu-avx2','protected-store-state','pending-avx-unprotected','pending-avx-protected','guest-exceptions','guest-raise-exception'))
+ def test_unknown_and_original50_phase_refused_before_package(self):
+  for phase in ['unknown','continuing-only-diagnostic']:
+   with patch.object(c,'require_runtime'),patch.object(p,'module',return_value=c),patch.object(p,'package_contract',side_effect=AssertionError('package reached')):
+    with self.assertRaisesRegex(ValueError,'non-Continuing'):p.prepare(phase,None,None,None)
+ def test_adapter_only_literals_and_one_prepared_union_call(self):
+  raw=ast.parse((HERE/'probe.py').read_text());converted=p.Literals().visit(copy.deepcopy(raw));site=p.PreparedUnion();converted=site.visit(converted)
+  self.assertEqual(site.count,1)
+  class Erase(ast.NodeTransformer):
+   def visit_Constant(self,node):
+    if type(node.value)is str:node.value='<string>'
+    return node
+   def visit_Call(self,node):
+    node=self.generic_visit(node)
+    if isinstance(node.func,ast.Attribute)and isinstance(node.func.value,ast.Name)and node.func.value.id=='current'and node.func.attr=='continuing_claim':node.args=[]
+    return node
+  self.assertEqual(ast.dump(Erase().visit(copy.deepcopy(raw))),ast.dump(Erase().visit(copy.deepcopy(converted))))
+  code=compile(ast.fix_missing_locations(converted),str(HERE/'probe.py'),'exec');expected={v.co_name:v for v in code.co_consts if isinstance(v,types.CodeType)}
+  for name in ['execute','verify_plan','read_final_cpu_log','restore_library','close_exact_main','close_initial_owned_main','bindings']:self.assertEqual(getattr(p,name).__code__,expected[name])
+ def test_private_execution_keeps_body_and_current_python_scope(self):
+  clone=e.execute_function(p);self.assertIs(clone.__code__,p.execute.__code__)
+  self.assertEqual({n for n in clone.__globals__ if clone.__globals__[n]is not p.execute.__globals__.get(n)},{'module'})
+  self.assertEqual(e.held_tool().CURRENT,'4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc')
+ def test_execute_replay_precedes_lineage_and_session(self):
+  tree=ast.parse((HERE/'probe.py').read_text());verify=next(n for n in tree.body if isinstance(n,ast.FunctionDef)and n.name=='verify_plan')
+  calls=[n for n in ast.walk(verify)if isinstance(n,ast.Call)and isinstance(n.func,ast.Attribute)]
+  self.assertLess(next(n.lineno for n in calls if n.func.attr=='verify_input_map'),next(n.lineno for n in calls if n.func.attr=='plan_lineage'))
+  run=next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef)and n.name=='execute');self.assertIn('verify_plan',ast.unparse(run.body[0]))
+ def test_bool_input_count_refused(self):
+  with patch.object(c,'SEALED_INSTALL_SHA','1'*64),patch.object(c,'SEALED_RESULT_SHA','2'*64),patch.object(c,'SEALED_INPUT_COUNT',True):
+   with self.assertRaisesRegex(ValueError,'pending'):c.require_install_pins()
+ def test_original50_adapter_changes_only_exact_verifier_site_literal(self):
+  before=(OLD/'original50.py').read_text()
+  expected=before.replace("module(HERE/'probe.py','completed57_continuing_plan_reader')","module(HERE/'adapt.py','completed57_continuing_plan_reader')")
+  self.assertEqual((HERE/'original50.py').read_text(),expected)
+ def test_current_execution_adapter_changes_only_raw_probe_pin(self):
+  prior=(c.PENDING50/'execution_tool.py').read_text()
+  self.assertEqual((HERE/'execution_tool.py').read_text(),prior.replace('359979e9964d157c6c43864f6c4debb3f82d7fb7d15edd9985bc036a8d93b25d','8b58720dbbfa2276341a475d9628b4c294f51db6fcc3f1df36df48454d9f7bdb'))
+ def test_exact_reader_signer_and_declared_adapter_source(self):
+  self.assertEqual(c.sha(c.INSTALL_READER),c.INSTALL_READER_SHA)
+  self.assertEqual(c.sha(c.INSTALL_REVIEW),c.INSTALL_REVIEW_SHA)
+  self.assertEqual(c.sha(c.UPDATE/'support.py'),c.SUPPORT_SHA)
+  self.assertEqual(c.sha(c.DECLARATION_ADAPTER),c.DECLARATION_ADAPTER_SHA)
+  self.assertEqual(c.s.PRIMITIVES[c.s.tool.PYTHON],c.s.tool.CURRENT)
+
+class SealedFiles(unittest.TestCase):
+ def setUp(self):
+  self.tmp=tempfile.TemporaryDirectory(dir='/private/tmp');self.addCleanup(self.tmp.cleanup)
+  self.root=Path(self.tmp.name);self.install=self.root/'binding.json';self.result=self.root/'result.json';self.result.write_text('{"test":true}');self.data=self.root/'data.bin';self.data.write_bytes(b'reviewed data')
+  self.inputs={str(self.result):c.sha(self.result),str(self.data):c.sha(self.data)};self.calls=[]
+  self.binding={'status':c.INSTALL_STATUS,'observedBuild':'60','sourceFreezeSha256':c.FREEZE,'acceptedProducerType':'exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update','signedNative60ReceiptSha256':c.SIGNED58_SHA,'inputs':self.inputs,'compositeInstallationResult':'result.json','compositeInstallationResultSha256':c.sha(self.result),'collectorProtectedDataView':{'providerType':'protected_data_view_with_current_bytes_of_accepted_native60_not_physical_baseline','providers':{},'activeGames':[]},'retainedProtectedPayload':str(self.root/'retained')}
+  self.save();self.stack=[]
+  def key(name,h,d):
+   path=Path(name)
+   if not path.is_relative_to(self.root) or path.is_symlink():raise ValueError('unknown external')
+   return path.relative_to(self.root).as_posix()
+  adapter=SimpleNamespace(input_key=key,input_path=lambda name,h,d:self.root/name,fingerprints=lambda values,d:{n:c.seven_stat(Path(n).lstat())for n in values})
+  for name,value in [('ROOT',self.root),('INSTALL',self.install),('SEALED_INSTALL_SHA',c.sha(self.install)),('SEALED_RESULT_SHA',c.sha(self.result)),('SEALED_INPUT_COUNT',2),('declaration_adapter',lambda:adapter),('reference_declarations',lambda adapter:{}),('install_reader',lambda:SimpleNamespace(installation_claims=lambda *args:self.calls.append('claims'))),('signed58_contract',lambda *args:self.calls.append('signed')),('current_metadata_source',lambda *args:self.calls.append('metadata'))]:
+   item=patch.object(c,name,value);item.start();self.stack.append(item)
+ def tearDown(self):
+  for item in reversed(self.stack):item.stop()
+ def save(self):self.install.write_text(json.dumps(self.binding,sort_keys=True))
+ def repin(self):self.save();c.SEALED_INSTALL_SHA=c.sha(self.install)
+ def check(self,extra=None):return c.inspected_install(self.install,extra)
+ def test_fresh_union_precedes_claims(self):
+  extra=self.root/'original50';extra.write_bytes(b'owned evidence');self.check({str(extra):c.sha(extra)})
+  self.assertEqual(self.calls,['claims','signed','metadata','metadata'])
+ def test_changed_provider_before_claims(self):
+  self.data.write_bytes(b'changed')
+  with self.assertRaisesRegex(ValueError,'full bytes differ'):self.check()
+  self.assertEqual(self.calls,[])
+ def test_omitted_input_before_replay(self):
+  del self.inputs[str(self.data)];self.repin()
+  with patch.object(c,'sealed_input_replay',side_effect=AssertionError('replay reached')):
+   with self.assertRaisesRegex(ValueError,'Complete actual60'):self.check()
+ def test_fallback_producer_before_replay(self):
+  self.binding['acceptedProducerType']='current_native57_reference_with_exact_retained_and_bounded_fresh_providers_before_native58_update';self.repin()
+  with patch.object(c,'sealed_input_replay',side_effect=AssertionError('replay reached')):
+   with self.assertRaisesRegex(ValueError,'sealed scope'):self.check()
+ def test_conflicting_extra_union_refused(self):
+  with self.assertRaisesRegex(ValueError,'nonconflicting'):self.check({str(self.data):'0'*64})
+ def test_changed_extra_before_claims(self):
+  extra=self.root/'extra';extra.write_bytes(b'evidence');h=c.sha(extra);extra.write_bytes(b'changed')
+  with self.assertRaisesRegex(ValueError,'full bytes differ'):self.check({str(extra):h})
+  self.assertEqual(self.calls,[])
+ def test_unknown_external_refused(self):
+  with self.assertRaisesRegex(ValueError,'unknown external'):c.sealed_input_replay({'/unknown/external':'0'*64})
+ def test_opened_fd_mode_drift_refused(self):
+  real=Path.open
+  def opened(path,*args,**kwargs):
+   stream=real(path,*args,**kwargs)
+   if path==self.data and args==('rb',):os.chmod(path,0o400)
+   return stream
+  with patch.object(Path,'open',opened):
+   with self.assertRaisesRegex(ValueError,'opened'):self.check()
+  self.assertEqual(self.calls,[])
+
+class FullLog(unittest.TestCase):
+ path='C:\\MadeiraCPU-'+('a'*32)+'\\raw\\guest_raise_exception_tests.exe'
+ def log(self):
+  lines=['JIT pool: RX=0x1000, RW=0x2000, size=512MB','JIT enabled and debugger attached.','[WineProc] Target exe: '+self.path+' (bundle=test)','All 803 exception deliveries verified; AVX=verified; integer state verified.','Private executable exception verified: deliveries=1 rip-in-owned-rx=1 joined=1 freed=1.']
+  lines += ['Native wait verified mode='+mode+' round='+str(i)+' result='+str(258 if mode=='timeout'else 0)for mode in ['timeout','signaled']for i in range(10)]
+  lines += ['[WineProc] Wine exited with code 0 (caught by longjmp)','[WineProc] Wine process thread finished cleanly'];return ('\n'.join(lines)+'\n').encode()
+ def validate(self,raw):return l.validate(raw,'guest-raise-exception',self.path)
+ def test_complete803_owned_private_and_waits(self):self.assertEqual(self.validate(self.log())['checks'],{'ordinaryDeliveries':803,'privateExecutableDeliveries':1,'nativeWaits':20})
+ def test_truncated803_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'All 803',b'All 802'))
+ def test_private_unjoined_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'joined=1',b'joined=0'))
+ def test_missing_native_wait_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'Native wait verified mode=signaled round=9 result=0\n',b''))
+ def test_wrong_native_wait_result_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'mode=timeout round=0 result=258',b'mode=timeout round=0 result=0'))
+ def test_missing_guest_zero_exit_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'exited with code 0',b'exited with code 1'))
+ def test_unavailable_avx_rejected(self):
+  with self.assertRaises(ValueError):self.validate(self.log().replace(b'All 803',b'AVX unavailable\nAll 803'))
+ def test_wrong_phase_and_stale_target_rejected(self):
+  for phase,path in [('unknown',self.path),('guest-raise-exception',self.path.replace('a'*32,'b'*32))]:
+   with self.assertRaises(ValueError):l.validate(self.log(),phase,path)
+
+class ToolDeclarations(unittest.TestCase):
+ def setUp(self):
+  self.external={'/opt/homebrew/Cellar/mingw-w64/14.0.0_3/include/f%05d.h'%i:'a'*64 for i in range(8587)}
+  closure={n:{'sha256':h,'resolvedPath':n}for n,h in self.external.items()}
+  closure.update({str(c.ROOT/'build/tools/a'):{'sha256':'b'*64,'resolvedPath':str(c.ROOT/'build/tools/a')},str(c.ROOT/'build/tools/b'):{'sha256':'c'*64,'resolvedPath':str(c.ROOT/'build/tools/b')}})
+  files={'raw/guest_raise_exception_tests.exe':'0742b284b6e8befe7e67f7e34cc1c64e9b30dbcaa7b155ad7a5e2459b2919c02'};files.update({'host/f%d.dll'%i:'d'*64 for i in range(62)})
+  self.package={'status':'fresh_initial_cpu_fixtures_built_not_device_or_runtime_qualified','files':files,'compilerClosure':closure};self.review={'externalCompilerProviders':dict(self.external),'externalCompilerSymlinks':{}}
+ def test_exact_typed_union(self):self.assertEqual(t.records(self.package,self.review),self.external)
+ def test_retained_real_record_metadata_matches_same_typed_category(self):
+  # Only two fixed proof JSONs are read; no compiler invocation or byte acceptance.
+  actual=t.records(t.frozen(t.PACKAGE_RECEIPT,t.PACKAGE_SHA),t.frozen(t.DIAGNOSTIC_REVIEW,t.DIAGNOSTIC_SHA))
+  self.assertEqual(len(actual),8587)
+ def test_missing_compiler_record_rejected(self):
+  self.package['compilerClosure'].pop(next(iter(self.external)))
+  with self.assertRaisesRegex(ValueError,'8589'):t.records(self.package,self.review)
+ def test_external_digest_fallback_rejected(self):
+  self.review['externalCompilerProviders'][next(iter(self.external))]='e'*64
+  with self.assertRaisesRegex(ValueError,'frozen external'):t.records(self.package,self.review)
+ def test_original50_overlay_cannot_replace_full_executable(self):
+  self.package['files']['raw/guest_raise_exception_tests.exe']=c.CONTINUING_EXE_SHA
+  with self.assertRaisesRegex(ValueError,'original63'):t.records(self.package,self.review)
+ def test_unknown_link_rejected(self):
+  self.review['externalCompilerSymlinks']['/unknown/link']={}
+  with self.assertRaisesRegex(ValueError,'Unknown'):t.records(self.package,self.review)
+
+
+class DefinitionAdapterControls(unittest.TestCase):
+ def setUp(self):
+  self.tmp=tempfile.TemporaryDirectory(dir='/private/tmp');self.addCleanup(self.tmp.cleanup)
+  self.here=Path(self.tmp.name);self.source=self.here/'composition.py';self.events=[]
+  self.source.write_text('''def continuing_receipt(path,digest,installation):
+ p=load('plan');r=load('receipt');plan_path='plan'
+ verified=module(HERE/'adapt.py','completed57_continuing_plan_reader').verify_plan(plan_path,sha(plan_path))
+ need(verified==p and r['inputHashes']==p['inputs'],'Actual Continuing plan/source/package/provider closure differs')
+ need(r['success'] is True,'actual pass required')
+ need(r['count']==50,'all50 required')
+ need(r['zeroBeforeTermination'] is True,'owned zero exit required')
+ return r,p
+''')
+  self.plan={'inputs':{'data':'a'*64}};self.record={'inputHashes':self.plan['inputs'],'success':True,'count':50,'zeroBeforeTermination':True}
+  self.reader=SimpleNamespace(HERE=self.here,load=lambda name:self.plan if name=='plan' else self.record,need=a.need,module=lambda *args:(_ for _ in ()).throw(AssertionError('recursive verifier')),sha=lambda *args:'b'*64,plan_lineage=lambda plan:self.events.append('lineage'))
+ def check(self,union=None):return a.receipt(self.reader,a.digest(self.source),Path('receipt'),'b'*64,{},self.plan['inputs'] if union is None else union)
+ def test_preserved_receipt_predicates_and_lineage_run_after_subset(self):
+  self.assertEqual(self.check(),(self.record,self.plan));self.assertEqual(self.events,['lineage'])
+ def test_omitted_actual50_plan_input_refused_before_lineage(self):
+  with self.assertRaisesRegex(ValueError,'input closure omitted'):self.check({'other':'b'*64})
+  self.assertEqual(self.events,[])
+ def test_changed_actual50_plan_input_refused(self):
+  with self.assertRaisesRegex(ValueError,'input closure omitted'):self.check({'data':'b'*64})
+ def test_no_empty_replayed_union(self):
+  with self.assertRaisesRegex(ValueError,'freshly replayed'):self.check({})
+ def test_changed_predicate_source_refused(self):
+  h=a.digest(self.source);self.source.write_text(self.source.read_text()+'# drift\n')
+  with self.assertRaisesRegex(ValueError,'frozen Original50'):a.receipt(self.reader,h,Path('receipt'),'b'*64,{},self.plan['inputs'])
+ def test_extra_verifier_site_refused(self):
+  s=self.source.read_text();line=" verified=module(HERE/'adapt.py','completed57_continuing_plan_reader').verify_plan(plan_path,sha(plan_path))\n";self.source.write_text(s.replace(line,line+line))
+  with self.assertRaisesRegex(ValueError,'sole Original50 verification'):self.check()
+ def test_changed_saved_plan_equality_predicate_refused(self):
+  self.source.write_text(self.source.read_text().replace("verified==p and r['inputHashes']==p['inputs']","True"))
+  with self.assertRaisesRegex(ValueError,'equality predicate'):self.check()
+ def test_fewer_than50_retained_predicate_refused(self):
+  self.record['count']=49
+  with self.assertRaisesRegex(ValueError,'all50'):self.check()
+ def test_no_owned_zero_before_cleanup_retained_predicate_refused(self):
+  self.record['zeroBeforeTermination']=False
+  with self.assertRaisesRegex(ValueError,'zero exit'):self.check()
+ def test_failed_actual_receipt_retained_predicate_refused(self):
+  self.record['success']=False
+  with self.assertRaisesRegex(ValueError,'actual pass'):self.check()
+ def test_wrong_saved_full_input_map_retained_predicate_refused(self):
+  self.record['inputHashes']={'wrong':'b'*64}
+  with self.assertRaisesRegex(ValueError,'plan/source/package'):self.check()
+
+if __name__=='__main__':unittest.main()

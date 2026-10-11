@@ -1,0 +1,63 @@
+"""Definition-only receipt adapter, called only after the sealed union byte replay.
+
+The actual Original50 binding was written by its retained verifier. Its exact
+binding/receipt hashes authenticate the already verified plan derivation. This
+adapter replaces only that function's redundant verify_plan call: it requires
+every saved plan input in the replayed union and runs the held pure lineage
+check. All remaining receipt, cleanup, ordering, evidence and raw-log predicates
+are compiled unchanged. No source module or process is patched globally.
+"""
+import ast
+import copy
+import hashlib
+from pathlib import Path
+
+
+def need(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def digest(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for data in iter(lambda: stream.read(1048576), b''):
+            h.update(data)
+    return h.hexdigest()
+
+
+def receipt(reader, source_digest, path, receipt_digest, installation, replayed_inputs):
+    need(type(replayed_inputs) is dict and replayed_inputs,
+         'Complete freshly replayed input union is required before Original50 claims')
+    source_path = reader.HERE / 'composition.py'
+    need(digest(source_path) == source_digest,
+         'Exact frozen Original50 receipt predicate source required')
+    tree = ast.parse(source_path.read_text())
+    functions = [n for n in tree.body if isinstance(n, ast.FunctionDef)
+                 and n.name == 'continuing_receipt']
+    need(len(functions) == 1, 'One exact Original50 receipt predicate required')
+    function = copy.deepcopy(functions[0])
+    old = ast.parse("verified=module(HERE/'adapt.py','completed57_continuing_plan_reader').verify_plan(plan_path,sha(plan_path))").body[0]
+    positions = [i for i, n in enumerate(function.body)
+                 if ast.dump(n, include_attributes=False) == ast.dump(old, include_attributes=False)]
+    need(len(positions) == 1, 'Exact sole Original50 verification boundary required')
+    index = positions[0]
+    following = ast.parse("need(verified==p and r['inputHashes']==p['inputs'],'Actual Continuing plan/source/package/provider closure differs')").body[0]
+    need(ast.dump(function.body[index + 1], include_attributes=False)
+         == ast.dump(following, include_attributes=False),
+         'Held Original50 complete plan-input equality predicate changed')
+    replacement = ast.parse("""
+need(type(p['inputs']) is dict and p['inputs'] and
+     all(_fresh_replayed_union.get(name)==value for name,value in p['inputs'].items()),
+     'Complete actual Original50 input closure omitted or changed after union replay')
+plan_lineage(p)
+verified=p
+""").body
+    function.body[index:index + 1] = replacement
+    # The transform is limited to one assignment. The following equality and
+    # every later receipt/log predicate remain the exact held AST nodes.
+    namespace = dict(vars(reader))
+    namespace['_fresh_replayed_union'] = dict(replayed_inputs)
+    code = ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[]))
+    exec(compile(code, str(source_path), 'exec'), namespace)
+    return namespace['continuing_receipt'](path, receipt_digest, installation)
