@@ -1,0 +1,265 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import base64
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import struct
+import tempfile
+import types
+import unittest
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+ROOT=HERE.parents[1]
+def module(name,path):
+    spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+m=module('qualification_runner',HERE/'run.py')
+proposal=module('real_recipe',m.RECIPE/'proposal.py')
+public=module('real_public',m.RECIPE/'windows_public_fixture.py')
+bounded=module('real_bounded',HERE/'bounded_local_process.py')
+commands_v5=module('commands_v5',HERE/'compile_v5.py')
+gates=json.loads((m.RECIPE/'invocation-and-gates.json').read_text())
+
+
+def layout(words=5):
+    return {'schema':2,'scope':'actual_imported_prx_cpu_materialization_not_gpu_execution',
+            'variantId':7,'specializationId':0,'spirvWordCount':words,'hostSubgroupSize':32,
+            'targetVulkanVersion':(1<<22)|(1<<12),'targetSpirvVersion':0x10000,
+            'layout':{'descriptorSet':0,'firstBinding':0,'pushConstantOffsetBytes':0,'pushConstantSizeBytes':0},
+            'bindings':[],'fragmentParameters':[],'specialization':[],'pushConstantBytes':[]}
+
+
+def markers(path,cache,origin):
+    return '\n'.join(['ACTUAL_DRIVER_PATH '+path,'ACTUAL_DRIVER_CACHE_SOURCE_VERSION '+cache,
+        'ACTUAL_DRIVER_CACHE_FORMAT 28','FULL_REQUEST_ORIGIN '+origin,
+        'FULL_REQUEST_CANONICAL_SERIALIZATION_VERSION 17','FULL_REQUEST_CANONICAL_ROUNDTRIP_MATCH 1',
+        'FULL_REQUEST_ORIGINAL_SERIALIZATION_MATCH '+('0' if origin=='legacy-ipad-v14-v15' else '1'),
+        'ACTUAL_MATERIALIZED_SPIRV_AND_BINDINGS_DUMPED 1',
+        'ACTUAL_DRIVER_FULL_PREPARE_CAPTURE_MATERIALIZE_PASS words=5 variant=7'])+'\n'
+
+
+class Predicates(unittest.TestCase):
+    def test_live_evidence_member_and_aggregate(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'x').write_bytes(b'abc')
+            with patch.object(m,'MEMBER_MAXIMUM',2):
+                with self.assertRaisesRegex(ValueError,'member'):m.inventory(p)
+            with patch.object(m,'EVIDENCE_MAXIMUM',2):
+                with self.assertRaisesRegex(ValueError,'aggregate'):m.inventory(p,reserve=0)
+    def test_live_owned_runtime_total(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'runtime').mkdir();(p/'runtime/x').write_bytes(b'abc')
+            with patch.object(m,'OWNED_MAXIMUM',2):
+                with self.assertRaisesRegex(ValueError,'aggregate'):m.inventory(p)
+    def test_unknown_output_link_and_special_member(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'x').symlink_to('/no-target')
+            with self.assertRaisesRegex(ValueError,'symlink'):m.inventory(p)
+            (p/'x').unlink();os.mkfifo(p/'x')
+            with self.assertRaisesRegex(ValueError,'Unknown'):m.inventory(p)
+    def test_prefix_link_is_counted_without_following(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'wine-prefix').mkdir();(p/'wine-prefix/z').symlink_to('/missing')
+            self.assertEqual(m.inventory(p)['ownedBytes'],len('/missing'))
+    def test_replay_origin_and_current_roundtrip(self):
+        self.assertEqual(m.replay_markers(markers('Z:\\a','a'*16,'legacy-ipad-v14-v15'),'Z:\\a','a'*16,'legacy-ipad-v14-v15'),(5,7))
+        self.assertEqual(m.replay_markers(markers('Z:\\a','a'*16,'request17'),'Z:\\a','a'*16,'request17'),(5,7))
+    def test_replay_duplicate_truncated_wrong_cache_markers(self):
+        text=markers('Z:\\a','a'*16,'request17')
+        for bad in [text+'FULL_REQUEST_CANONICAL_ROUNDTRIP_MATCH 1\n',text.replace('variant=7','variant=0'),
+                    text.replace('VERSION 17','VERSION 1'),text.replace('FORMAT 28','FORMAT 22'),text.replace('PATH Z:\\a','PATH Z:\\wrong')]:
+            with self.subTest(text=bad),self.assertRaises(ValueError):m.replay_markers(bad,'Z:\\a','a'*16,'request17')
+    def test_layout_schema2_and_all_new_fields(self):
+        valid=layout();m.layout_shape(valid,5)
+        bad=layout();bad['schema']=1
+        with self.assertRaises(ValueError):m.layout_shape(bad,5)
+        bad=layout();bad['bindings']=[{'bufferRead':[],'samplerIntegerBorder':[],'imageUnnormalizedBaseLevel':[]}]
+        with self.assertRaisesRegex(ValueError,'descriptor'):m.layout_shape(bad,5)
+    def test_actual_target_environment(self):
+        self.assertEqual(m.validator_target(layout()),'vulkan1.1')
+        x=layout();x['targetSpirvVersion']=0x10400
+        self.assertEqual(m.validator_target(x),'vulkan1.1spv1.4')
+        x['targetVulkanVersion']=2<<22
+        with self.assertRaises(ValueError):m.validator_target(x)
+    def test_layout_equivalence_is_type_sensitive(self):
+        a=layout();b=layout();a['layout']['descriptorSet']=False
+        self.assertFalse(m.layouts_equal(a,b))
+    def test_native_import_and_forwarder_closure(self):
+        records={'caller.exe':{'names':{},'ordinals':{},'imports':{'driver.prx':['entry']}},
+                 'driver.prx':{'names':{'entry':1},'ordinals':{1:'target.#2'},'imports':{}},
+                 'target.dll':{'names':{},'ordinals':{2:None},'imports':{'kernel32.dll':['External']}}}
+        self.assertTrue(m.import_closure(records,lambda n:n=='kernel32.dll')['allCopiedNativeDependenciesResolved'])
+        del records['target.dll']['ordinals'][2]
+        with self.assertRaisesRegex(ValueError,'Unresolved'):m.import_closure(records,lambda n:n=='kernel32.dll')
+    def test_runtime_case_alias_and_missing_library_refused(self):
+        row={'names':{},'ordinals':{},'imports':{'missing.prx':['entry']}}
+        with self.assertRaisesRegex(ValueError,'Missing'):m.import_closure({'a.exe':row},lambda n:False)
+        with self.assertRaisesRegex(ValueError,'aliased'):m.import_closure({'A.exe':row,'a.exe':row},lambda n:False)
+    def test_input_atime_is_ignored_but_bytes_and_inode_checked(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'x';p.write_bytes(b'old');row=m.checked(p);p.read_bytes()
+            plan={'inputs':{str(p):row},'trees':{}}
+            m.verify_frozen(plan,full=True)
+            p.write_bytes(b'new')
+            with self.assertRaises(ValueError):m.verify_frozen(plan,full=True)
+    def test_source_tree_added_file_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'a').write_text('a');plan={'inputs':{},'trees':{str(p):m.tree(p)}}
+            (p/'b').write_text('b')
+            with self.assertRaisesRegex(ValueError,'tree'):m.verify_frozen(plan,full=False)
+    def test_actual_nine_small_requests_explicit_origins(self):
+        self.assertEqual(len(gates['requests']),9)
+        for row in gates['requests']:
+            data=proposal.canonical_request((ROOT/row['reqPath']).read_bytes(),storage_encoding=row['storageEncoding'],origin=row['origin'],expected_sha256=row['reqSha256'],version=row['requestVersion'])
+            self.assertEqual(hashlib.sha256(base64.b64decode(data.rstrip(b'\n'),validate=True)).hexdigest(),row['decodedPayloadSha256'])
+    def test_compile_route_is_exact_seven_fresh_commands(self):
+        commands=commands_v5.compile_commands(ROOT,Path('/local/wine'),output=m.BASE/('current-prx-qualification-'+'0'*32)/'runtime')
+        self.assertEqual(len(commands),7)
+        self.assertIn('-Dmain=CandidateFixtureMain',commands[0]['argv'])
+        self.assertTrue(all('shader_recompiler_agc_driver.a' not in ' '.join(c['argv']) for c in commands))
+    def test_hle_does_not_admit_skip_or_previous_source(self):
+        defaults=['default_tests'];targets=['lib'+str(i) for i in range(47)]
+        b={'targets':targets,'anyps5_commit':m.TARGET,'host_tests_passed':defaults,
+           'additional_host_tests_passed':m.ADDITIONS,'host_test_cases_skipped':[],
+           'host_test_runtime_inputs_verified_unchanged':True,'device_or_gameplay_verified':False,
+           'patches':{str(i):'a'*64 for i in range(16)},'flags':{'ANYPS5_USE_SYSTEM_DEPS':False},
+           'host_test_arena':dict(m.HOST_TEST_ARENA),
+           'host_test_case_results':{name:{'status':'passed'} for name in
+             {'guest_kernel_module_lifecycle','savedata_memory_growth','savedata_memory_growth_read_failure'}|{('windows_compiler_once' if n=='compiler_once_tests' else n.removesuffix('_tests')) for n in m.ADDITIONS}}}
+        manifest={'schema':1,'kind':'anyps5_unpatched_hle_runtime','source_commit':m.TARGET,'contains_game_data':False,'runtime_verified':False,
+                  'files':{n:'a'*64 for n in ['unpatched/'+n+'.prx' for n in targets]+['runtime/'+n for n in ('libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll')]},'build_provenance':b}
+        registered={('windows_compiler_once' if n=='compiler_once_tests' else n.removesuffix('_tests')):n for n in m.ADDITIONS}
+        registered.update({n:'agc_shader_memory_tests' for n in m.SHADER_MEMORY_CASES})
+        actual_results={n:{'status':'passed','target':target} for n,target in registered.items()}
+        b['host_test_case_results'].update(actual_results)
+        m.hle_contract(manifest,defaults,registered,actual_results)
+        removed=b['patches'].pop('12')
+        with self.assertRaisesRegex(ValueError,'sixteen-patch'):m.hle_contract(manifest,defaults,registered,actual_results)
+        b['patches']['12']=removed
+        b['host_test_cases_skipped']=['skipped']
+        with self.assertRaises(ValueError):m.hle_contract(manifest,defaults,registered,actual_results)
+        b['host_test_cases_skipped']=[];manifest['source_commit']='old'
+        with self.assertRaises(ValueError):m.hle_contract(manifest,defaults,registered,actual_results)
+
+
+class InjectedExecution(unittest.TestCase):
+    """Exercise the complete orchestration with tiny fake command products.
+
+    The real output predicates/readback/freeze/cleanup decisions run; the injected
+    process boundary never invokes Wine/compiler/SPIRV tools or touches assets.
+    """
+    def execute(self,root,mode='pass',check_environment=False):
+        root=root.resolve()
+        base=root/'build/anyps5-full-main-update-20261012';base.mkdir(parents=True)
+        here=root/'build/current-prx-latest16-host-arena-runner-proposal';here.mkdir()
+        (here/'source-review.json').write_text('{}')
+        output=base/('current-prx-qualification-'+'1'*32)
+        build=base/'winlibs-build-v5';raw=build/'core/libs/libs/unpatched';raw.mkdir(parents=True)
+        tools=root/'tools';(tools/'bin').mkdir(parents=True)
+        names=['unpatched/libSceAgcDriver.prx','unpatched/libc.prx']
+        for name in names:(raw/Path(name).name).write_bytes(b'fake PE')
+        for name in ('libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll'):
+            (tools/'bin'/name).write_bytes(b'fake runtime');names.append('runtime/'+name)
+        (build/'tests').mkdir()
+        for name in ('agc_unused_barycentric_tests','agc_profile_output_tests'):(build/'tests'/(name+'.exe')).write_bytes(b'fake fixture')
+        requests=[]
+        for i in range(9):
+            p=root/('request'+str(i));p.write_bytes(b'5SPA'+(14 if i==0 else 15).to_bytes(4,'little')+b'synthetic')
+            requests.append({'role':'request'+str(i),'reqPath':p.name,'reqSha256':m.sha(p),'storageEncoding':'binary',
+                             'origin':'legacy-ipad-v14-v15','requestVersion':14 if i==0 else 15,
+                             'previousSpirvSha256':'0'*64,'previousLayoutSha256':'0'*64})
+        wine=root/'wine';wine.write_bytes(b'fake wine')
+        plan={'schema':1,'status':'prepared_current_latest16_host_arena_loaded_prx_cpu_qualification_not_executed',
+              'inputs':{str(p):m.checked(p) for p in root.rglob('*') if p.is_file()},'trees':{},
+              'output':str(output),'wine':str(wine),'validator':str(root/'spirv-val'),
+              'hleSha256':'a'*64,'sourceReviewSha256':m.sha(here/'source-review.json'),
+              'hleManifest':{'files':{n:'unused' for n in names},'build_provenance':{'host_test_arena':dict(m.HOST_TEST_ARENA)}},
+              'hostTestArena':dict(m.HOST_TEST_ARENA),'sourceVersion':'b'*16,
+              'gates':{'nullCaseNames':gates['nullCaseNames'],'requests':requests},
+              'compileCommands':commands_v5.compile_commands(root,wine,output=output/'runtime')}
+        plan_path=here/'plan.json';m.save(plan_path,plan)
+        args=types.SimpleNamespace(plan=plan_path,plan_sha=m.sha(plan_path))
+        expected=proposal.win(output/'runtime/libSceAgcDriver.prx')
+        invocations=[]
+        def fake_run(argv,**kw):
+            label=kw['stdout'].name.removesuffix('.stdout.log');invocations.append(label)
+            if check_environment:
+                self.assertFalse(any(k.startswith(('DYLD_','CCACHE_')) for k in kw['env']))
+                self.assertEqual(kw['env']['UNCHANGED_TEST_ENV'],'kept')
+                self.assertEqual(kw['env']['WINEPREFIX'],str(output/'wine-prefix'))
+                self.assertEqual(kw['env']['ANYPS5_NO_SHADER_CACHE'],'1')
+                self.assertEqual({k:kw['env'][k] for k in m.HOST_TEST_ARENA},m.HOST_TEST_ARENA)
+            kw['guard']();text='';exit_code=0
+            if label=='profile-output':text='profile output tests passed\n'
+            elif label=='standalone355':text=''.join('PASS '+n+'\n' for n in public.case_names(public.STANDALONE))+'TOTAL_PASS 355\n'
+            elif label.startswith('link-current-'):
+                executable=Path(str(argv[-1])[2:].replace('\\','/'));executable.write_bytes(b'fake linked PE')
+            elif label=='loaded538':
+                text='ACTUAL_DRIVER_PATH '+expected+'\nACTUAL_DRIVER_CACHE_SOURCE_VERSION '+'b'*16+'\nACTUAL_DRIVER_CACHE_FORMAT 28\n'
+                text+=''.join('PASS '+n+'\n' for n in public.case_names(public.IMPORTED))+'TOTAL_PASS 538\n'
+                if mode=='truncated':text=text.replace('TOTAL_PASS 538','TOTAL_PASS 53')
+                if mode=='nonzero':exit_code=3
+            elif label=='public-wrong-driver':text='ACTUAL_DRIVER_IDENTITY_REJECTED\n';exit_code=2
+            elif label=='null12':
+                text='ACTUAL_DRIVER_PATH '+expected+'\nACTUAL_DRIVER_CACHE_SOURCE_VERSION '+'b'*16+'\nACTUAL_DRIVER_CACHE_FORMAT 28\n'
+                text+=''.join('PASS '+n+'\n' for n in gates['nullCaseNames'])+'TOTAL_PASS 12\nGPU_EXECUTION 0\nREGISTER_SHADER_DEVICE_API_EXECUTION 0\n'
+            elif label=='null-wrong-driver':text='NULL_PIXEL_MATERIALIZATION_FAILURE wrong PRX\n';exit_code=1
+            elif label=='full-wrong-driver':text='FULL_REQUEST_REPLAY_FAILURE Actual driver identity rejected\n';exit_code=1
+            elif label.startswith(('legacy-request','current17-request')):
+                origin='legacy-ipad-v14-v15' if label.startswith('legacy') else 'request17'
+                text=markers(expected,'b'*16,origin)
+                dump=Path(str(argv[4])[2:].replace('\\','/'));dump.mkdir()
+                metadata=layout()
+                if mode=='different-layout' and origin=='request17':metadata['layout']['firstBinding']=1
+                (dump/'binding-layout.json').write_text(json.dumps(metadata))
+                (dump/'materialized.spv').write_bytes(struct.pack('<5I',0x07230203,0x10000,0,1,0))
+                (dump/'canonical-v17.req').write_bytes(base64.b64encode(b'5SPA'+(17).to_bytes(4,'little')+b'synthetic')+b'\n')
+            kw['stdout'].write_text(text);kw['stderr'].write_text('')
+            row={'argv':list(map(str,argv)),'exitCode':exit_code,'timedOut':False,'stdoutBytes':len(text),
+                 'stderrBytes':0,'stdoutDiscarded':0,'stderrDiscarded':0,'directChildJoined':True,
+                 'groupAbsent':True,'streamsJoined':True,'captureComplete':True,'processTransportClosed':True,'cleanupErrors':[]}
+            if mode=='timeout' and label=='loaded538':
+                row.update(timedOut=True,captureComplete=False);raise bounded.CommandFailure('synthetic timeout',row)
+            return row
+        fake_bounded=types.SimpleNamespace(run=fake_run,CommandFailure=bounded.CommandFailure)
+        fake_pe=types.SimpleNamespace(PEImage=lambda path:types.SimpleNamespace(imports=lambda:{'libSceAgcDriver.prx':['native'],'libc.prx':['APS5NativeCompilerOnce_nid_no_patch']},exports=lambda:({'native':1,'APS5NativeCompilerOnce_nid_no_patch':2},{1:None,2:None})))
+        modules={'owned_child':fake_bounded,'current_public':public,'request_recipe':proposal,'prx_pe':fake_pe,
+                 'runtime_dependencies':types.SimpleNamespace(external=lambda n:False)}
+        with patch.multiple(m,ROOT=root,BASE=base,HERE=here,BUILD=build,TOOLS=tools),patch.object(m,'load',side_effect=lambda name,path:modules[name]),patch.object(m.shutil,'disk_usage',return_value=types.SimpleNamespace(free=8*1024**3)),patch('builtins.print'):
+            if mode=='pass':m.execute(args)
+            else:
+                with self.assertRaises(RuntimeError):m.execute(args)
+        return json.loads((output/'results.json').read_text()),invocations
+
+    def test_complete_355_538_null12_nine_twice_validated_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,labels=self.execute(Path(d))
+            self.assertIn('cpu_passed_not_gpu_or_gameplay',r['status'])
+            self.assertEqual((r['standaloneCases'],r['publicCases'],r['nullPixelCases']),(355,538,12))
+            self.assertEqual(len(r['fullReplays']),9)
+            self.assertEqual(sum(n.startswith('validate-') for n in labels),18)
+            self.assertTrue(r['ownedPrefixJoined'] and r['allOwnedChildrenJoined'] and r['finalInputHashesAndIdentitiesMatched'])
+            self.assertFalse(r['gpuExecution'] or r['gameExecution'] or r['deviceActions'])
+    def test_nonzero_and_truncated_markers_do_not_qualify(self):
+        for mode in ('nonzero','truncated'):
+            with self.subTest(mode=mode),tempfile.TemporaryDirectory() as d:
+                r,labels=self.execute(Path(d),mode)
+                self.assertEqual(r['status'],'failed');self.assertEqual(r['publicCases'],0)
+                self.assertTrue(r['ownedPrefixJoined']);self.assertFalse(r['fullReplays'])
+    def test_timeout_retains_failed_row_and_joins_prefix(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,labels=self.execute(Path(d),'timeout')
+            self.assertEqual(r['status'],'failed');self.assertTrue(r['ownedPrefixJoined'])
+            self.assertTrue(next(row for row in r['commands'] if row['label']=='loaded538')['timedOut'])
+    def test_schema2_difference_refuses_migration_equivalence(self):
+        with tempfile.TemporaryDirectory() as d:
+            r,labels=self.execute(Path(d),'different-layout')
+            self.assertEqual(r['status'],'failed');self.assertFalse(r['fullReplays'])
+            self.assertTrue(r['ownedPrefixJoined'])
+
+
+if __name__=='__main__':unittest.main()

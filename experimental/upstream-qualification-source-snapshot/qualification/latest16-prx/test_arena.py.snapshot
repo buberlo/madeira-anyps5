@@ -1,0 +1,84 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import copy
+import importlib.util
+import json
+import os
+from pathlib import Path
+import tempfile
+import types
+import unittest
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+def load(name,path):
+    spec=importlib.util.spec_from_file_location(name,path)
+    value=importlib.util.module_from_spec(spec);spec.loader.exec_module(value);return value
+m=load('host_arena_runner',HERE/'run.py')
+retained=load('host_arena_fake',HERE/'test_runner.py')
+helper=load('host_arena_hle',m.ROOT/'scripts/build-hle.py')
+
+def fixture():
+    targets=['module'+str(i) for i in range(47)]
+    registered={('windows_compiler_once' if n=='compiler_once_tests' else n.removesuffix('_tests')):n for n in m.ADDITIONS}
+    registered.update({n:'agc_shader_memory_tests' for n in m.SHADER_MEMORY_CASES})
+    cases={'guest_kernel_module_lifecycle','savedata_memory_growth','savedata_memory_growth_read_failure'}|set(registered)
+    actual={name:{'status':'passed','target':target} for name,target in registered.items()}
+    b={'targets':targets,'anyps5_commit':m.TARGET,'host_tests_passed':list(helper.TESTS),
+       'additional_host_tests_passed':m.ADDITIONS,'host_test_cases_skipped':[],
+       'host_test_runtime_inputs_verified_unchanged':True,'device_or_gameplay_verified':False,
+       'patches':{str(i):'a'*64 for i in range(16)},'flags':{'ANYPS5_USE_SYSTEM_DEPS':False},
+       'host_test_arena':dict(m.HOST_TEST_ARENA),
+       'host_test_case_results':{n:{'status':'passed'} for n in cases}}
+    b['host_test_case_results'].update(actual)
+    names=['unpatched/'+n+'.prx' for n in targets]+['runtime/'+n for n in ('libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll')]
+    manifest={'schema':1,'kind':'anyps5_unpatched_hle_runtime','source_commit':m.TARGET,
+              'contains_game_data':False,'runtime_verified':False,'files':{n:'a'*64 for n in names},'build_provenance':b}
+    return manifest,registered,actual
+
+class HostArena(unittest.TestCase):
+    def test_actual_producer_environment_matches_fixed_successful_host_range(self):
+        manifest,registered,actual=fixture()
+        self.assertEqual(m.hle_contract(manifest,helper.TESTS,registered,actual)['host_test_arena'],m.HOST_TEST_ARENA)
+
+    def test_old_eight_gib_producer_refused(self):
+        manifest,registered,actual=fixture()
+        manifest['build_provenance']['host_test_arena']['APS5_GUEST_ARENA_BASE']='0x200000000'
+        with self.assertRaisesRegex(ValueError,'qualified host arena'):m.hle_contract(manifest,helper.TESTS,registered,actual)
+
+    def test_unrecorded_arena_not_inferred_from_pass_markers(self):
+        manifest,registered,actual=fixture();del manifest['build_provenance']['host_test_arena']
+        with self.assertRaisesRegex(ValueError,'qualified host arena'):m.hle_contract(manifest,helper.TESTS,registered,actual)
+
+    def test_lazy_size_chunk_type_or_unknown_key_refused(self):
+        for changes in ({'APS5_GUEST_ARENA_LAZY':'0'},{'APS5_GUEST_ARENA_SIZE':'0x200000000'},
+                        {'APS5_GUEST_ARENA_CHUNK':'0x20000000'},{'APS5_GUEST_ARENA_LAZY':1},{'unknown':'value'}):
+            manifest,registered,actual=fixture();manifest['build_provenance']['host_test_arena'].update(changes)
+            with self.subTest(changes=changes),self.assertRaisesRegex(ValueError,'qualified host arena'):
+                m.hle_contract(manifest,helper.TESTS,registered,actual)
+
+    def test_plan_environment_or_producer_mutation_refused_before_output_acquisition(self):
+        for changed in ('plan','producer'):
+            with tempfile.TemporaryDirectory() as directory:
+                plan={'schema':1,'status':'prepared_current_latest16_host_arena_loaded_prx_cpu_qualification_not_executed',
+                      'hostTestArena':dict(m.HOST_TEST_ARENA),
+                      'hleManifest':{'build_provenance':{'host_test_arena':dict(m.HOST_TEST_ARENA)}}}
+                value=plan['hostTestArena'] if changed=='plan' else plan['hleManifest']['build_provenance']['host_test_arena']
+                value['APS5_GUEST_ARENA_BASE']='0x200000000'
+                p=Path(directory)/'plan.json';p.write_text(json.dumps(plan))
+                with patch.object(m,'load') as loaded,self.assertRaisesRegex(ValueError,'actual HLE host arena'):
+                    m.execute(types.SimpleNamespace(plan=p,plan_sha=m.sha(p)))
+                loaded.assert_not_called()
+                self.assertEqual([q.name for q in p.parent.iterdir()],['plan.json'])
+
+    def test_every_injected_runtime_and_cleanup_child_uses_frozen_arena_over_host_overrides(self):
+        environment={'APS5_GUEST_ARENA_BASE':'0x200000000','APS5_GUEST_ARENA_SIZE':'bad',
+                     'APS5_GUEST_ARENA_CHUNK':'bad','APS5_GUEST_ARENA_LAZY':'0','UNCHANGED_TEST_ENV':'kept'}
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,environment):
+            result,labels=retained.InjectedExecution().execute(Path(directory),check_environment=True)
+        self.assertEqual(result['hostTestArena'],m.HOST_TEST_ARENA)
+        self.assertTrue(result['ownedPrefixJoined'] and result['allOwnedChildrenJoined'])
+        self.assertIn('prefix-init',labels);self.assertIn('prefix-graceful-wait',labels)
+
+if __name__=='__main__':unittest.main()

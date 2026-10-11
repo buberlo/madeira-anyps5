@@ -1,0 +1,133 @@
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+"""Read held C++ and oracle fixtures; source algebra only, no compiler or device."""
+from pathlib import Path
+import difflib, hashlib, json, re
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+SOURCE = HERE.parent / 'qualification-source-v5'
+RELATIVE = Path('core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp')
+GRAPHICS = SOURCE / 'core/libs/prx/libSceAgcDriver/Graphics'
+TESTS = SOURCE / 'core/libs/prx/libSceAgcDriver/tests'
+ADDR = ROOT / 'build/solitaire-investigation/msaa-layout-reference/addrlib/src/gfx10'
+INPUTS = [SOURCE / RELATIVE, TESTS / 'TextureTiling.cpp', GRAPHICS / 'src/TextureDetiler.cpp',
+          GRAPHICS / 'src/TextureFormat.cpp', GRAPHICS / 'include/TextureSwizzleEquations.hpp',
+          GRAPHICS / 'include/TextureTiling.hpp', ADDR / 'gfx10addrlib.h', ADDR / 'gfx10addrlib.cpp']
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def numbers(value):
+    return [int(n, 0) for n in re.findall(r'0x[0-9a-fA-F]+|\b[0-9]+', value)]
+
+def align(value, multiple):
+    return (value + multiple - 1) // multiple * multiple
+
+def model(mode, element_bytes, width, height, depth, count, text):
+    index = element_bytes.bit_length() - 1
+    table = 'thick4KB' if mode == 'kStandard4KB' else 'thick64KB'
+    raw = re.search(r'\b' + table + r'\[5\]\[3\] = \{(.*?)\};', text).group(1)
+    dims = numbers(raw)[index * 3:index * 3 + 3]
+    bx, by, bz = [1 << n for n in dims]
+    block_bytes = 4096 if mode == 'kStandard4KB' else 65536
+    log2 = block_bytes.bit_length() - 1
+    tail_width = bx >> 1 if log2 % 3 == 1 else bx
+    tail_height = by >> 1 if log2 % 3 == 0 else by
+    effective = log2 - (log2 - 8) // 3
+    max_tail = 1 + (1 << (effective - 9)) if effective <= 11 else effective - 4
+    first = count
+    for level in range(count) if count > 1 else []:
+        if ((width + (1 << level) - 1) >> level) <= tail_width and ((height + (1 << level) - 1) >> level) <= tail_height and count - level <= max_tail:
+            first = level
+            break
+    offset = block_bytes if first < count else 0
+    mips = [None] * count
+    for level in reversed(range(count)):
+        w = max((width + (1 << level) - 1) >> level, 1)
+        h = max((height + (1 << level) - 1) >> level, 1)
+        tail = level >= first
+        tail_x = tail_y = 0
+        row_blocks = align(w, bx) // bx
+        if tail:
+            slot = max_tail - 1 - (level - first)
+            slot_offset = 16 << slot if slot > 6 else slot << 8
+            for bit in range(6):
+                tail_x |= ((slot_offset >> (9 + 2 * bit)) & 1) << bit
+                tail_y |= ((slot_offset >> (8 + 2 * bit)) & 1) << bit
+            micro = [[8, 4], [4, 4], [4, 4], [4, 2], [2, 2]][index]
+            tail_x *= micro[0]
+            tail_y *= micro[1]
+            mip_offset = 0
+        else:
+            mip_offset = offset
+            offset += row_blocks * (align(h, by) // by) * block_bytes
+        mips[level] = dict(offset=mip_offset, tail=tail, tail_x=tail_x, tail_y=tail_y, rows=row_blocks)
+    return dict(bytes=offset * ((depth + bz - 1) // bz), slab=offset, block=(bx, by, bz), block_bytes=block_bytes, first=first, mips=mips)
+
+def main():
+    held = {str(p): sha(p) for p in INPUTS}
+    assert held[str(SOURCE / RELATIVE)] == '04be404d77a9534eccbc455a4c75b78940b57089a4e0391fd8b9772e6d2248fa'
+    source = (SOURCE / RELATIVE).read_text()
+    fixture = (TESTS / 'TextureTiling.cpp').read_text()
+    oracle = (ADDR / 'gfx10addrlib.h').read_text()
+    oracle_impl = (ADDR / 'gfx10addrlib.cpp').read_text()
+    old = 'if (descriptor.dimension == TextureDimension::k3D && (descriptor.tileMode == TextureTileMode::kZ64KBX || descriptor.tileMode == TextureTileMode::kD64KBX || descriptor.tileMode == TextureTileMode::kR64KBX))'
+    new = old.replace(' || descriptor.tileMode == TextureTileMode::kD64KBX', '')
+    assert source.count(old) == 1
+    candidate = source.replace(old, new)
+    thin_mask = re.search(r'Gfx10Rsrc3dThin64KBSwModeMask = (.*?);', oracle, re.S).group(1)
+    assert 'ADDR_SW_64KB_D_X' not in thin_mask and 'ADDR_SW_64KB_Z_X' in thin_mask and 'ADDR_SW_64KB_R_X' in thin_mask
+    assert 'm_swizzleModeTable[swizzleMode].isStd || m_swizzleModeTable[swizzleMode].isDisp' in oracle
+    d_flags = numbers(re.search(r'\{\{(.*?)\}\}, // ADDR_SW_64KB_D_X', oracle_impl).group(1))
+    assert d_flags[7] == 1
+    equations = {}
+    for mode, bpe, bits in re.findall(r'\{(0x[0-9a-f]+|[0-9]+)u, ([0-9]+)u, \{([^}]+)\}\}', (GRAPHICS / 'include/TextureSwizzleEquations.hpp').read_text()):
+        equations[(int(mode, 0), int(bpe))] = numbers(bits)
+    mode_numbers = {'kStandard4KB': 0x105, 'kStandard64KB': 0x109, 'kS64KBX': 0x119, 'kD64KBX': 0x11a}
+    cases = []
+    sample_count = 0
+    pattern = r'requireThickAddresses\(thickVolume\(TextureTileMode::(\w+), ([0-9]+), ([0-9]+), ([0-9]+), ([0-9]+), ([0-9]+)\), ([0-9]+), ([0-9]+), ([0-9]+), (\w+), "([^"]+)"\);'
+    for mode, fmt, w, h, d, count, bpe, tail, size, array, label in re.findall(pattern, fixture):
+        bpe, w, h, d, count, tail, size = map(int, [bpe, w, h, d, count, tail, size])
+        m = model(mode, bpe, w, h, d, count, source)
+        assert (m['bytes'], m['first']) == (size, tail), label
+        rows = re.search(r'constexpr ElementAddress ' + array + r'\[\] = \{(.*?)\};', fixture).group(1)
+        samples = [numbers(row) for row in re.findall(r'\{([^}]+)\}', rows)]
+        bits = equations[(mode_numbers[mode], bpe)]
+        bx, by, bz = m['block']
+        for level, x, y, z, expected in samples:
+            mip = m['mips'][level]
+            address = z // bz * m['slab'] + mip['offset']
+            if mip['tail']:
+                x += mip['tail_x']; y += mip['tail_y']
+            else:
+                address += (y // by * mip['rows'] + x // bx) * m['block_bytes']
+            for bit, mask in enumerate(bits):
+                selected = (x & (mask & 0xfff)) ^ ((y << 12) & (mask & 0xfff000)) ^ ((z << 24) & (mask & 0xff000000))
+                address += (selected.bit_count() & 1) << bit
+            assert address == expected, (label, level, x, y, z, address, expected)
+        sample_count += len(samples)
+        cases.append(dict(label=label, guestBytes=size, firstTailLevel=tail, samplesMatched=len(samples)))
+    assert len(cases) == 10
+    target = HERE / 'overlay' / RELATIVE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open('x') as out:
+        out.write(candidate)
+    patch = HERE / 'thick-dx-dispatch.patch'
+    with patch.open('x') as out:
+        out.writelines(difflib.unified_diff(source.splitlines(True), candidate.splitlines(True), fromfile='a/' + str(RELATIVE), tofile='b/' + str(RELATIVE)))
+    assert {str(p): sha(p) for p in INPUTS} == held
+    receipt = dict(schema=1, status='source_only_real_thick_dx_dispatch_bug_candidate_not_compiled', sourceInputs=held,
+        candidate=str(target), candidateSha256=sha(target), patchSha256=sha(patch), fixtureUnchanged=True,
+        diagnosis='D_X 3D incorrectly enters thin DescribeSurface path; independent Addrlib classifies display D_X as thick.',
+        originalThinBytes=1048576, independentExpectedThickBytes=262144, thickBlockExtent=[32, 32, 16],
+        productionThickPipelineAlreadyPresent=True, oracleExpectationsChanged=False, guardsChanged=False,
+        sourceAlgebraFixtureCases=cases, sourceAlgebraAddressCount=sample_count,
+        sourceAlgebraIsNotCppExecution=True, compilerInvoked=False, deviceActions=False, canonicalSourceEdited=False,
+        requiredRootVerification='Apply only held one-line production diff to a fresh scoped source successor; rebuild and rerun full Graphics including unchanged address and negative fixtures.')
+    with (HERE / 'receipt.json').open('x') as out:
+        json.dump(receipt, out, indent=2); out.write('\n')
+    print(json.dumps(dict(candidate=str(target), candidateSha256=sha(target), receiptSha256=sha(HERE / 'receipt.json'), sourceAlgebraCases=len(cases), sourceAlgebraAddressCount=sample_count, compilerInvoked=False, deviceActions=False)))
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,67 @@
+"""Initial adoption controls; separate actual partial evidence controls verify current bytes."""
+import ast,copy,importlib.util,json,unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+HERE=Path(__file__).resolve().parent
+def module(name):
+ p=HERE/(name+'.py');sp=importlib.util.spec_from_file_location('exact_observed59_test_'+name,p);m=importlib.util.module_from_spec(sp);sp.loader.exec_module(m);return m
+r=module('reference');i=module('install');s=r.s
+def functions(p):return{n.name:ast.dump(n,include_attributes=False)for n in ast.parse(p.read_text()).body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))}
+class Adoption(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  cls.observed=s.load(r.OBSERVED);cls.rows=s.load(r.OBSERVED_ROWS)['rows'];b=s.load(s.INSTALL59);p,cpu,dirs,session,_=r.failed_origin()
+  cls.reference={**copy.deepcopy(b['collectorProtectedDataView']),'approvedCpuRecords':cpu,'approvedCpuDirectories':dirs,'exactSessionLog':session,'exactConfig':p['entry']['config'],'originalLibrarySha256':p['originalLibrarySha256'],'acceptedNative59BindingSha256':s.INSTALL59_SHA,'observedBundlePath':b['observedBundlePath']}
+  cls.receipt={'providers':{k:{'path':str(r.READ_RECEIPT.parent/'bytes'/('%02d.bin'%n)),'record':row['after'],'stableLocalStat':[1,2,33188,1,row['after']['bytes'],3,4]}for n,(k,row)in enumerate(sorted((k,v)for k,v in cls.rows.items()if v['after']and v['after']['kind']=='file'))}}
+  cls.policy=s.module(i.POLICY,i.POLICY_SHA,'exact_unchanged_preservation_policy_test')
+ def adopt(self,rows=None,receipt=None):
+  # Explicit stub at this layer: actual current byte proof remains pending.
+  return r.adopt_observed(self.reference,{},self.observed,rows or self.rows,receipt or self.receipt,mock.Mock())
+ def test_exact_ten_rows_initial_adoption_and_old_provider_retained(self):
+  q,values=self.adopt();proof=r.transition(q,self.observed,self.policy);self.assertEqual(len(proof['initialObservedRows']),10);self.assertFalse(proof['postInstallPolicyExceptionsAdded'])
+  absent='Documents/logs/game.exe-2026-10-09_08-03-09.txt';self.assertNotIn(absent,q['inventory']);self.assertNotIn(absent,q['providers']);self.assertIn(self.reference['providers'][absent]['path'],values)
+ def test_actual_production_validator_factory_saved_identity(self):
+  v=r.adoption_validator();key='Documents/madeira-controls.json';row=self.reference['providers'][key];expected=self.reference['inventory'][key];self.assertEqual(v.verified_file(row['path'],expected,row['stableLocalStat']),row['stableLocalStat']);bad=list(row['stableLocalStat']);bad[1]+=1;self.assertRaises(ValueError,v.verified_file,row['path'],expected,bad)
+ def test_controls_exact_bytes(self):
+  q,_=self.adopt();now=copy.deepcopy(self.observed);now['Documents/madeira-controls.json']=self.reference['inventory']['Documents/madeira-controls.json'];self.assertRaises(ValueError,r.transition,q,now,self.policy)
+ def test_absent_log_cannot_reappear(self):
+  q,_=self.adopt();now=copy.deepcopy(self.observed);k='Documents/logs/game.exe-2026-10-09_08-03-09.txt';now[k]=self.rows[k]['before'];self.assertRaises(ValueError,r.transition,q,now,self.policy)
+ def test_extra_appconfig_child_refused(self):
+  q,_=self.adopt();now=copy.deepcopy(self.observed);k=next(k for k,v in self.rows.items()if k.endswith('/AppConfig'));now[k+'/unobserved']={'kind':'directory'};self.assertRaises(ValueError,r.transition,q,now,self.policy)
+ def test_directory_type_changed(self):
+  q,_=self.adopt();now=copy.deepcopy(self.observed);k=next(k for k,v in self.rows.items()if v['after']=={'kind':'directory'});now[k]={'kind':'symlink','target':'/tmp'};self.assertRaises(ValueError,r.transition,q,now,self.policy)
+ def test_missing_current_provider(self):
+  receipt=copy.deepcopy(self.receipt);receipt['providers'].pop('Documents/madeira-controls.json');self.assertRaises(ValueError,self.adopt,receipt=receipt)
+ def test_provider_route_substitution(self):
+  receipt=copy.deepcopy(self.receipt);receipt['providers']['Documents/madeira-controls.json']['path']=str(HERE/'support.py');self.assertRaises(ValueError,self.adopt,receipt=receipt)
+ def test_historical_before_tamper(self):
+  rows=copy.deepcopy(self.rows);rows['Documents/madeira-controls.json']['before']['sha256']='0'*64;self.assertRaises(ValueError,self.adopt,rows=rows)
+ def test_incomplete_observed_set(self):
+  rows=copy.deepcopy(self.rows);rows.pop('Documents/madeira-controls.json');self.assertRaises(ValueError,self.adopt,rows=rows)
+ def test_pending_actual_read_refuses_before_accepted_replay(self):
+  with mock.patch.object(r,'READ_RECEIPT_SHA','PENDING'),mock.patch.object(r.s,'accepted59',side_effect=AssertionError):self.assertRaises(ValueError,r.inspect_reference)
+class Source(unittest.TestCase):
+ def test_install_online_and_post_policy_functions_unchanged(self):
+  old=functions(r.PREDECESSOR/'install.py');new=functions(HERE/'install.py')
+  for key in old:
+   if key not in ['offline_proof','plan_record','install_online_definitions']:self.assertEqual(old[key],new[key],key)
+  self.assertEqual(old['offline_proof'].replace('source_only_native60_preserved59_update_reader_not_executed','source_only_native60_initial_quiescence_partial_read_update_reader_not_executed'),new['offline_proof'])
+  self.assertEqual(old['plan_record'].replace('frozen_inert_exact_current_python_observed59_reference_qualification60_update_not_executed','frozen_inert_initial_quiescence_partial_read_reference_qualification60_update_not_executed'),new['plan_record'])
+ def test_reference_existing_functions_exact(self):
+  old=functions(r.PREDECESSOR/'reference.py');new=functions(HERE/'reference.py')
+  for key in old:
+   if key!='inspect_reference':self.assertEqual(old[key],new[key],key)
+  for name in ['support.py','package.py']:self.assertEqual((HERE/name).read_bytes(),(r.PREDECESSOR/name).read_bytes())
+  previous=(r.PREDECESSOR/'providers.py').read_text()
+  expected=previous.replace('9062c826471bbaffbd9caa3d034aafb47774543cf7f96b30ed5b431a5c8a92e5',s.pv.MAP_SHA).replace('==673','==674').replace('Exact673','Exact674').replace('673-entry','674-entry')
+  self.assertEqual(expected,(HERE/'providers.py').read_text())
+ def test_reader_only_explicit_new_producer_origin(self):
+  old=functions(r.PREDECESSOR/'binding.py');new=functions(HERE/'binding.py')
+  self.assertEqual(set(old)|{'initial_quiescence_evidence'},set(new))
+  for key in old:
+   if key=='inspect_install':
+    tree=ast.parse((r.PREDECESSOR/'binding.py').read_text());node=next(n for n in tree.body if isinstance(n,ast.FunctionDef)and n.name==key);index=next(j for j,n in enumerate(node.body)if isinstance(n,ast.Assign)and isinstance(n.targets[0],ast.Name)and n.targets[0].id=='stage');node.body.insert(index+1,ast.parse('initial_quiescence_evidence(stage,r,n)').body[0]);self.assertEqual(ast.dump(node,include_attributes=False),new[key]);continue
+   expected=old[key].replace('exact_preserved_native59_sources_and_current_own_diagnostic_before_signed_native60_update','exact_ten_observed_native59_rows_partial_files_initial_own59_quiescence_fresh_full_before_native60_update')if key=='binding_record'else old[key]
+   self.assertEqual(expected,new[key],key)
+if __name__=='__main__':unittest.main()

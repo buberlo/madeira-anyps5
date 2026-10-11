@@ -5,9 +5,10 @@ The project now includes the complete checked AnyPS5 `main` snapshot at
 **1,735 merged commits after `c963432d`**, including Apple fixes #1776,
 #1831 and #2015. Both the canonical checkout and actual build checkout match
 all **2,137 source files and modes**. Eleven nested dependencies are initialized
-at their recorded commits and clean. All sixteen local patches pass the full
-64-command application/check/reversal roundtrip.
+at their recorded commits and clean. All seventeen local patches pass the full
+68-command application/check/reversal roundtrip.
 [Actual source and scoped-test record](evidence/anyps5-0a8b-source-integration-20261012.json).
+[Additive 3D layout repair](evidence/anyps5-latest17-source-integration-20261012.json).
 
 Madeira main remains `48f97642`. Official FEX main and FEX-2610 remain
 `14c92681`; Madeira's FEX iOS-port baseline remains `3bec2ac4`. These match
@@ -81,8 +82,10 @@ The complete **47-library Windows HLE rebuild and all 49 selected test
 executables compile**. The runtime attempt passes the first 28 default targets
 and stops in Graphics: a 3D `SW_64KB_D_X` texture is incorrectly dispatched to
 the thin layout, producing 1,048,576 bytes where the independent Addrlib fixture
-requires 262,144. The fixture is retained unchanged; the production dispatch is
-being repaired. The remaining default targets and seven additional targets,
+requires 262,144. Patch 0017 routes this format to the existing thick-volume
+layout; all 202 independent address expectations and rejection guards remain
+unchanged. A fresh complete seventeen-patch build and test run is underway.
+The remaining default targets and seven additional targets,
 including all four registered ShaderMemory cases, still require the full run.
 No qualified archive was exported from this failed attempt.
 [Actual build and failure](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
@@ -95,7 +98,7 @@ this arena; that result does not establish allocation on the iPad.
 
 The earlier **95 host/relinker passes**, scoped once-provider execution and
 older 47-library/production-PRX results retain their source identities. They
-are not automatically results of the final sixteen-patch runtime.
+are not automatically results of the current seventeen-patch runtime.
 [Scoped once execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
 [historical thirteen-patch roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
 

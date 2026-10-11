@@ -1,0 +1,57 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, subprocess
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+proposal = base/'latest-0a8b-seventeen-patch-proposal'
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+old_path = base/'latest-0a8b-sixteen-patch-proposal/source-candidate-review.json'
+new_path = proposal/'source-candidate-review.json'
+assert sha(old_path) == '7e6d8baa48ddbd9470f01a04ea23b9b79358498f8ab3dcc4338a92e5bfe98c97'
+assert sha(new_path) == 'dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44'
+old, new = (json.loads(p.read_text()) for p in (old_path, new_path))
+relative = 'core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp'
+assert old['upstreamCommit'] == new['upstreamCommit']
+assert set(old['sourceTree']) == set(new['sourceTree'])
+assert [p for p in old['sourceTree'] if old['sourceTree'][p] != new['sourceTree'][p]] == [relative]
+assert all(new['patches'][p] == h for p, h in old['patches'].items())
+assert old['thirdPartyGitlinks'] == new['thirdPartyGitlinks']
+assert len(new['sourceTree']) == 2137
+patch = root/'patches/anyps5/0017-thick-display-xor-volume-layout.patch'
+assert sha(patch) == new['patches'][patch.name] == '70f5ceecf36d5b73ef6086bcc12c046653f45b6a09b22fc0ecf9392ebe82f352'
+out = base/'actual-source17-promotion'
+out.mkdir(exist_ok=False)
+
+def verify(source, review):
+    assert subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD']).decode().strip() == review['upstreamCommit']
+    for name, record in review['sourceTree'].items():
+        p = source/name
+        assert p.is_file() and not p.is_symlink() and sha(p) == record['sha256'], name
+        assert ('100755' if p.stat().st_mode & 0o111 else '100644') == record['mode'], name
+    for declaration in review['thirdPartyGitlinks']:
+        row, name = declaration.split('\t')
+        p = source/name
+        assert subprocess.check_output(['git','-C',str(p),'rev-parse','HEAD']).decode().strip() == row.split()[2], name
+        assert not subprocess.check_output(['git','-C',str(p),'status','--porcelain']), name
+
+destinations = [root/'upstreams/AnyPS5', base/'qualification-source-v5']
+for source in destinations:
+    verify(source, old)
+for source in destinations:
+    tag = 'canonical' if source == destinations[0] else 'build'
+    (out/(tag+'-before-TextureTiling.cpp')).write_bytes((source/relative).read_bytes())
+    subprocess.run(['git','-C',str(source),'apply','--check',str(patch)],check=True)
+    subprocess.run(['git','-C',str(source),'apply',str(patch)],check=True)
+    verify(source, new)
+(out/'receipt.json').write_text(json.dumps({
+    'upstreamCommit':new['upstreamCommit'], 'sourceReviewSha256':sha(new_path),
+    'previousSourceReviewSha256':sha(old_path), 'sourceEntries':2137,
+    'changedSourcePaths':[relative], 'canonicalAndBuildSourceReadbackMatched':True,
+    'elevenDependencyTreesCleanAtExactGitlinks':True,
+    'previousActualSourceBytesRetained':True, 'patchCount':17,
+    'compilerExecuted':False, 'deviceActions':False, 'fullHleQualified':False,
+    'gameplayVerified':False},indent=2)+'\n')
+print('Actual source17 promoted: one production file; 2137 source entries and eleven dependencies verified in both trees')

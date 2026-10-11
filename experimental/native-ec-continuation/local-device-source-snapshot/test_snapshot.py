@@ -11,7 +11,7 @@ class Snapshot(unittest.TestCase):
   for name,digest in manifest['files'].items():
    self.assertEqual(hashlib.sha256((HERE/name).read_bytes()).hexdigest(),digest,name)
  def test_sources_parse_without_importing(self):
-  sources=list(HERE.rglob('*.snapshot'));self.assertEqual(len(sources),53)
+  sources=list(HERE.rglob('*.snapshot'));self.assertEqual(len(sources),60)
   for source in sources:ast.parse(source.read_text(),filename=source.name)
  def test_pending_runtime_tuple(self):
   tree=ast.parse((HERE/'original50/composition.py.snapshot').read_text());values={}
@@ -122,4 +122,16 @@ class Snapshot(unittest.TestCase):
   manifest=json.loads((HERE/'source-manifest.json').read_text())
   self.assertEqual(manifest['orderedOwn59QuiescenceOriginal50SourceControls'],27)
   self.assertFalse(manifest['actualNative60Installed'])
+ def test_fixture674_source_preserves_hash_and_pending_boundary(self):
+  helper=(HERE/'fixture674-own59-quiescence-updater60/providers.py.snapshot').read_text()
+  self.assertIn('==674',helper);self.assertIn('Historical logical digest must not change',helper)
+  tree=ast.parse((HERE/'fixture674-own59-quiescence-original50/composition.py.snapshot').read_text());values={}
+  for node in tree.body:
+   if isinstance(node,ast.Assign)and isinstance(node.value,ast.Constant):
+    for target in node.targets:
+     if isinstance(target,ast.Name):values[target.id]=node.value.value
+  self.assertEqual(values['SEALED_INSTALL_SHA'],'PENDING');self.assertEqual(values['SEALED_RESULT_SHA'],'PENDING');self.assertIsNone(values['SEALED_INPUT_COUNT'])
+  manifest=json.loads((HERE/'source-manifest.json').read_text())
+  self.assertEqual((manifest['fixture674UpdaterSourceControls'],manifest['fixture674Original50SourceControls']),(54,27))
+  self.assertFalse(manifest['fixture674HistoricalExpectedHashesRewritten'])
 if __name__=='__main__':unittest.main()

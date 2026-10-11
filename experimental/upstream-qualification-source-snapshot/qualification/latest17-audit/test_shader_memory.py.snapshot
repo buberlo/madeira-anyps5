@@ -1,0 +1,61 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import copy
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+HERE=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location('shader_consumer',HERE/'audit.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+helper_spec=importlib.util.spec_from_file_location('shader_hle',m.ROOT/'scripts/build-hle.py')
+helper=importlib.util.module_from_spec(helper_spec);helper_spec.loader.exec_module(helper)
+
+def fixture():
+    rows=[]
+    for name,args in m.SHADER_MEMORY_CASES.items():
+        env=['ANYPS5_NO_SHADER_CACHE=1']
+        if name=='agc_shader_frontend_pair_off':env+=['APS5_NO_PERF_FRONTEND_PAIR=1']
+        rows.append({'name':name,'command':['Z:'+str(m.BUILD/'tests/agc_shader_memory_tests.exe'),*args],
+                     'properties':[{'name':'ENVIRONMENT','value':env}]})
+    return {'tests':rows}, {name:'agc_shader_memory_tests' for name in m.SHADER_MEMORY_CASES}
+
+class ShaderMemoryContracts(unittest.TestCase):
+    def test_all_four_exact_registered_modes(self):
+        value,registered=fixture();m.shader_memory_registration(json.dumps(value),registered)
+        self.assertEqual(value['tests'][0]['command'],['Z:'+str(m.BUILD/'tests/agc_shader_memory_tests.exe')])
+    def test_normal_name_with_bindless_args_cannot_replace_whole_main(self):
+        value,registered=fixture();value['tests'][0]['command'].append('--bindless')
+        with self.assertRaisesRegex(ValueError,'whole no-argument main'):m.shader_memory_registration(json.dumps(value),registered)
+    def test_missing_extra_and_duplicate_memory_case_refused(self):
+        for mode in ('missing','extra','duplicate'):
+            value,registered=fixture()
+            if mode=='missing':registered.pop('agc_shader_memory')
+            if mode=='extra':registered['unknown_memory_case']='agc_shader_memory_tests'
+            if mode=='duplicate':value['tests'].append(copy.deepcopy(value['tests'][0]))
+            with self.subTest(mode=mode),self.assertRaises(ValueError):m.shader_memory_registration(json.dumps(value),registered)
+    def test_pair_off_requires_its_exact_environment(self):
+        for env in (['ANYPS5_NO_SHADER_CACHE=1'],['ANYPS5_NO_SHADER_CACHE=1','APS5_NO_PERF_FRONTEND_PAIR=0'],
+                    ['ANYPS5_NO_SHADER_CACHE=1','APS5_NO_PERF_FRONTEND_PAIR=1','foreign=1']):
+            value,registered=fixture();value['tests'][-1]['properties'][0]['value']=env
+            with self.subTest(env=env),self.assertRaisesRegex(ValueError,'environment'):m.shader_memory_registration(json.dumps(value),registered)
+    def test_actual_junit_requires_all_four_run_without_skip(self):
+        _,registered=fixture()
+        with tempfile.TemporaryDirectory() as d:
+            report=Path(d)/'report.xml'
+            def write(extra='',omit=None):
+                report.write_text('<testsuite>'+''.join('<testcase name="'+n+'" status="run">'+(extra if n=='agc_shader_memory' else '')+'</testcase>' for n in registered if n!=omit)+'</testsuite>')
+            write();self.assertEqual(set(helper.additional_ctest_results(registered,report)),set(registered))
+            for extra in ('<skipped/>','<failure/>','<error/>'):
+                write(extra)
+                with self.subTest(extra=extra),self.assertRaises(ValueError):helper.additional_ctest_results(registered,report)
+            write(omit='agc_shader_memory')
+            with self.assertRaises(ValueError):helper.additional_ctest_results(registered,report)
+    def test_fixed_arena_preserves_all_four_strings(self):
+        self.assertEqual(m.HOST_TEST_ARENA,{'APS5_GUEST_ARENA_LAZY':'1','APS5_GUEST_ARENA_BASE':'0x7400000000',
+            'APS5_GUEST_ARENA_SIZE':'0x100000000','APS5_GUEST_ARENA_CHUNK':'0x10000000'})
+
+if __name__=='__main__':unittest.main()

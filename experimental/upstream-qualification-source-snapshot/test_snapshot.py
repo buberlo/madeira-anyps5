@@ -9,6 +9,16 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 
 
+def stable_ast(tree):
+    # Python 3.12 adds empty generic type-parameter fields to functions/classes.
+    # They do not represent authored syntax in these saved pre-3.12 recipes.
+    # Keep their original AST hashes portable without changing snapshot bytes.
+    for node in ast.walk(tree):
+        if 'type_params' in node._fields and getattr(node, 'type_params', None) == []:
+            node._fields = tuple(name for name in node._fields if name != 'type_params')
+    return ast.dump(tree, include_attributes=False)
+
+
 class Snapshot(unittest.TestCase):
     def setUp(self):
         self.manifest = json.loads((HERE / 'source-manifest.json').read_text())
@@ -22,6 +32,8 @@ class Snapshot(unittest.TestCase):
             'root/run-native-latest15-fixture-successor.py.snapshot',
             'root/run-current-shader-memory.py.snapshot',
             'root/run-full-hle-latest16.py.snapshot',
+            'root/promote-latest17.py.snapshot',
+            'root/run-full-hle-latest17.py.snapshot',
             'color-xor/test_fixture.py.snapshot',
         }
         for folder in (
@@ -31,9 +43,63 @@ class Snapshot(unittest.TestCase):
             'graphics-exact-barycentric-proof-fallback-proposal',
         ):
             names.add('targeted/' + folder + '/run-targeted.py.snapshot')
+        for name in ('audit.py', 'test_audit.py', 'test_latest.py', 'test_shader_memory.py'):
+            names.add('qualification/latest16-audit/' + name + '.snapshot')
+        for name in (
+            'run.py', 'compile_v5.py', 'bounded_local_process.py', 'test_runner.py',
+            'test_v5.py', 'test_arena.py', 'test_latest.py', 'test_bounded_local_process.py',
+            'test_shader_memory.py',
+        ):
+            names.add('qualification/latest16-prx/' + name + '.snapshot')
+        for name in ('run.py', 'compile_v5.py', 'test_historical_bindings.py'):
+            names.add('qualification/latest16-history-successor/' + name + '.snapshot')
+        for name in ('audit.py', 'test_audit.py', 'test_latest.py', 'test_shader_memory.py', 'test_source17.py'):
+            names.add('qualification/latest17-audit/' + name + '.snapshot')
+        for name in (
+            'run.py', 'compile_v5.py', 'bounded_local_process.py', 'test_runner.py',
+            'test_v5.py', 'test_arena.py', 'test_latest.py', 'test_bounded_local_process.py',
+            'test_shader_memory.py', 'test_historical_bindings.py', 'test_source17.py',
+        ):
+            names.add('qualification/latest17-prx/' + name + '.snapshot')
         self.assertEqual(set(self.manifest['sourceFiles']), names)
         self.assertEqual({str(p.relative_to(HERE)) for p in HERE.rglob('*.snapshot')}, names)
-        self.assertEqual(self.manifest['snapshotCount'], 12)
+        self.assertEqual(self.manifest['snapshotCount'], 46)
+
+    def test_previous_twelve_snapshots_remain_exact(self):
+        prior = self.manifest['priorTwelveSnapshotSha256']
+        self.assertEqual(len(prior), 12)
+        self.assertTrue(all(not name.startswith('qualification/') for name in prior))
+        for name, digest in prior.items():
+            self.assertEqual(hashlib.sha256((HERE / name).read_bytes()).hexdigest(), digest, name)
+            self.assertEqual(self.manifest['sourceFiles'][name]['snapshotSha256'], digest, name)
+
+    def test_previous_twenty_eight_snapshots_and_new_source_only_scope(self):
+        prior = self.manifest['previousTwentyEightSnapshotSha256']
+        self.assertEqual(len(prior), 28)
+        for name, digest in prior.items():
+            self.assertEqual(hashlib.sha256((HERE / name).read_bytes()).hexdigest(), digest, name)
+        self.assertTrue(self.manifest['latest17AuthoredRecipesPreserved'])
+        self.assertFalse(self.manifest['latest17ExecutionResultsIncluded'])
+        self.assertEqual(self.manifest['latest17ActualSourceReviewSha256'],
+            'dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44')
+        self.assertEqual(self.manifest['latest17ActualPreparationSha256'],
+            'da870f22304abc131b3ac2ccb5eb7f42fbd197b7aa2fd8f2febd8f912486e681')
+
+    def test_reviewed_transport_and_pending_recipe_scope(self):
+        expected = 'ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6'
+        record = self.manifest['sourceFiles']['qualification/latest16-prx/bounded_local_process.py.snapshot']
+        self.assertEqual(record['originalSha256'], expected)
+        self.assertEqual(record['normalizedSha256'], expected)
+        self.assertEqual(self.manifest['transportHelperOriginalSha256'], expected)
+        self.assertFalse(self.manifest['actualLoadedPrxPlanOrQualificationClaimed'])
+        self.assertFalse(self.manifest['latest17SourceOrRuntimeQualificationClaimed'])
+        added = {name: row for name, row in self.manifest['sourceFiles'].items()
+                 if name.startswith('qualification/')}
+        self.assertEqual(len(added), 32)
+        for name, row in added.items():
+            self.assertFalse(row['actualArchiveOrRuntimeQualificationClaimed'], name)
+            self.assertRegex(row['heldReviewSha256'], r'^[0-9a-f]{64}$', name)
+            self.assertIn('source_only', row['originalSourceStatus'], name)
 
     def test_exact_snapshot_and_body_hashes(self):
         total = 0
@@ -68,7 +134,7 @@ class Snapshot(unittest.TestCase):
         for name, record in self.manifest['sourceFiles'].items():
             tree = ast.parse((HERE / name).read_text(), filename=name)
             original_body = ast.Module(body=tree.body[1:], type_ignores=tree.type_ignores)
-            digest = hashlib.sha256(ast.dump(original_body, include_attributes=False).encode()).hexdigest()
+            digest = hashlib.sha256(stable_ast(original_body).encode()).hexdigest()
             self.assertEqual(digest, record['normalizedAstSha256'], name)
 
     def test_declared_redactions_only(self):

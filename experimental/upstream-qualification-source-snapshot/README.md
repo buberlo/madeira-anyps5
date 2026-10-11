@@ -27,6 +27,32 @@ latest15 native suites had real failures; later corrections do not rewrite them.
 The latest16 HLE recipe's presence does not establish an exported qualified
 archive, Windows/iPad execution, GPU output or playable MiniGolf.
 
+The additional `qualification` snapshots preserve the authored latest16 audit,
+loaded PRX runner, compiler command builder, their control tests and the exact
+`ccc02baf` process helper. The helper closes captured streams and process transport
+after joining owned children and process groups; it is preserved here without
+replacing the existing public runnable helper. The 12 earlier snapshots retain
+their exact bytes. All source copies remain nonrunnable.
+
+The held latest16 PRX recipe declared six stale historical source rows but
+initially excluded only three. Its saved source remains the failing preparation
+candidate. The separate history successor excludes exactly the six declared
+paths while binding the current replacement sources; it passed 64 portable
+controls, including an actual preparation acquisition prefix that stops before
+opening an archive or writing a plan. This does not establish an executed loaded
+PRX test or a completed HLE archive. The successor must be rebound if production
+source changes; its presence asserts no runtime qualification.
+
+The latest17 additive copies preserve both root promotion/full-HLE recipes and
+the held audit/PRX/compiler/control sources rebound to the actual17 preparation
+and fresh build/archive paths. All 28 previous snapshots remain exact; the archive
+now contains 46 nonrunnable sources. The source review/preparation identities are
+recorded as source provenance, separately from execution. These saved recipes
+retain 47 modules, all49 host targets, four exact ShaderMemory modes, the fixed
+arena, mixed355/538 proof/compiler scope, null12 and nine legacy-to17 replays.
+Their 45/66 portable controls pass. No actual completed archive, loaded PRX
+qualification or execution result is included or inferred from these snapshots.
+
 The small ColorXOR source-control recipe is also preserved. Its original checks
 read the held upstream equation header and candidate C++ fixture, so the archived
 recipe is not a standalone portable C++ or GPU test. The public patch contains the
@@ -34,6 +60,8 @@ fixture correction; this archive retains the authored Python control logic only.
 
 Portable verification parses source as data and checks hashes, transformations,
 inert module guards, inventory and privacy. It never imports a snapshot:
+Empty generic-type AST fields added by newer Python versions are normalized so
+the original AST hashes stay portable; source and snapshot bytes remain exact.
 
 ```sh
 python3 -I -B -m unittest discover -s experimental/upstream-qualification-source-snapshot -p test_snapshot.py

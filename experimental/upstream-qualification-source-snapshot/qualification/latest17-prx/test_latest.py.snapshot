@@ -1,0 +1,59 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import tempfile
+import types
+import unittest
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+def load(name,path):
+    spec=importlib.util.spec_from_file_location(name,path)
+    value=importlib.util.module_from_spec(spec);spec.loader.exec_module(value);return value
+m=load('latest17_runner',HERE/'run.py')
+retained_tests=load('latest17_fake_runner',HERE/'test_runner.py')
+
+class LatestOrigin(unittest.TestCase):
+    def test_exact_actual_latest17_actual_source_tuple(self):
+        raw=m.PREPARATION.read_bytes();p=json.loads(raw)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),m.PREPARATION_SHA)
+        self.assertEqual(p['upstreamCommit'],m.TARGET)
+        self.assertEqual((len(p['patches']),len(p['sourceFiles'])),(17,2137))
+        self.assertEqual(p['source'],str(m.SOURCE))
+
+    def test_retained_twelve_patch_plan_refused_before_module_or_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p=Path(directory)/'plan.json'
+            p.write_text(json.dumps({'schema':1,'status':'prepared_current_v5_loaded_prx_cpu_qualification_not_executed'}))
+            with patch.object(m,'load') as loaded,self.assertRaisesRegex(ValueError,'latest seventeen-patch'):
+                m.execute(types.SimpleNamespace(plan=p,plan_sha=m.sha(p)))
+            loaded.assert_not_called()
+            self.assertEqual(sorted(x.name for x in p.parent.iterdir()),['plan.json'])
+
+    def test_real_orchestration_strips_loader_and_cache_overrides_for_every_child(self):
+        values={'DYLD_LIBRARY_PATH':'/foreign','DYLD_INSERT_LIBRARIES':'/foreign/injected',
+                'CCACHE_PREFIX':'foreign-tool','CCACHE_DIR':'/foreign/cache','UNCHANGED_TEST_ENV':'kept'}
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,values):
+            result,labels=retained_tests.InjectedExecution().execute(Path(directory),check_environment=True)
+        self.assertTrue(result['ownedPrefixJoined'] and result['allOwnedChildrenJoined'])
+        self.assertIn('prefix-init',labels);self.assertIn('prefix-graceful-wait',labels)
+        self.assertEqual(len(result['fullReplays']),9)
+
+
+class CurrentPublicScope(unittest.TestCase):
+    def test_loaded_fixture_is_exact_current_mixed_guard_source(self):
+        preparation=json.loads(m.PREPARATION.read_text())
+        expected=preparation['projectFixtureSourceFiles']['tools/checks/native-shader/ExtendedPublicShaderCases.cpp']
+        self.assertEqual(hashlib.sha256((HERE/'loaded-public-cases.cpp').read_bytes()).hexdigest(),expected)
+        self.assertEqual((HERE/'loaded-public-cases.cpp').read_bytes(),(m.ROOT/'tools/checks/native-shader/ExtendedPublicShaderCases.cpp').read_bytes())
+        commands=load('latest17_commands',HERE/'compile_v5.py').compile_commands(m.ROOT,Path('/local/wine'),output=m.BASE/('current-prx-qualification-'+'0'*32)/'runtime')
+        source=load('latest17_commands_win',HERE/'compile_v5.py').win(HERE/'loaded-public-cases.cpp')
+        self.assertIn(source,commands[0]['argv'])
+        self.assertNotIn(load('latest17_old_path',HERE/'compile_v5.py').win(m.RECIPE/'loaded-public-cases.cpp'),commands[0]['argv'])
+
+if __name__=='__main__':unittest.main()

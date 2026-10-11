@@ -1,0 +1,24 @@
+"""Exact historical fixture source mapping only; no baseline replay/device."""
+import copy,importlib.util,json,unittest
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('fixture674_source',HERE/'providers.py');v=importlib.util.module_from_spec(sp);sp.loader.exec_module(v)
+LOGICAL=str(v.ROOT/'upstreams/AnyPS5/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp')
+EXPECTED='0f6223f5e1d66eb07021166a84c77f6f7b2ebfd54ea4d3137a64aa5b1aa8e328'
+class Fixture674(unittest.TestCase):
+ def setUp(self):self.mapping=json.loads((HERE/'source-relocations.json').read_text());self.row=self.mapping['rows'][LOGICAL]
+ def test_one_exact_addition_preserves_all_old673_rows(self):
+  old=json.loads((HERE.parent/'initial-own59-quiescence-ordered-evidence-preserved-source-update-proposal/source-relocations.json').read_text())
+  self.assertEqual(self.mapping['count'],674);self.assertEqual(set(self.mapping['rows'])-set(old['rows']),{LOGICAL})
+  self.assertEqual({k:self.mapping['rows'][k]for k in old['rows']},old['rows'])
+  self.assertEqual({k:x for k,x in self.mapping.items()if k not in ['rows','count']},{k:x for k,x in old.items()if k not in ['rows','count']})
+ def test_actual_binding_expected_fixture_resolves_exact_retained_bytes(self):
+  binding=json.loads((v.ROOT/'build/minigolf-upstream-20261010/native59-device-prep/exact-current-python-observed58-diagnostic-update-proposal/installation-binding.json').read_text())
+  self.assertEqual(v.sha(HERE/'source-relocations.json'),v.MAP_SHA);self.assertEqual(binding['inputs'][LOGICAL],EXPECTED)
+  self.assertEqual(self.row['sha256'],EXPECTED);self.assertEqual(self.row['bytes'],67792)
+  view=v.View({LOGICAL:self.row});self.assertEqual(view.physical_map({LOGICAL:EXPECTED}),{self.row['path']:EXPECTED});self.assertEqual(v.sha(view.file(LOGICAL)),EXPECTED)
+ def test_current_digest_cannot_replace_historical_expected_fixture(self):
+  current=v.sha(LOGICAL);self.assertNotEqual(current,EXPECTED)
+  row=copy.deepcopy(self.row);row['sha256']=current
+  with self.assertRaises(ValueError):v.View({LOGICAL:row})
+if __name__=='__main__':unittest.main()

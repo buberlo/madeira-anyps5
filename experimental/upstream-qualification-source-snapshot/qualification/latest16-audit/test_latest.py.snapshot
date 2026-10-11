@@ -1,0 +1,45 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import copy
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location('latest_audit',HERE/'audit.py')
+a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+
+class LatestOrigin(unittest.TestCase):
+    def test_exact_actual_latest16_actual_preparation(self):
+        raw=a.PREPARATION.read_bytes();p=json.loads(raw)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),a.PREPARATION_SHA)
+        self.assertEqual(p['upstreamCommit'],a.TARGET)
+        self.assertEqual((len(p['patches']),len(p['sourceFiles'])),(16,2137))
+        self.assertEqual(p['source'],str(a.SOURCE))
+
+    def test_previous_a11c_origin_refused_before_provider_reads(self):
+        p=json.loads(a.PREPARATION.read_bytes())
+        p['upstreamCommit']='a11c8f7f70a0ed4e71504a89de69e8cdae687817'
+        with patch.object(a,'read') as read,self.assertRaisesRegex(ValueError,'Exact latest'):
+            a.source_replay(p)
+        read.assert_not_called()
+
+    def test_current_map_replays_every_declared_source_digest(self):
+        p=json.loads(a.PREPARATION.read_bytes());seen=[]
+        def read(path):
+            if Path(path).is_relative_to(a.SOURCE):
+                name=Path(path).relative_to(a.SOURCE).as_posix();seen.append(name)
+                digest=p['sourceFiles'][name]
+            elif Path(path).relative_to(a.ROOT).as_posix() in p['projectFixtureSourceFiles']:
+                digest=p['projectFixtureSourceFiles'][Path(path).relative_to(a.ROOT).as_posix()]
+            else:digest=p['expectedOrderedPublicCaseNamesSha256']
+            return b'fake-source-boundary',digest
+        with patch.object(a,'read',side_effect=read):a.source_replay(p)
+        self.assertEqual(set(seen),set(p['sourceFiles']))
+        self.assertEqual(len(seen),2137)
+
+if __name__=='__main__':unittest.main()

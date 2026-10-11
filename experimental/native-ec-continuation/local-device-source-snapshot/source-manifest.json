@@ -21,6 +21,43 @@
       "redactions": [],
       "sourceSha256": "3234d02fef590c7b19718816fd69fefaf325d6e87f78313eb89e795f22fb061e"
     },
+    "fixture674-own59-quiescence-original50/composition.py.snapshot": {
+      "byteIdentical": false,
+      "redactions": [
+        "pre-cleanup.<LOCAL_LOG_LEAF>"
+      ],
+      "sourceSha256": "9fce2933613aa5f9fb8ab69ffe7a04b9e5d030764ec67e1fdd8f3e9b1c06027a"
+    },
+    "fixture674-own59-quiescence-original50/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "5477ffe6af58ef01b1235d2fb3b15e653ca28c2d3e3f44b086a4a39552713eb1"
+    },
+    "fixture674-own59-quiescence-original50/test_route.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "d69e1350e4ec296f26520c709c385a6a0f0c2adb105a49ad71e4ddb15b36587f"
+    },
+    "fixture674-own59-quiescence-updater60/make_review.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "364740cc4e9e4f3ea6fc9e6b88fb79a1b04b083ecfb3c9e326a540064c7e72c4"
+    },
+    "fixture674-own59-quiescence-updater60/providers.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "5cc4973c5f3c81eaac52b03679c57f99f7de0de06b74bd8d5876bf0f000ccbc2"
+    },
+    "fixture674-own59-quiescence-updater60/test_fixture674.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "0dce00b67f27d3576571f227786a53631cc2a861a80ad2132c65cd01499bd76f"
+    },
+    "fixture674-own59-quiescence-updater60/test_observed.py.snapshot": {
+      "byteIdentical": true,
+      "redactions": [],
+      "sourceSha256": "be087c8c94361b18c02b21fc20943fd9de62f274fd68201cdb5284257c63de85"
+    },
     "initial-own59-quiescence-original50/composition.py.snapshot": {
       "byteIdentical": false,
       "redactions": [
@@ -324,9 +361,16 @@
   "deviceActions": false,
   "deviceIdentifierIncluded": false,
   "files": {
-    "README.md": "4599099b57b6b32767784c8f042692bc140f6fcdb869c64c340dd15aa0c05f88",
+    "README.md": "ca126c9db5e3344005e51068ba08de30c93c6c96884a9e88a3cfe97f4658d89c",
     "current59-retention/read_current.py.snapshot": "44cf8ae8ee0fdde7e6415bab960b35d42dd1c4f68e85cecaa3b945ccd777b8d9",
     "current59-retention/test_read_current.py.snapshot": "3234d02fef590c7b19718816fd69fefaf325d6e87f78313eb89e795f22fb061e",
+    "fixture674-own59-quiescence-original50/composition.py.snapshot": "6d0f29f7532f007ce5ac5d11b4766891488fcc8b3187ce4d5b44686a69dd53e6",
+    "fixture674-own59-quiescence-original50/make_review.py.snapshot": "5477ffe6af58ef01b1235d2fb3b15e653ca28c2d3e3f44b086a4a39552713eb1",
+    "fixture674-own59-quiescence-original50/test_route.py.snapshot": "d69e1350e4ec296f26520c709c385a6a0f0c2adb105a49ad71e4ddb15b36587f",
+    "fixture674-own59-quiescence-updater60/make_review.py.snapshot": "364740cc4e9e4f3ea6fc9e6b88fb79a1b04b083ecfb3c9e326a540064c7e72c4",
+    "fixture674-own59-quiescence-updater60/providers.py.snapshot": "5cc4973c5f3c81eaac52b03679c57f99f7de0de06b74bd8d5876bf0f000ccbc2",
+    "fixture674-own59-quiescence-updater60/test_fixture674.py.snapshot": "0dce00b67f27d3576571f227786a53631cc2a861a80ad2132c65cd01499bd76f",
+    "fixture674-own59-quiescence-updater60/test_observed.py.snapshot": "be087c8c94361b18c02b21fc20943fd9de62f274fd68201cdb5284257c63de85",
     "initial-own59-quiescence-original50/composition.py.snapshot": "eace1983d3cf6a5f3b0e8a069d50b42bc809daacf3453a603791e008d5ae0ecb",
     "initial-own59-quiescence-original50/make_review.py.snapshot": "dd8fb035b75bc660041980c3f02fd3adc21e0d5ebf0d9bf91b74da248277360e",
     "initial-own59-quiescence-original50/test_route.py.snapshot": "46c826bd54a0311ecc34d47232aca9bee28b54fb3f314d9df31eb09acb8cf5fc",
@@ -370,7 +414,7 @@
     "partial-retention-updater60/test_partial.py.snapshot": "bf7b0742a99eb68c4e0623bb63439a07650aeaba0fa3e9eb85743022d7ac38ce",
     "runtime-ready-original50/composition.py.snapshot": "dd5f4171cf7b884e833959f658902550dbfce23b25f75a408d1a15fa0a82c37c",
     "runtime-ready-original50/test_route.py.snapshot": "7e3268133aea2f7e0fe0a7a728d9bedee0366c087f02731b1381a2dcc0e5f148",
-    "test_snapshot.py": "50c48d13662b682de21dc3ac02397d609bfb423193e0a29e3fc1a24839934df7",
+    "test_snapshot.py": "1eee00bc4fe96eed79e81db585be3923624469d122d142c61bcdd5b4e4749bdc",
     "updater60/binding.py.snapshot": "e1ab62cb52229d99e7e366091c8c32147b18746a7f0420a59259824149ebd165",
     "updater60/install.py.snapshot": "5222e081f9fef974d869836b742bfd9423f394270e89fd27666ac9bc8d20995b",
     "updater60/make_review.py.snapshot": "5dbf4757b50e85226e53245f22034e6597fe9625b92d6699d93e2363b06f753b",
@@ -380,6 +424,11 @@
     "updater60/support.py.snapshot": "477a6ce8a45fcd317fd60db82849f3ecca0d31bfbe91f35ae22916039cfbda2f",
     "updater60/test_native60.py.snapshot": "eccd8a12e4d4ac01ed68602cf5cbd0296ccccf7a212daef16afd7a6f84fcc1f5"
   },
+  "fixture674CanonicalSourcesChanged": false,
+  "fixture674HistoricalExpectedHashesRewritten": false,
+  "fixture674Original50InstallationPinsPending": true,
+  "fixture674Original50SourceControls": 27,
+  "fixture674UpdaterSourceControls": 54,
   "initialOwn59QuiescenceDeviceExecuted": false,
   "initialOwn59QuiescenceFutureInstallPolicyUnchanged": true,
   "initialOwn59QuiescenceOriginal50InstallationPinsPending": true,
@@ -389,6 +438,8 @@
   "initialOwn59QuiescenceSourceControls": 48,
   "localSourceReviews": {
     "current59Retention": "a3ba5388a9fa48073dfa847659b3134bddfe94e49ffeb2e5ea583837c14543cc",
+    "fixture674Original50PendingSource": "b7c347a00d163faadbe646bdd69a2afdc08691b1c49acd3f3b9ce329d4fd7126",
+    "fixture674UpdaterSource": "fc1fe462eef98b845a6f06b71f3e6c0bba9b63c15fda93d5840840b1c4c07c06",
     "initialOwn59QuiescenceOriginal50PendingSource": "22bdf25004f65d666ca2acadb68fa876fb811c27d0a0d450a47940241cba5e0a",
     "initialOwn59QuiescencePendingSource": "bf3ffef198039f8b49c14f43df70b400012bb7ef671c0c5a5b2665821e6f2834",
     "observed59InitialAdoptionPendingDraft": "1746f112ecd34d82f4c2f63b6ad0c935dbae786f8fc9e45a6edfab5e81e39152",

@@ -45,9 +45,9 @@ source pin is updated.
 ## Complete main refresh, 2026-10-12
 
 AnyPS5 includes all **1,735 merged commits** after `c963432d`, including
-Apple fixes #1776, #1831 and #2015. Sixteen reconciled patches retain the
+Apple fixes #1776, #1831 and #2015. Seventeen reconciled patches retain the
 iPad runtime and strict shader/resource contracts. Fresh application and
-reversal pass all 64 commands. Both actual source checkouts match all 2,137
+reversal pass all 68 commands. Both actual source checkouts match all 2,137
 files and modes; eleven dependency trees are initialized at their exact
 recorded commits and clean.
 

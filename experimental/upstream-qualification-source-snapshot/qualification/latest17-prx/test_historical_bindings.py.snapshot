@@ -1,0 +1,165 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+"""Actual preparation acquisition with tiny sources, before any archive read."""
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import types
+import unittest
+from unittest.mock import patch
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('historical_consumer', HERE / 'run.py')
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+EXACT_HISTORICAL = {
+    'tools/checks/anyps5_null_pixel_materialization.cpp',
+    'tools/checks/windows_public_fixture.py',
+    'tools/checks/test_windows_public_fixture.py',
+    'tools/checks/native-shader/ExtendedPublicShaderCases.cpp',
+    'upstreams/AnyPS5/core/libs/prx/libSceAgcDriver/CMakeLists.txt',
+    'upstreams/AnyPS5/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp',
+}
+
+
+class ArchiveNotAcquired(Exception):
+    pass
+
+
+class HistoricalBindings(unittest.TestCase):
+    def acquisition(self, root, *, stale_extra=False, drift=None):
+        """Run the real prepare() input-acquisition prefix with fake sources.
+
+        All six historical rows have wrong old hashes. Current replacements
+        remain exact reviewed inputs. The archive boundary is an explicit
+        sentinel; no HLE/helper load, ZIP read or plan write is possible.
+        """
+        root = root.resolve()
+        here = root / 'build/current-runner'
+        recipe = root / 'build/retained-recipe'
+        here.mkdir(parents=True)
+        recipe.mkdir(parents=True)
+        current = {}
+        for name in sorted(EXACT_HISTORICAL):
+            replacement = name.replace('upstreams/AnyPS5/', 'build/current-private-source/')
+            p = root / replacement
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(('current replacement: ' + name).encode())
+            current[replacement] = hashlib.sha256(p.read_bytes()).hexdigest()
+        stable = root / 'scripts/retained.py'
+        stable.parent.mkdir()
+        stable.write_bytes(b'retained exact recipe input')
+        old_inputs = {name: '0' * 64 for name in EXACT_HISTORICAL}
+        old_inputs['scripts/retained.py'] = hashlib.sha256(stable.read_bytes()).hexdigest()
+        if stale_extra:
+            extra = root / 'scripts/unreviewed.py'
+            extra.write_bytes(b'changed unreviewed input')
+            old_inputs['scripts/unreviewed.py'] = '0' * 64
+        review = here / 'source-review.json'
+        review.write_text(json.dumps({'inputs': current}))
+        retained = recipe / 'source-review.json'
+        retained.write_text(json.dumps({'inputs': old_inputs}))
+        if drift is not None:
+            (root / drift).write_bytes(b'changed current replacement')
+        args = types.SimpleNamespace(
+            source_review_sha=m.sha(review), hle=root / 'never-read.zip', hle_sha='0' * 64,
+            provenance=root / 'never-read.json', provenance_sha='0' * 64,
+            plan=here / 'must-not-create-plan.json')
+        original = m.checked
+        checked_names = []
+        def checked(path, expected=None):
+            path = Path(path)
+            checked_names.append(path.relative_to(root).as_posix())
+            if path == args.hle:
+                raise ArchiveNotAcquired('source acquisition completed; no archive opened')
+            return original(path, expected)
+        with patch.multiple(m, ROOT=root, HERE=here, RECIPE=recipe,
+                            RECIPE_REVIEW_SHA=m.sha(retained)), \
+             patch.object(m, 'checked', side_effect=checked), \
+             patch.object(m, 'load') as load, \
+             patch.object(m.zipfile, 'ZipFile') as archive, \
+             patch.object(m, 'save') as save:
+            try:
+                m.prepare(args)
+            finally:
+                load.assert_not_called()
+                archive.assert_not_called()
+                save.assert_not_called()
+                self.assertFalse(args.plan.exists())
+                self.assertFalse(args.hle.exists())
+
+    def test_only_the_exact_six_declared_historical_rows(self):
+        self.assertEqual(m.HISTORICAL_REFERENCE_ROWS, EXACT_HISTORICAL)
+        review = json.loads((HERE / 'source-review.json').read_text())
+        self.assertEqual(set(review['historicalReferenceRowsNotConsumed']), EXACT_HISTORICAL)
+
+    def test_real_prepare_acquisition_accepts_all_six_stale_rows_only(self):
+        with tempfile.TemporaryDirectory() as d, self.assertRaises(ArchiveNotAcquired):
+            self.acquisition(Path(d))
+
+    def test_undeclared_stale_row_still_fails_before_archive_acquisition(self):
+        with tempfile.TemporaryDirectory() as d, self.assertRaisesRegex(ValueError, 'Input drift'):
+            self.acquisition(Path(d), stale_extra=True)
+
+    def test_current_public_replacement_drift_is_not_ignored(self):
+        with tempfile.TemporaryDirectory() as d, self.assertRaisesRegex(ValueError, 'Input drift'):
+            self.acquisition(Path(d), drift='tools/checks/native-shader/ExtendedPublicShaderCases.cpp')
+
+    def test_current_private_core_replacement_drift_is_not_ignored(self):
+        with tempfile.TemporaryDirectory() as d, self.assertRaisesRegex(ValueError, 'Input drift'):
+            self.acquisition(Path(d), drift='build/current-private-source/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp')
+
+    def test_actual_source_maps_bind_every_current_replacement(self):
+        preparation = json.loads(m.PREPARATION.read_text())
+        self.assertEqual(m.sha(m.PREPARATION), m.PREPARATION_SHA)
+        review = json.loads((HERE / 'source-review.json').read_text())
+        for name in EXACT_HISTORICAL:
+            if name.startswith('upstreams/AnyPS5/'):
+                key = name.removeprefix('upstreams/AnyPS5/')
+                path = m.SOURCE / key
+                expected = preparation['sourceFiles'][key]
+            elif name.endswith('ExtendedPublicShaderCases.cpp'):
+                path = m.ROOT / name
+                expected = preparation['projectFixtureSourceFiles'][name]
+            else:
+                replacement = ('null-pixel-materialization.cpp'
+                    if name.endswith('anyps5_null_pixel_materialization.cpp') else Path(name).name)
+                path = m.RECIPE / replacement
+                expected = review['inputs'][path.relative_to(m.ROOT).as_posix()]
+            self.assertEqual(m.checked(path, expected)['sha256'], expected)
+
+    def test_every_retained_nonhistorical_recipe_row_still_matches(self):
+        review = json.loads((m.RECIPE / 'source-review.json').read_text())
+        selected = {name: digest for name, digest in review['inputs'].items()
+                    if name not in EXACT_HISTORICAL}
+        self.assertEqual(len(selected), 44)
+        for name, digest in selected.items():
+            self.assertEqual(m.checked(m.ROOT / name, digest)['sha256'], digest)
+
+    def test_compiler_arguments_rebind_only_exact_latest17_build_and_copy(self):
+        def commands(path, name):
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module.compile_commands(m.ROOT, Path('/local/wine'),
+                output=m.BASE / ('current-prx-qualification-' + '0' * 32) / 'runtime')
+        old = m.ROOT / 'build/current-prx-latest16-historical-binding-successor-proposal'
+        before = commands(old / 'compile_v5.py', 'old_commands')
+        after = commands(HERE / 'compile_v5.py', 'new_commands')
+        old_arg = next(x for x in before[0]['argv'] if x.replace('\\', '/').endswith('/loaded-public-cases.cpp'))
+        new_arg = next(x for x in after[0]['argv'] if x.replace('\\', '/').endswith('/loaded-public-cases.cpp'))
+        before[0]['argv'][before[0]['argv'].index(old_arg)] = new_arg
+        for row in before:
+            row['argv'] = [arg.replace('winlibs-build-v5', 'winlibs-build-latest17') for arg in row['argv']]
+        self.assertEqual(before, after)
+        self.assertEqual(m.sha(old / 'loaded-public-cases.cpp'), m.sha(HERE / 'loaded-public-cases.cpp'))
+        self.assertEqual(m.sha(HERE / 'loaded-public-cases.cpp'),
+            '05ad56636a39991215a0de35961c38fda049a373f76a69b1ab4e506d32dbf5c4')
+
+
+if __name__ == '__main__':
+    unittest.main()

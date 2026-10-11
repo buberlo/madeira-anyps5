@@ -1,4 +1,6 @@
 {
+  "actualLoadedPrxPlanOrQualificationClaimed": false,
+  "astHashPolicy": "dump_without_attributes_and_empty_python312_type_params",
   "authoredLogicPreservedExceptDeclaredTransformations": true,
   "colorXorOriginalControlsRequireHeldSourceAndCandidate": true,
   "compilerWineDeviceActions": false,
@@ -10,14 +12,64 @@
   "gameAssetsIncluded": false,
   "guardPrefix": "# Archival source snapshot only. Never execute or import this module.\nraise RuntimeError(\"Snapshot-only module; use reviewed current tooling instead.\")\n\n",
   "historicalFailuresRelabeled": false,
-  "portableSourceControlCount": 7,
+  "latest17ActualPreparationSha256": "da870f22304abc131b3ac2ccb5eb7f42fbd197b7aa2fd8f2febd8f912486e681",
+  "latest17ActualSourceReviewSha256": "dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44",
+  "latest17AuthoredRecipesPreserved": true,
+  "latest17ExecutionResultsIncluded": false,
+  "latest17SourceOrRuntimeQualificationClaimed": false,
+  "portableSourceControlCount": 10,
+  "previousTwentyEightSnapshotSha256": {
+    "color-xor/test_fixture.py.snapshot": "e1b07269e13b43e2366f953c3ac1af4497fcb5b8f460c9fcb062a7bbe3263bd2",
+    "qualification/latest16-audit/audit.py.snapshot": "62d7d1e19f0b9322e3558e723be7dd74857c4f9b2dd798ffddcaa4eeabbc16a2",
+    "qualification/latest16-audit/test_audit.py.snapshot": "95d97cde3d9c57decc4bce5549ee39d4c51f62614eece8677eb0f690f288d668",
+    "qualification/latest16-audit/test_latest.py.snapshot": "927cf8fe534b7c9b8501f4f04b8a85a1855b0d5f7c15ec6a97d4e647c8e9e4ed",
+    "qualification/latest16-audit/test_shader_memory.py.snapshot": "f6d8ba58769c7e4e605761d87d76583c9a9fdea65a2b15f5eb1395de7cfc0516",
+    "qualification/latest16-history-successor/compile_v5.py.snapshot": "4bec469f3fe9526621be5063c42c6aee9dc5cf3c084258a17b40454e49a38ab9",
+    "qualification/latest16-history-successor/run.py.snapshot": "eaa6f1b43717b848b9022cf5551f72dd513db06f05372a8a98552f1e19f6472f",
+    "qualification/latest16-history-successor/test_historical_bindings.py.snapshot": "2eafea3cce64b058d3f30ea8f1e0398bb878a5dcf660f1f66c8075de2773227e",
+    "qualification/latest16-prx/bounded_local_process.py.snapshot": "83a0f3b58bc8a273f4a9f6aab469db5feb68bdd849229916f9616630cc17bbf1",
+    "qualification/latest16-prx/compile_v5.py.snapshot": "388556e25086588bd2b61a26d06f36376a0c3279eee3bd4ab65151530d1d1a6e",
+    "qualification/latest16-prx/run.py.snapshot": "0ae6e1f52deeb472fac3941aa61335e12fe5b71c4cf3b32e56f07fde1da82eff",
+    "qualification/latest16-prx/test_arena.py.snapshot": "bd4abeba23b7b7da8c32f557bec34bce2bb89171e15b77db9848d267a60e7de7",
+    "qualification/latest16-prx/test_bounded_local_process.py.snapshot": "c02820bf406b45ab3ac38d7740382d157d577d3b56192f0a1f551b03eb38278d",
+    "qualification/latest16-prx/test_latest.py.snapshot": "5e9e99c407c33ec003df17cec7e001e2ddfb7e31fab0f26f25ef8a5f5caa4caf",
+    "qualification/latest16-prx/test_runner.py.snapshot": "628ca335419959188a2ea8c5d799057a69537d12f45d3e5fce6c1614b0a98a0f",
+    "qualification/latest16-prx/test_shader_memory.py.snapshot": "6e0bf1384cc4917f6f6c8d69cc2566d4044367a06883f3e01f4bc768bf9c2db2",
+    "qualification/latest16-prx/test_v5.py.snapshot": "27c3d19d562fd85082bec46fab5df19ffa4cf61e9325907a53831451ae0b2ff2",
+    "root/apply-proof-fixture-successor.py.snapshot": "fa031c9bfec9b8f98cf33e7c8fd68d69225eaaa4c260b6295b4442a87eb3c938",
+    "root/promote-latest15.py.snapshot": "b185070afa1fa1a43546e0ceef1535860b6a92a988d45cfcd963c8c65320adce",
+    "root/promote-latest16.py.snapshot": "982ced725454597e73f7a96bf09814262f8a76365bc464bdd9c6f1032dc6c62e",
+    "root/run-current-shader-memory.py.snapshot": "f32b34014275fe9bc9adec2d6b8fae8a67c0a2eb8a8972cd8f28316b4bd79190",
+    "root/run-full-hle-latest16.py.snapshot": "3f0ec329d94c31d51e267a61618dd289f3ad0821250caf11afd99b84deb36423",
+    "root/run-native-latest15-fixture-successor.py.snapshot": "4c3616f779610b337e6a9efe2351ed4e9557fd5eee8b16d0632309ae66368659",
+    "root/run-native-latest15.py.snapshot": "767b8967019a035168b7df2a3dfd7159bcbef681bc7590172b28d3df9383a751",
+    "targeted/graphics-exact-barycentric-proof-fallback-proposal/run-targeted.py.snapshot": "32eab5f3bf0f1fc0928da7275ec2dd2b7eb3aec9fc8dd0b6f5a29e08c178b1fe",
+    "targeted/graphics-grouped-stencil-fixture-proposal/run-targeted.py.snapshot": "a50c0e98d7208b6f4103efca138765bc6b91d7931a4d3f5df9507085e5ae2c44",
+    "targeted/graphics-stencil-and-reserved-fixture-proposal/run-targeted.py.snapshot": "0309122db13d65d44c07e6996937c8e38145ff9983e1f02bb053f1d0c1bfc75e",
+    "targeted/graphics-stencil-fixture-complete-proposal/run-targeted.py.snapshot": "3aa7b60f1ebd4ab278765dd9b44a6db80e1780fe58f43afe9ebe8e10a7868f29"
+  },
+  "priorTwelveSnapshotSha256": {
+    "color-xor/test_fixture.py.snapshot": "e1b07269e13b43e2366f953c3ac1af4497fcb5b8f460c9fcb062a7bbe3263bd2",
+    "root/apply-proof-fixture-successor.py.snapshot": "fa031c9bfec9b8f98cf33e7c8fd68d69225eaaa4c260b6295b4442a87eb3c938",
+    "root/promote-latest15.py.snapshot": "b185070afa1fa1a43546e0ceef1535860b6a92a988d45cfcd963c8c65320adce",
+    "root/promote-latest16.py.snapshot": "982ced725454597e73f7a96bf09814262f8a76365bc464bdd9c6f1032dc6c62e",
+    "root/run-current-shader-memory.py.snapshot": "f32b34014275fe9bc9adec2d6b8fae8a67c0a2eb8a8972cd8f28316b4bd79190",
+    "root/run-full-hle-latest16.py.snapshot": "3f0ec329d94c31d51e267a61618dd289f3ad0821250caf11afd99b84deb36423",
+    "root/run-native-latest15-fixture-successor.py.snapshot": "4c3616f779610b337e6a9efe2351ed4e9557fd5eee8b16d0632309ae66368659",
+    "root/run-native-latest15.py.snapshot": "767b8967019a035168b7df2a3dfd7159bcbef681bc7590172b28d3df9383a751",
+    "targeted/graphics-exact-barycentric-proof-fallback-proposal/run-targeted.py.snapshot": "32eab5f3bf0f1fc0928da7275ec2dd2b7eb3aec9fc8dd0b6f5a29e08c178b1fe",
+    "targeted/graphics-grouped-stencil-fixture-proposal/run-targeted.py.snapshot": "a50c0e98d7208b6f4103efca138765bc6b91d7931a4d3f5df9507085e5ae2c44",
+    "targeted/graphics-stencil-and-reserved-fixture-proposal/run-targeted.py.snapshot": "0309122db13d65d44c07e6996937c8e38145ff9983e1f02bb053f1d0c1bfc75e",
+    "targeted/graphics-stencil-fixture-complete-proposal/run-targeted.py.snapshot": "3aa7b60f1ebd4ab278765dd9b44a6db80e1780fe58f43afe9ebe8e10a7868f29"
+  },
   "privateOriginalsPreserved": true,
   "privateProviderMapsIncluded": false,
+  "qualificationRecipeSnapshotsIncluded": true,
   "rawLogsOrReceiptsIncluded": false,
   "runtimeOrGameplayQualificationClaimed": false,
   "schema": 1,
-  "snapshotBytes": 35307,
-  "snapshotCount": 12,
+  "snapshotBytes": 370886,
+  "snapshotCount": 46,
   "snapshotModulesImportedOrExecuted": false,
   "sourceFiles": {
     "color-xor/test_fixture.py.snapshot": {
@@ -38,6 +90,710 @@
       ],
       "snapshotBytes": 3327,
       "snapshotSha256": "e1b07269e13b43e2366f953c3ac1af4497fcb5b8f460c9fcb062a7bbe3263bd2"
+    },
+    "qualification/latest16-audit/audit.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "9d542c879a1d348fd8486859eaab848f02a45f38fa48bf9b67b5483824bf353c",
+      "normalizedAstSha256": "06ac1b023e705190251cd9ba13b41de17c9c97ef0f6195642cbc0ec9d4d1d20c",
+      "normalizedSha256": "45c4394c5b045e538d0c14ac9ef7bf4ed65e2bd2caa81e292aa23781d98528f1",
+      "originalBytes": 16298,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest16-postbuild-audit-proposal/audit.py",
+      "originalSha256": "45c4394c5b045e538d0c14ac9ef7bf4ed65e2bd2caa81e292aa23781d98528f1",
+      "originalSourceStatus": "held_latest16_postbuild_audit_source_only_actual_audit_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 16451,
+      "snapshotSha256": "62d7d1e19f0b9322e3558e723be7dd74857c4f9b2dd798ffddcaa4eeabbc16a2"
+    },
+    "qualification/latest16-audit/test_audit.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "9d542c879a1d348fd8486859eaab848f02a45f38fa48bf9b67b5483824bf353c",
+      "normalizedAstSha256": "efb171eeb9c558f29d151844dd02f38392ed821a0a52f971949e559982068173",
+      "normalizedSha256": "f62f6ba9595017f99d68875fcd5b03c6085f418416bd060f7a961ae42b7198f1",
+      "originalBytes": 11222,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest16-postbuild-audit-proposal/test_audit.py",
+      "originalSha256": "f62f6ba9595017f99d68875fcd5b03c6085f418416bd060f7a961ae42b7198f1",
+      "originalSourceStatus": "held_latest16_postbuild_audit_source_only_actual_audit_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 11375,
+      "snapshotSha256": "95d97cde3d9c57decc4bce5549ee39d4c51f62614eece8677eb0f690f288d668"
+    },
+    "qualification/latest16-audit/test_latest.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "9d542c879a1d348fd8486859eaab848f02a45f38fa48bf9b67b5483824bf353c",
+      "normalizedAstSha256": "0d6cddf969a44b148abd6daa5589fedd68c53c7337d7ab38552891db3b41d5b6",
+      "normalizedSha256": "d515a82785d418cf8269d60c364c07e267677ccf62ce30186a41ac54da6ed972",
+      "originalBytes": 1936,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest16-postbuild-audit-proposal/test_latest.py",
+      "originalSha256": "d515a82785d418cf8269d60c364c07e267677ccf62ce30186a41ac54da6ed972",
+      "originalSourceStatus": "held_latest16_postbuild_audit_source_only_actual_audit_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 2089,
+      "snapshotSha256": "927cf8fe534b7c9b8501f4f04b8a85a1855b0d5f7c15ec6a97d4e647c8e9e4ed"
+    },
+    "qualification/latest16-audit/test_shader_memory.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "9d542c879a1d348fd8486859eaab848f02a45f38fa48bf9b67b5483824bf353c",
+      "normalizedAstSha256": "7fbbdb5655affb0ead60f2bddee4fe76eb99d0ca80f3ddd045554b122db54f83",
+      "normalizedSha256": "4179c173dca7c05fe406236db79b961a071be1a40a6f882482ef9ae4c0b4066b",
+      "originalBytes": 3793,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest16-postbuild-audit-proposal/test_shader_memory.py",
+      "originalSha256": "4179c173dca7c05fe406236db79b961a071be1a40a6f882482ef9ae4c0b4066b",
+      "originalSourceStatus": "held_latest16_postbuild_audit_source_only_actual_audit_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3946,
+      "snapshotSha256": "f6d8ba58769c7e4e605761d87d76583c9a9fdea65a2b15f5eb1395de7cfc0516"
+    },
+    "qualification/latest16-history-successor/compile_v5.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "ff2c57f55c806e8b456e41e6f62720b33e4d66c6b003b5b4a89b3d5cebf2a40b",
+      "normalizedAstSha256": "0d9f6b8038f33042898f9e8b9ab96571a314b59261ca26e74b2d869beb49b996",
+      "normalizedSha256": "1c8fe78919079ca82d1fde56ef81a325f67a6a89febc4ba9f9bd6440a391f20e",
+      "originalBytes": 4868,
+      "originalRelativePath": "build/current-prx-latest16-historical-binding-successor-proposal/compile_v5.py",
+      "originalSha256": "1c8fe78919079ca82d1fde56ef81a325f67a6a89febc4ba9f9bd6440a391f20e",
+      "originalSourceStatus": "source_only_exact_six_historical_rows_64_portable_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5021,
+      "snapshotSha256": "4bec469f3fe9526621be5063c42c6aee9dc5cf3c084258a17b40454e49a38ab9"
+    },
+    "qualification/latest16-history-successor/run.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "ff2c57f55c806e8b456e41e6f62720b33e4d66c6b003b5b4a89b3d5cebf2a40b",
+      "normalizedAstSha256": "5580a2fb22bf2043fa674cbc5f7dc360453185fe4f39c2f9152ede901f32f630",
+      "normalizedSha256": "4a94c8c68648592b42c6dbd4f1e4321ebebfd6572082b5192f1b22122e772a2a",
+      "originalBytes": 40522,
+      "originalRelativePath": "build/current-prx-latest16-historical-binding-successor-proposal/run.py",
+      "originalSha256": "4a94c8c68648592b42c6dbd4f1e4321ebebfd6572082b5192f1b22122e772a2a",
+      "originalSourceStatus": "source_only_exact_six_historical_rows_64_portable_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 40675,
+      "snapshotSha256": "eaa6f1b43717b848b9022cf5551f72dd513db06f05372a8a98552f1e19f6472f"
+    },
+    "qualification/latest16-history-successor/test_historical_bindings.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "ff2c57f55c806e8b456e41e6f62720b33e4d66c6b003b5b4a89b3d5cebf2a40b",
+      "normalizedAstSha256": "bb35e6481a7fd44146baaaf7a88d4ec23b2a0a1adb4753d90c17df33cd8cc698",
+      "normalizedSha256": "f8ddd4aade68c56d9526671c5804ad10c5e0bcfc47e6ec6ee1c73ae58685a6e0",
+      "originalBytes": 8127,
+      "originalRelativePath": "build/current-prx-latest16-historical-binding-successor-proposal/test_historical_bindings.py",
+      "originalSha256": "f8ddd4aade68c56d9526671c5804ad10c5e0bcfc47e6ec6ee1c73ae58685a6e0",
+      "originalSourceStatus": "source_only_exact_six_historical_rows_64_portable_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 8280,
+      "snapshotSha256": "2eafea3cce64b058d3f30ea8f1e0398bb878a5dcf660f1f66c8075de2773227e"
+    },
+    "qualification/latest16-prx/bounded_local_process.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "b552d69c2fa1dbe0e915ab37f325c683e86331378735f3f3d6f650e7913d4aa4",
+      "normalizedSha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6",
+      "originalBytes": 7486,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/bounded_local_process.py",
+      "originalSha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 7639,
+      "snapshotSha256": "83a0f3b58bc8a273f4a9f6aab469db5feb68bdd849229916f9616630cc17bbf1"
+    },
+    "qualification/latest16-prx/compile_v5.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "23c5a96a39ea1b4a1efa8bb2f685e2c9319e64e58e6f67c390644c19c945da90",
+      "normalizedSha256": "7a1580a404bece0dbffee49b5377a25f5d16d808b664597cf74d3f1ba7186849",
+      "originalBytes": 4857,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/compile_v5.py",
+      "originalSha256": "7a1580a404bece0dbffee49b5377a25f5d16d808b664597cf74d3f1ba7186849",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5010,
+      "snapshotSha256": "388556e25086588bd2b61a26d06f36376a0c3279eee3bd4ab65151530d1d1a6e"
+    },
+    "qualification/latest16-prx/run.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "af896725409459d1824bc7c5a995b1173e6c348f4251a167a79f734a2fe92f55",
+      "normalizedSha256": "07f5c01f7d03464bad45f882e0467999d0800d0378fe68a76b6f635d17f97672",
+      "originalBytes": 40302,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/run.py",
+      "originalSha256": "07f5c01f7d03464bad45f882e0467999d0800d0378fe68a76b6f635d17f97672",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 40455,
+      "snapshotSha256": "0ae6e1f52deeb472fac3941aa61335e12fe5b71c4cf3b32e56f07fde1da82eff"
+    },
+    "qualification/latest16-prx/test_arena.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "5a3a587bc0ce7b6fda459013b2e1eb2454cee7165a05c25d50d644fecf97cad6",
+      "normalizedSha256": "d0172f8ebf34eeca01a6bcbf32e56f3f4f0f7a5010f3b033ba6817d45f813b71",
+      "originalBytes": 5245,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_arena.py",
+      "originalSha256": "d0172f8ebf34eeca01a6bcbf32e56f3f4f0f7a5010f3b033ba6817d45f813b71",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5398,
+      "snapshotSha256": "bd4abeba23b7b7da8c32f557bec34bce2bb89171e15b77db9848d267a60e7de7"
+    },
+    "qualification/latest16-prx/test_bounded_local_process.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "eca5181196f3168ed00cbd4fab6e92c105489dfe89bccaf37c87ab4567f30497",
+      "normalizedSha256": "20b8a9cffd9c9a80f680c9b3466c8f3d2dfa049d09ba10cf46d4e111eaf979b6",
+      "originalBytes": 4544,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_bounded_local_process.py",
+      "originalSha256": "20b8a9cffd9c9a80f680c9b3466c8f3d2dfa049d09ba10cf46d4e111eaf979b6",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 4697,
+      "snapshotSha256": "c02820bf406b45ab3ac38d7740382d157d577d3b56192f0a1f551b03eb38278d"
+    },
+    "qualification/latest16-prx/test_latest.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "58590765b3d86c83cd5513a0e8191acdb38346113d613ab583f2075f857d9280",
+      "normalizedSha256": "509211eff2e684b03d72ce69bfbf6accfdb2031de2c7ddcd008bfea349b6d658",
+      "originalBytes": 3281,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_latest.py",
+      "originalSha256": "509211eff2e684b03d72ce69bfbf6accfdb2031de2c7ddcd008bfea349b6d658",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3434,
+      "snapshotSha256": "5e9e99c407c33ec003df17cec7e001e2ddfb7e31fab0f26f25ef8a5f5caa4caf"
+    },
+    "qualification/latest16-prx/test_runner.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "c0ff5b63dd531725790e445cf2cbf9df067a1e5536d95004eacff595d5e4d1ea",
+      "normalizedSha256": "6c361d5fb33bffca6263cfae85e2e53f8123ff56693b569698177ffe241837b1",
+      "originalBytes": 18838,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_runner.py",
+      "originalSha256": "6c361d5fb33bffca6263cfae85e2e53f8123ff56693b569698177ffe241837b1",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 18991,
+      "snapshotSha256": "628ca335419959188a2ea8c5d799057a69537d12f45d3e5fce6c1614b0a98a0f"
+    },
+    "qualification/latest16-prx/test_shader_memory.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "13295e9cc5bc0b256e1cb5ef5c97857cf10c0d67769f0ce5602d425f607264e4",
+      "normalizedSha256": "c07c62813bb7bb79828c3c1d6767bf12a376ef0af4a9f2567745591072f02e57",
+      "originalBytes": 3791,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_shader_memory.py",
+      "originalSha256": "c07c62813bb7bb79828c3c1d6767bf12a376ef0af4a9f2567745591072f02e57",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3944,
+      "snapshotSha256": "6e0bf1384cc4917f6f6c8d69cc2566d4044367a06883f3e01f4bc768bf9c2db2"
+    },
+    "qualification/latest16-prx/test_v5.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "943dddcd8d334af1ae4b7925ca51a8f58c8a01d0ceee53ca70b5aa2889b2473f",
+      "normalizedAstSha256": "fafe18d672ef37ab36734ea8070c7fb2ff7c7da806b9202b2acc92a626e5f840",
+      "normalizedSha256": "de59d0c0819a8513e3c96d99d8758d95aac4694248393d932799bb4cd6510e9e",
+      "originalBytes": 5956,
+      "originalRelativePath": "build/current-prx-latest16-host-arena-runner-proposal/test_v5.py",
+      "originalSha256": "de59d0c0819a8513e3c96d99d8758d95aac4694248393d932799bb4cd6510e9e",
+      "originalSourceStatus": "held_latest16_prx_source_only_prepare_blocked_by_three_stale_historical_rows",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 6109,
+      "snapshotSha256": "27c3d19d562fd85082bec46fab5df19ffa4cf61e9325907a53831451ae0b2ff2"
+    },
+    "qualification/latest17-audit/audit.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "3c631207ae5309f1c7bec24be4efa43a92466fc1bdd43766886288bb2b56f5bc",
+      "normalizedAstSha256": "4a535a5fd13966501e5dcc914c3a6899baf67eb80b7ecc537c3134f53121fd4f",
+      "normalizedSha256": "277445ee1ca7dceabd1711878575c8c075f993ac67c7ad849880ff2f52172649",
+      "originalBytes": 16310,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest17-postbuild-audit-proposal/audit.py",
+      "originalSha256": "277445ee1ca7dceabd1711878575c8c075f993ac67c7ad849880ff2f52172649",
+      "originalSourceStatus": "source_only_latest17_postbuild_audit_45_controls_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 16463,
+      "snapshotSha256": "2c62ebbce76c62a01c6be56ae8d16c42cb992406c39afe19554643f911c17e79"
+    },
+    "qualification/latest17-audit/test_audit.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "3c631207ae5309f1c7bec24be4efa43a92466fc1bdd43766886288bb2b56f5bc",
+      "normalizedAstSha256": "ce94ae55d80a86d3f8a4908554e9bf6919db4d19e3d8483bdeee16e339dfe085",
+      "normalizedSha256": "5848b28e6de2044f2dbda2ce25d7d6cbbf12a0d70039c9c0fdd49848a052d918",
+      "originalBytes": 11226,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest17-postbuild-audit-proposal/test_audit.py",
+      "originalSha256": "5848b28e6de2044f2dbda2ce25d7d6cbbf12a0d70039c9c0fdd49848a052d918",
+      "originalSourceStatus": "source_only_latest17_postbuild_audit_45_controls_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 11379,
+      "snapshotSha256": "929cdf36bf877e005f5f12c3c63be102daa4b858d380037f22d265e0c1b73e11"
+    },
+    "qualification/latest17-audit/test_latest.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "3c631207ae5309f1c7bec24be4efa43a92466fc1bdd43766886288bb2b56f5bc",
+      "normalizedAstSha256": "d7bd0065c4f3a7da1db1b8e5dbb9e5fa0dea054a510f0201f66ab6f6b148bea1",
+      "normalizedSha256": "25e3be7293f002f3205cc7f2503fe264baf24fd6da3074dc8ca83e1a10bab351",
+      "originalBytes": 1936,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest17-postbuild-audit-proposal/test_latest.py",
+      "originalSha256": "25e3be7293f002f3205cc7f2503fe264baf24fd6da3074dc8ca83e1a10bab351",
+      "originalSourceStatus": "source_only_latest17_postbuild_audit_45_controls_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 2089,
+      "snapshotSha256": "ed37862ff07ee91938e4b37598a08962a01185302ab7ae6a78017da61fda93d6"
+    },
+    "qualification/latest17-audit/test_shader_memory.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "3c631207ae5309f1c7bec24be4efa43a92466fc1bdd43766886288bb2b56f5bc",
+      "normalizedAstSha256": "7fbbdb5655affb0ead60f2bddee4fe76eb99d0ca80f3ddd045554b122db54f83",
+      "normalizedSha256": "4179c173dca7c05fe406236db79b961a071be1a40a6f882482ef9ae4c0b4066b",
+      "originalBytes": 3793,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest17-postbuild-audit-proposal/test_shader_memory.py",
+      "originalSha256": "4179c173dca7c05fe406236db79b961a071be1a40a6f882482ef9ae4c0b4066b",
+      "originalSourceStatus": "source_only_latest17_postbuild_audit_45_controls_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3946,
+      "snapshotSha256": "f6d8ba58769c7e4e605761d87d76583c9a9fdea65a2b15f5eb1395de7cfc0516"
+    },
+    "qualification/latest17-audit/test_source17.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "3c631207ae5309f1c7bec24be4efa43a92466fc1bdd43766886288bb2b56f5bc",
+      "normalizedAstSha256": "6692d90b55dc0e68b3ed5b6ff7ab2f6d8848bdf5e30461aca91e480915584ebe",
+      "normalizedSha256": "4e41630369c9d1a27d533112ded928df594987aa68899192a663ed58a16c118d",
+      "originalBytes": 2198,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/latest17-postbuild-audit-proposal/test_source17.py",
+      "originalSha256": "4e41630369c9d1a27d533112ded928df594987aa68899192a663ed58a16c118d",
+      "originalSourceStatus": "source_only_latest17_postbuild_audit_45_controls_not_executed",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 2351,
+      "snapshotSha256": "e013d7875a58a45fc13c7a52f49dc7a4b71f7562252959f70a63674c826ddfaa"
+    },
+    "qualification/latest17-prx/bounded_local_process.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "b552d69c2fa1dbe0e915ab37f325c683e86331378735f3f3d6f650e7913d4aa4",
+      "normalizedSha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6",
+      "originalBytes": 7486,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/bounded_local_process.py",
+      "originalSha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 7639,
+      "snapshotSha256": "83a0f3b58bc8a273f4a9f6aab469db5feb68bdd849229916f9616630cc17bbf1"
+    },
+    "qualification/latest17-prx/compile_v5.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "bea74eff0da9d6449803f7d6a460c3a1af895fe9450ef998cd475f9a96ebc826",
+      "normalizedSha256": "e52d6bb49e5824249b804e2d9d733742a1d8c120cf88a5bbb52396193032ef76",
+      "originalBytes": 4863,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/compile_v5.py",
+      "originalSha256": "e52d6bb49e5824249b804e2d9d733742a1d8c120cf88a5bbb52396193032ef76",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5016,
+      "snapshotSha256": "fb08d70f862955724c291b186851d4522937e0adb978482817aff6d6159be9be"
+    },
+    "qualification/latest17-prx/run.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "58b4e2c20f4247523b0c9ae2004a2a8a30e095aec079544d9295b8bf507ef911",
+      "normalizedSha256": "2e6895402bf03f8180492355254f3c8b0fe1ca6ffb39d85731b6265f8ace8ae2",
+      "originalBytes": 40534,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/run.py",
+      "originalSha256": "2e6895402bf03f8180492355254f3c8b0fe1ca6ffb39d85731b6265f8ace8ae2",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 40687,
+      "snapshotSha256": "cc23b8e896558b8b670ee0467fbd585ca6b513cb07e24aa2c973ad3007086107"
+    },
+    "qualification/latest17-prx/test_arena.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "708802f84b3b75b7402277c0b4202056ab26956eb39faa09908a8792f8287dce",
+      "normalizedSha256": "8ca1314606602751039a34d6676ec32e808316e0a03febc2bc0ed7af160cf26d",
+      "originalBytes": 5245,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_arena.py",
+      "originalSha256": "8ca1314606602751039a34d6676ec32e808316e0a03febc2bc0ed7af160cf26d",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5398,
+      "snapshotSha256": "611a98f4088ba34f5dc37ba131d5157ddaf2e83d15c76f3e44d50955b8f6cf93"
+    },
+    "qualification/latest17-prx/test_bounded_local_process.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "eca5181196f3168ed00cbd4fab6e92c105489dfe89bccaf37c87ab4567f30497",
+      "normalizedSha256": "20b8a9cffd9c9a80f680c9b3466c8f3d2dfa049d09ba10cf46d4e111eaf979b6",
+      "originalBytes": 4544,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_bounded_local_process.py",
+      "originalSha256": "20b8a9cffd9c9a80f680c9b3466c8f3d2dfa049d09ba10cf46d4e111eaf979b6",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 4697,
+      "snapshotSha256": "c02820bf406b45ab3ac38d7740382d157d577d3b56192f0a1f551b03eb38278d"
+    },
+    "qualification/latest17-prx/test_historical_bindings.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "dfd5240143055305ee3339cb1f3108e1015c328e0b570a5ddf59e407f8978edc",
+      "normalizedSha256": "50d63188e8dbdd26752ccf6539c4eb80436036f42d81c7a7605289b327712b9a",
+      "originalBytes": 8276,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_historical_bindings.py",
+      "originalSha256": "50d63188e8dbdd26752ccf6539c4eb80436036f42d81c7a7605289b327712b9a",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 8429,
+      "snapshotSha256": "8c0fdab8498a807f5d2955785a73efc39c42c198f06aca662103267b18aef9e7"
+    },
+    "qualification/latest17-prx/test_latest.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "5a21b48ba107b5e7770c04f20a143cc3b69dcc7bdc676d69560cc448568dc583",
+      "normalizedSha256": "37659c3f739d2d19b6f183e598cd41dd6daa6ea680f8d82cccfc484fce8186a1",
+      "originalBytes": 3283,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_latest.py",
+      "originalSha256": "37659c3f739d2d19b6f183e598cd41dd6daa6ea680f8d82cccfc484fce8186a1",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3436,
+      "snapshotSha256": "32d24e11cc6368796ad30eccd26688bdb047a945d654b9b4a0bf17cfa03937b4"
+    },
+    "qualification/latest17-prx/test_runner.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "7a1fcb9511c68074c1f3987d9a5437699960b7aa483a7516217840679148e043",
+      "normalizedSha256": "04566d6a6f1d8c0d2e9f07feadee9f172e226380e5bfeb754646cdbc3cf2e370",
+      "originalBytes": 18846,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_runner.py",
+      "originalSha256": "04566d6a6f1d8c0d2e9f07feadee9f172e226380e5bfeb754646cdbc3cf2e370",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 18999,
+      "snapshotSha256": "403cc6a01d859b647c8857cf9f5f3096592614f51413aa63fbf7f828c104a6af"
+    },
+    "qualification/latest17-prx/test_shader_memory.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "13295e9cc5bc0b256e1cb5ef5c97857cf10c0d67769f0ce5602d425f607264e4",
+      "normalizedSha256": "c07c62813bb7bb79828c3c1d6767bf12a376ef0af4a9f2567745591072f02e57",
+      "originalBytes": 3791,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_shader_memory.py",
+      "originalSha256": "c07c62813bb7bb79828c3c1d6767bf12a376ef0af4a9f2567745591072f02e57",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3944,
+      "snapshotSha256": "6e0bf1384cc4917f6f6c8d69cc2566d4044367a06883f3e01f4bc768bf9c2db2"
+    },
+    "qualification/latest17-prx/test_source17.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "3e0bd6169484c22deae22d1f5a80dd9f3967949461595afcc5eef98d4c379373",
+      "normalizedSha256": "c6921b9d02f2718741a94483ce23586ede8bc23588e5b179dc38fd1d160e9867",
+      "originalBytes": 2546,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_source17.py",
+      "originalSha256": "c6921b9d02f2718741a94483ce23586ede8bc23588e5b179dc38fd1d160e9867",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 2699,
+      "snapshotSha256": "c88d53f45f0c59a0b44bb0fde0e492d1cd2b63caa27272a6c3ee9d2b254e6858"
+    },
+    "qualification/latest17-prx/test_v5.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "heldReviewSha256": "a84ef6e0c27fd056ef71f6d2ad9af4d8d098af449796ae1b77a2fc6891b225f5",
+      "normalizedAstSha256": "2e7a8a98677f03edfcc54635d89b403b1a08371709793f9d1f9bc0975ecf839f",
+      "normalizedSha256": "63af6f41332434d4f174f624c6774aa0b04177e0805ea7290b73026ee9849b9e",
+      "originalBytes": 5968,
+      "originalRelativePath": "build/current-prx-latest17-host-arena-runner-proposal/test_v5.py",
+      "originalSha256": "63af6f41332434d4f174f624c6774aa0b04177e0805ea7290b73026ee9849b9e",
+      "originalSourceStatus": "source_only_latest17_exact_six_history_prx_66_controls_not_prepared",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 6121,
+      "snapshotSha256": "f092e7053cdfb7e18770c9ea01eec8dec69a4345169c89a320daf4e43fa4ffbf"
     },
     "root/apply-proof-fixture-successor.py.snapshot": {
       "guardPrefixBytes": 153,
@@ -96,6 +852,27 @@
       "snapshotBytes": 3386,
       "snapshotSha256": "982ced725454597e73f7a96bf09814262f8a76365bc464bdd9c6f1032dc6c62e"
     },
+    "root/promote-latest17.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "normalizedAstSha256": "57eea7a120611a85a3764690675cc2b6e4367896912f18f27ef35e97192c9712",
+      "normalizedSha256": "1b23c68d0da527b87ac5addaf39483e8969ee63b337d88407f2343b8302feef5",
+      "originalBytes": 3258,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/promote-latest17.py",
+      "originalSha256": "e8e8527d8e4fe171a503d42ef416e29b11d0dac5ac37e0d2239815043b9855da",
+      "originalSourceStatus": "authored_latest17_promotion_or_full_hle_recipe_archival_only_execution_not_inferred",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 3390,
+      "snapshotSha256": "f861eab3333ff0b1669ffc21bdffc672b506082fe51be78d659227d0d5c1b57f"
+    },
     "root/run-current-shader-memory.py.snapshot": {
       "guardPrefixBytes": 153,
       "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
@@ -133,6 +910,27 @@
       ],
       "snapshotBytes": 4863,
       "snapshotSha256": "3f0ec329d94c31d51e267a61618dd289f3ad0821250caf11afd99b84deb36423"
+    },
+    "root/run-full-hle-latest17.py.snapshot": {
+      "actualArchiveOrRuntimeQualificationClaimed": false,
+      "guardPrefixBytes": 153,
+      "guardPrefixSha256": "f9c4fe2acc23de3038f0c999e589aa87158b438ff20c335dbc87ab2d7d019d09",
+      "normalizedAstSha256": "c5abd9a75d6ed5cc9b9e53b0ee96230d9e6f302aca2117dfb036531ba6c6cf91",
+      "normalizedSha256": "619346ebf14564468cf6d9768246de9167d88fb9b4e647575652cb50c86bae9d",
+      "originalBytes": 5250,
+      "originalRelativePath": "build/anyps5-full-main-update-20261012/run-full-hle-latest17.py",
+      "originalSha256": "b96b13a120375e6c49c299a6929ee0b5a71d3ac54fa6bd53c674b7f28544af6f",
+      "originalSourceStatus": "authored_latest17_promotion_or_full_hle_recipe_archival_only_execution_not_inferred",
+      "originalVerifiedUnchanged": true,
+      "redactions": [
+        {
+          "kind": "absolute-local-project-root",
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        }
+      ],
+      "snapshotBytes": 5382,
+      "snapshotSha256": "3377b37ca33be79447268dcee8e261e6d8f2867f74e381eb098aa29d6dfa1600"
     },
     "root/run-native-latest15-fixture-successor.py.snapshot": {
       "guardPrefixBytes": 153,
@@ -249,5 +1047,6 @@
       "snapshotSha256": "3aa7b60f1ebd4ab278765dd9b44a6db80e1780fe58f43afe9ebe8e10a7868f29"
     }
   },
-  "status": "nonrunnable_archival_authored_source_preservation_only"
+  "status": "nonrunnable_archival_authored_source_preservation_only",
+  "transportHelperOriginalSha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6"
 }

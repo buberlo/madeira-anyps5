@@ -1,0 +1,52 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+"""Pure latest17 lineage and old-plan refusal; no archive acquisition."""
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import types
+import unittest
+from unittest.mock import patch
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('latest17_lineage_prx', HERE / 'run.py')
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+
+class Source17(unittest.TestCase):
+    def test_actual_lineage_is_exactly_one_texture_change_and_one_patch(self):
+        current = json.loads(m.PREPARATION.read_text())
+        prior = json.loads((m.BASE / 'qualification-source-latest16-actual-preparation.json').read_text())
+        receipt = m.BASE / 'actual-source17-promotion/receipt.json'
+        self.assertEqual(hashlib.sha256(receipt.read_bytes()).hexdigest(),
+            '5071747b9a3519d8834f390aeed04aed467dd965ce5f424dc4dd4eede3f68005')
+        self.assertEqual(current['latestSourceCandidateReviewSha256'],
+            'dae47991698eaced67c491af0e91c17a30b320fdc132fedd3119ccdc3cc98c44')
+        self.assertEqual(set(current['sourceFiles']), set(prior['sourceFiles']))
+        self.assertEqual([name for name in prior['sourceFiles']
+            if current['sourceFiles'][name] != prior['sourceFiles'][name]],
+            ['core/libs/prx/libSceAgcDriver/Graphics/src/TextureTiling.cpp'])
+        self.assertEqual(len(current['patches']), 17)
+        self.assertEqual({name: current['patches'][name] for name in prior['patches']}, prior['patches'])
+        self.assertEqual(current['actualInitializedDependencies'], prior['actualInitializedDependencies'])
+        self.assertEqual((current['requiredCompleteHostTestTargetCount'],
+            current['defaultHostTestTargetCount'], current['additionalTestTargetCount']), (49, 42, 7))
+
+    def test_latest16_plan_refused_before_load_or_output_acquisition(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'old-plan.json'
+            path.write_text(json.dumps({'schema': 1,
+                'status': 'prepared_current_latest16_host_arena_loaded_prx_cpu_qualification_not_executed'}))
+            with patch.object(m, 'load') as load, patch.object(m, 'clean_output_path') as output, \
+                 self.assertRaisesRegex(ValueError, 'seventeen-patch'):
+                m.execute(types.SimpleNamespace(plan=path, plan_sha=m.sha(path)))
+            load.assert_not_called()
+            output.assert_not_called()
+
+
+if __name__ == '__main__':
+    unittest.main()

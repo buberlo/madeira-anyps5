@@ -1,0 +1,46 @@
+{
+  "compilerWineDeviceActions": false,
+  "fullUpstreamSourceCopiesIncluded": false,
+  "gameAssetsIncluded": false,
+  "guardPrefix": "raise RuntimeError(\"Snapshot-only module; use reviewed current tooling instead.\")\n",
+  "historicalFailuresRelabeled": false,
+  "modelRequiresHeldSourceAndIndependentFixture": true,
+  "originalAstRuntime": "Python 3.12.14",
+  "portableAstNormalization": "omit-only-empty-type_params-fields",
+  "privateOriginalsPreserved": true,
+  "privateProviderMapsIncluded": false,
+  "rawLogsOrReceiptsIncluded": false,
+  "runtimeOrGameplayQualificationClaimed": false,
+  "schema": 1,
+  "snapshotCount": 2,
+  "snapshotModulesImportedOrExecuted": false,
+  "sourceFiles": {
+    "source_diagnosis.py.snapshot": {
+      "guardPrefixBytes": 82,
+      "originalAstSha256": "6c2b6c82dff7f620cbf20def2af5f71d7523e4238b92ed5297bce609bbb05530",
+      "originalBytes": 8065,
+      "originalSha256": "730fbac5b3be195b52833202d0a2a74555734194bd6b7e70541311efacf63e3b",
+      "originalVerifiedUnchanged": true,
+      "portableAstSha256": "a461281f5e4fc48263b54b1cc4e64eda9016bbd2f791af9b2cf40847be4c01e1",
+      "snapshotBytes": 8147,
+      "snapshotSha256": "4b214661edc3c4f9c92366056a5f4d3b3a5c5f4af6fa5f91b779450b7667e47f",
+      "transformations": [
+        "unconditional-module-level-guard"
+      ]
+    },
+    "verify_source.py.snapshot": {
+      "guardPrefixBytes": 82,
+      "originalAstSha256": "eaa3aefa020e0de992b7678e836f19f423f7123e8c6d9e4292c15b7a61ced010",
+      "originalBytes": 10871,
+      "originalSha256": "e903b643a46a1283909ce1b3604a58a356a8b1cf986d0ae2099101c4b648492a",
+      "originalVerifiedUnchanged": true,
+      "portableAstSha256": "0b2000d416e7c462dee66fb05f0428129745ffbbf83e8a93121ed6cae55e0a6c",
+      "snapshotBytes": 10953,
+      "snapshotSha256": "66c111db60e1344067947e2d3319bd2987c3944217931aaefbd7dbf733a6a349",
+      "transformations": [
+        "unconditional-module-level-guard"
+      ]
+    }
+  },
+  "status": "inert_authored_source_archive_only"
+}

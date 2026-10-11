@@ -1,6 +1,6 @@
 # AnyPS5 main reconciliation
 
-Apply all **sixteen** adjacent `.patch` files in lexical order to
+Apply all **seventeen** adjacent `.patch` files in lexical order to
 `0a8b1d32b12a6d6a3acd462787750b482bf78884`. They form one reconciled series;
 archived subdirectories describe earlier pins and are not applied to this one.
 The complete merged upstream includes Apple fixes #1776/#1831/#2015.
@@ -28,8 +28,12 @@ remain required; general guest multisample depth transfer is not established.
   the guard directly; admitted profiles retain full compiler execution.
 - **0016** retains global coordinate bits in the 4-KiB XOR test oracle and adds
   explicit cross-block X32/Y32 assertions. Production tiling is unchanged.
+- **0017** routes 3D `SW_64KB_D_X` textures to the existing thick-volume layout,
+  matching Addrlib's display-swizzle classification. The independent size and
+  202 address expectations remain unchanged; 2D, Z/R and rejection paths retain
+  their existing behavior. Actual complete runtime qualification is pending.
 
-All 64 apply/check/reverse commands pass; all 2,137 candidate entries and modes
+All 68 apply/check/reverse commands pass; all 2,137 candidate entries and modes
 match, reversal restores 2,055 base entries, and eleven gitlinks remain exact.
 The actual canonical/build trees and initialized dependencies are independently
 compared. Six fresh native shader suites and complete ShaderMemory pass.

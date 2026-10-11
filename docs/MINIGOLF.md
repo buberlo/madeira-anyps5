@@ -9,7 +9,7 @@ stroke are not established.
 
 The complete AnyPS5 source is now pinned at **`0a8b1d32`**, including all
 1,735 merged commits after `c963432d` and Apple fixes #1776/#1831/#2015.
-All sixteen local patches apply and reverse exactly. Both the canonical
+All seventeen local patches apply and reverse exactly. Both the canonical
 checkout and actual build checkout match all 2,137 source entries and eleven
 initialized, clean dependency trees. Madeira main and official FEX main/
 FEX-2610 were already current; the FEX iOS port and #6021 bounds repair remain.
@@ -29,7 +29,8 @@ The full 47-library build and all 49 selected test executable targets compile.
 The runtime attempt passes 28 default targets, including memory and exception
 tests, before Graphics detects an incorrect thin-layout dispatch for 3D
 `SW_64KB_D_X` textures. The independent Addrlib size and address fixtures remain
-unchanged; the production repair and remaining tests are pending.
+unchanged. Patch 0017 repairs the production dispatch; a fresh complete build
+and runtime test run is in progress.
 [Actual attempt](evidence/anyps5-latest16-full-hle-attempt-20261012.json).
 The tests use the explicitly probed `0x7400000000` test-host arena.
 That result does not prove fixed-address allocation on the iPad. Stale graphics

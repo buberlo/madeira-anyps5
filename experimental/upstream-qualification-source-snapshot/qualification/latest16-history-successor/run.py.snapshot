@@ -1,0 +1,596 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+#!/usr/bin/env python3
+"""Fresh loaded-PRX CPU qualification; prepare is filesystem-only.
+
+Execution requires an exact reviewed source digest and an immutable prepared
+plan. No GPU, game, device, network or remote execution is performed.
+"""
+import argparse
+import base64
+import errno
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import sys
+import time
+import uuid
+import zipfile
+
+sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+BASE = ROOT / 'build/anyps5-full-main-update-20261012'
+RECIPE = BASE / 'current-prx-shader-qualification-proposal'
+BUILD = BASE / 'winlibs-build-v5'
+SOURCE = BASE / 'qualification-source-v5'
+TOOLS = ROOT / 'build/toolchains/winlibs/mingw64'
+RECIPE_REVIEW_SHA = '959bf17076d61449e6610b019ecc9ab1c6dd7a08b5b8ad1e85a35eb91b43e826'
+TARGET = '0a8b1d32b12a6d6a3acd462787750b482bf78884'
+PREPARATION = BASE/'qualification-source-latest16-actual-preparation.json'
+PREPARATION_SHA = '5ef9478c853f3cac633a135081f7256eb5ca2f8253ad87086fed2baf11a7add8'
+HOST_TEST_ARENA = {
+    'APS5_GUEST_ARENA_LAZY':'1','APS5_GUEST_ARENA_BASE':'0x7400000000',
+    'APS5_GUEST_ARENA_SIZE':'0x100000000','APS5_GUEST_ARENA_CHUNK':'0x10000000'}
+MIB = 1048576
+MIN_FREE = 2 * 1024**3
+EVIDENCE_MAXIMUM = 128 * MIB
+MEMBER_MAXIMUM = 32 * MIB
+OWNED_MAXIMUM = 1024 * MIB
+TOTAL_SECONDS = 7200
+TERMINAL_RESERVE = 7 * MIB  # Three cleanup commands, two1MiB streams each,1MiB receipt.
+ADDITIONS = sorted(['guest_pthread_key_tests', 'guest_thread_callback_abi_tests',
+                    'guest_thread_atexit_tests', 'audio_out_ex_tests', 'audio_out2_port_buffers_tests', 'compiler_once_tests', 'agc_shader_memory_tests'])
+HISTORICAL_REFERENCE_ROWS = {
+    'tools/checks/anyps5_null_pixel_materialization.cpp',
+    'tools/checks/windows_public_fixture.py', 'tools/checks/test_windows_public_fixture.py',
+    'tools/checks/native-shader/ExtendedPublicShaderCases.cpp',
+    'upstreams/AnyPS5/core/libs/prx/libSceAgcDriver/CMakeLists.txt',
+    'upstreams/AnyPS5/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp'}
+
+
+def need(value, message):
+    if not value: raise ValueError(message)
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for data in iter(lambda: stream.read(MIB), b''): h.update(data)
+    return h.hexdigest()
+
+
+def identity(path):
+    s = Path(path).lstat()
+    need(stat.S_ISREG(s.st_mode) and s.st_nlink == 1, 'Ordinary single-link input required: ' + str(path))
+    return [s.st_dev, s.st_ino, s.st_mode, s.st_nlink, s.st_size, s.st_mtime_ns, s.st_ctime_ns]
+
+
+def checked(path, expected=None):
+    before = identity(path)
+    digest = sha(path)
+    need(identity(path) == before and (expected is None or digest == expected), 'Input drift: ' + str(path))
+    return {'sha256': digest, 'fingerprint': before}
+
+
+def load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    return module
+
+
+def save(path, value, maximum=MEMBER_MAXIMUM):
+    data = (json.dumps(value, indent=2, sort_keys=True) + '\n').encode()
+    need(len(data) <= maximum, 'Bounded receipt/plan required')
+    with Path(path).open('xb') as stream: stream.write(data)
+
+
+def tree(root):
+    need(root.is_dir() and not root.is_symlink(), 'Ordinary input tree required: ' + str(root))
+    names = []
+    for directory, dirs, files in os.walk(root, followlinks=False, onerror=lambda error: (_ for _ in ()).throw(error)):
+        for name in dirs:
+            need(stat.S_ISDIR((Path(directory)/name).lstat().st_mode), 'Linked/unknown input directory')
+        for name in files:
+            p = Path(directory)/name
+            identity(p); names.append(p.relative_to(root).as_posix())
+    return sorted(names)
+
+
+def clean_output_path(path):
+    need(path.is_absolute() and path == Path(os.path.abspath(path)), 'Canonical absolute output required')
+    need(path.parent == BASE and re.fullmatch(r'current-prx-qualification-[0-9a-f]{32}', path.name), 'Fresh dedicated qualification output required')
+    need(not path.exists() and not path.is_symlink(), 'Output already exists')
+    need(not any(p.is_symlink() for p in [path.parent, *path.parent.parents]), 'Linked output ancestor')
+
+
+def verify_frozen(plan, *, full):
+    for name, row in plan['inputs'].items():
+        p = Path(name)
+        need(identity(p) == row['fingerprint'], 'Frozen input identity differs: ' + name)
+        if full: need(sha(p) == row['sha256'], 'Frozen input bytes differ: ' + name)
+    for name, expected in plan['trees'].items():
+        need(tree(Path(name)) == expected, 'Frozen source/header tree differs: ' + name)
+
+
+SHADER_MEMORY_CASES = {
+    'agc_shader_memory': [],
+    'agc_shader_bindless': ['--bindless'],
+    'agc_shader_frontend_pair': ['--frontend-pair'],
+    'agc_shader_frontend_pair_off': ['--frontend-pair'],
+}
+
+def shader_memory_registration(text, registered):
+    tests = json.loads(text)['tests']
+    target = 'agc_shader_memory_tests'
+    need({name for name, value in registered.items() if value == target} == set(SHADER_MEMORY_CASES),
+         'Exactly four actual ShaderMemory registrations required')
+    for name, args in SHADER_MEMORY_CASES.items():
+        rows = [row for row in tests if row.get('name') == name]
+        need(len(rows) == 1 and rows[0].get('command') == ['Z:' + str(BUILD/'tests'/ (target + '.exe')), *args],
+             'Exact ShaderMemory command including whole no-argument main required: ' + name)
+        properties = rows[0].get('properties', [])
+        environment = [row.get('value') for row in properties if row.get('name') == 'ENVIRONMENT']
+        expected = ['ANYPS5_NO_SHADER_CACHE=1']
+        if name == 'agc_shader_frontend_pair_off': expected += ['APS5_NO_PERF_FRONTEND_PAIR=1']
+        need(environment == [expected], 'Exact registered ShaderMemory environment required: ' + name)
+
+def registered_additional(helper,text):
+    registered=helper.additional_ctest_inventory(ADDITIONS,text)
+    once=[row for row in json.loads(text)['tests'] if row.get('name')=='windows_compiler_once']
+    expected=['Z:'+str(BUILD/p) for p in ('tests/compiler_once_tests.exe','core/libs/libs/unpatched/libc.prx','tests/compiler_once_cross.dll')]
+    need(registered.get('windows_compiler_once')=='compiler_once_tests' and len(once)==1
+         and once[0].get('command')==expected,'Exact actual registered once executable/libc/cross paths required')
+    shader_memory_registration(text,registered)
+    return registered
+
+def hle_contract(m, defaults, registered, actual_additional_results):
+    b = m['build_provenance']
+    need(m.get('schema') == 1 and m.get('kind') == 'anyps5_unpatched_hle_runtime'
+         and m.get('source_commit') == TARGET and m.get('contains_game_data') is False
+         and m.get('runtime_verified') is False, 'Exact current unpatched HLE required')
+    names = set(m['files'])
+    need(len(b['targets']) == len(set(b['targets'])) == 47
+         and names == {'unpatched/'+n+'.prx' for n in b['targets']} | {
+             'runtime/'+n for n in ('libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll')}, 'Raw47/runtime3 inventory differs')
+    need(b['anyps5_commit'] == TARGET and b['host_tests_passed'] == list(defaults)
+         and b['additional_host_tests_passed'] == ADDITIONS and b['host_test_cases_skipped'] == []
+         and b['host_test_runtime_inputs_verified_unchanged'] is True
+         and b['device_or_gameplay_verified'] is False, 'Completed current local CPU build required')
+    need(len(b['patches']) == 16 and b['flags']['ANYPS5_USE_SYSTEM_DEPS'] is False, 'Current sixteen-patch bundled build required')
+    need(b.get('host_test_arena')==HOST_TEST_ARENA,'Exact actual HLE qualified host arena required')
+    need(registered.get('windows_compiler_once')=='compiler_once_tests' and set(registered.values())==set(ADDITIONS),
+         'All seven actual additional target registrations required')
+    need({n for n,t in registered.items() if t=='agc_shader_memory_tests'}==set(SHADER_MEMORY_CASES),
+         'All four actual ShaderMemory case results required')
+    need(actual_additional_results=={n:{'status':'passed','target':target} for n,target in registered.items()},
+         'Actual passing additional JUnit required')
+    cases = {'guest_kernel_module_lifecycle','savedata_memory_growth','savedata_memory_growth_read_failure'} | set(registered)
+    need(set(b['host_test_case_results']) == cases and all(r.get('status') == 'passed' for r in b['host_test_case_results'].values()), 'Registered HLE CPU case absent/failed')
+    need(all(b['host_test_case_results'][name]==row for name,row in actual_additional_results.items()),'Actual additional results differ from archive provenance')
+    return b
+
+
+def prepare(args):
+    checked(HERE/'source-review.json', args.source_review_sha)
+    review = json.loads((HERE/'source-review.json').read_text())
+    inputs = {}
+    def add(path, expected=None):
+        path = Path(path).resolve()
+        row = checked(path, expected)
+        need(str(path) not in inputs or inputs[str(path)] == row, 'Conflicting input provider')
+        inputs[str(path)] = row
+    for name, digest in review['inputs'].items(): add(ROOT/name, digest)
+    add(HERE/'source-review.json', args.source_review_sha)
+    add(RECIPE/'source-review.json', RECIPE_REVIEW_SHA)
+    recipe_review = json.loads((RECIPE/'source-review.json').read_text())
+    # These six old canonical files were replaced by current public copies.
+    # They are historical references, not byte providers for the current caller.
+    for name, digest in recipe_review['inputs'].items():
+        if name not in HISTORICAL_REFERENCE_ROWS: add(ROOT/name, digest)
+    add(args.hle, args.hle_sha); add(args.provenance, args.provenance_sha)
+    helper = load('hle_current_recipe', ROOT/'scripts/build-hle.py')
+    add(BUILD/'inventory-additional.log');add(BUILD/'test-additional.xml')
+    registered=registered_additional(helper,(BUILD/'inventory-additional.log').read_text())
+    actual_additional=helper.additional_ctest_results(registered,BUILD/'test-additional.xml')
+    m = None
+    with zipfile.ZipFile(args.hle) as archive:
+        rows = archive.infolist()
+        need(len(rows) == 51 and len({r.filename for r in rows}) == 51
+             and all(not r.is_dir() and not r.flag_bits & 1 and stat.S_IFMT(r.external_attr>>16) in (0,stat.S_IFREG) for r in rows), 'Exact ordinary HLE ZIP inventory required')
+        m = json.loads(archive.read('hle-manifest.json')); b = hle_contract(m, helper.TESTS, registered, actual_additional)
+        need(set(archive.namelist()) == set(m['files']) | {'hle-manifest.json'}, 'Unknown HLE member')
+        need(b == json.loads(args.provenance.read_text()), 'Archive and actual build provenance differ')
+        for name, digest in m['files'].items():
+            need(re.fullmatch(r'(unpatched|runtime)/[A-Za-z0-9_.+-]+\.(prx|dll)', name), 'Unsafe HLE member')
+            h = hashlib.sha256()
+            with archive.open(name) as f:
+                for data in iter(lambda: f.read(MIB), b''): h.update(data)
+            need(h.hexdigest() == digest, 'HLE member bytes differ')
+            path = BUILD/'core/libs/libs'/name if name.startswith('unpatched/') else TOOLS/'bin'/Path(name).name
+            add(path, digest)
+    for name, digest in b['host_test_runtime_inputs'].items(): add(ROOT/name, digest)
+    source_preparation=PREPARATION
+    add(source_preparation,PREPARATION_SHA)
+    prepared_source=json.loads(source_preparation.read_text())
+    need(prepared_source['source']==str(SOURCE) and prepared_source['upstreamCommit']==TARGET
+         and prepared_source['selectedPrxTargets']==b['targets'] and len(prepared_source['sourceFiles'])==2137
+         and prepared_source['patches']==b['patches']
+         and sorted(prepared_source['additionalTestTargets'])==ADDITIONS
+         and prepared_source['requiredHostTestArena']==HOST_TEST_ARENA
+         and prepared_source.get('sourceOnly') is False
+         and prepared_source.get('status')=='actual_promoted_latest16_source_verified_before_full_hle_run',
+         'Exact latest16 actual sixteen-patch source map required')
+    for name,digest in prepared_source['sourceFiles'].items():add(SOURCE/name,digest)
+    for name,digest in prepared_source['projectFixtureSourceFiles'].items():add(ROOT/name,digest)
+    add(ROOT/'tools/checks/native-shader/expected-public-case-names.json',prepared_source['expectedOrderedPublicCaseNamesSha256'])
+    need(checked(HERE/'loaded-public-cases.cpp')['sha256']==prepared_source['projectFixtureSourceFiles']['tools/checks/native-shader/ExtendedPublicShaderCases.cpp'],
+         'Fresh loaded public fixture must equal exact current mixed guard/compiler source')
+    patches = {p.name: sha(p) for p in (ROOT/'patches/anyps5').glob('*.patch')}
+    need(patches == b['patches'], 'Current patch stack differs from actual build')
+    for p in (ROOT/'patches/anyps5').glob('*.patch'): add(p)
+    add(ROOT/'scripts/package-runtime.py')
+    add(ROOT/'tools/runtime-probes/pe_image.py')
+    add(BUILD/'core/libs/libs/implib/liblibSceAgcDriver.dll.a')
+    add(BUILD/'core/libs/libs/implib/liblibc.dll.a')
+    header = BUILD/'core/libs/prx/libSceAgcDriver/shader_recompiler_agc_driver_generated/ShaderCacheVersion.hpp'
+    add(header)
+    matches = re.findall(r'SourceVersion\s*=\s*(0x[0-9a-fA-F]+)ull', header.read_text())
+    need(len(matches) == 1, 'One fresh generated cache source identity required')
+    cache = f'{int(matches[0],16):016x}'
+    gates = json.loads((RECIPE/'invocation-and-gates.json').read_text())
+    proposal = load('current_proposal', RECIPE/'proposal.py')
+    need(gates['cacheFormat'] == 28 and len(gates['requests']) == 9, 'Current cache28/nine request contract required')
+    for row in gates['requests']:
+        p=ROOT/row['reqPath']; add(p,row['reqSha256'])
+        data=proposal.canonical_request(p.read_bytes(),storage_encoding=row['storageEncoding'],origin=row['origin'],expected_sha256=row['reqSha256'],version=row['requestVersion'])
+        need(hashlib.sha256(base64.b64decode(data.rstrip(b'\n'),validate=True)).hexdigest() == row['decodedPayloadSha256'], 'Frozen decoded request differs')
+    wine = args.wine.resolve(); validator = args.validator.resolve()
+    for p in [wine,wine.parent/'wineboot',wine.parent/'wineserver',validator,Path(sys.executable).resolve()]: add(p)
+    for name in ['g++.exe','cc1plus.exe','collect2.exe','ld.exe','objcopy.exe']:
+        found = sorted(TOOLS.rglob(name)); need(found, 'Compiler component required: '+name)
+        for p in found: add(p)
+    trees = {}
+    # Bind the actual caller include roots, compiler builtin headers and linker
+    # inputs without copying any source tree or private diagnostic payload.
+    roots = [SOURCE/'core',SOURCE/'3rdparty/Vulkan-Headers',SOURCE/'3rdparty/SPIRV-Headers',SOURCE/'3rdparty/glslang',
+             ROOT/'tools/checks/native-shader',BUILD/'core/libs/prx/libSceAgcDriver/generated',
+             BUILD/'core/libs/prx/libSceAgcDriver/shader_recompiler_agc_driver_generated',
+             TOOLS/'include',TOOLS/'lib/gcc',TOOLS/'x86_64-w64-mingw32/include',TOOLS/'x86_64-w64-mingw32/lib']
+    for p in sorted((TOOLS/'bin').glob('*.dll')): add(p)
+    for root in roots:
+        names = tree(root); trees[str(root)] = names
+        for name in names: add(root/name)
+    need(len(inputs) <= 40000, 'Source/provider count exceeds bounded preparation')
+    output=args.output or BASE/('current-prx-qualification-'+uuid.uuid4().hex)
+    clean_output_path(output)
+    commands = load('v5_commands',HERE/'compile_v5.py').compile_commands(ROOT,wine,output=output/'runtime')
+    plan = {'schema':1,'status':'prepared_current_latest16_host_arena_loaded_prx_cpu_qualification_not_executed',
+            'sourceReviewSha256':args.source_review_sha,'recipeReviewSha256':RECIPE_REVIEW_SHA,
+            'inputs':inputs,'trees':trees,'output':str(output),'wine':str(wine),'validator':str(validator),
+            'hleSha256':args.hle_sha,'provenanceSha256':args.provenance_sha,'hleManifest':m,
+            'sourceVersion':cache,'cacheSchema':28,'compileCommands':commands,'gates':gates,
+            'hostTestArena':dict(b['host_test_arena']),
+            'historicalReferenceRowsNotConsumed':sorted(HISTORICAL_REFERENCE_ROWS),
+            'limits':{'initialAndLiveFreeBytes':MIN_FREE,'compilerSeconds':600,'fixtureSeconds':180,
+                      'validatorSeconds':30,'publicNullStreamBytesEach':MIB,'otherStreamBytesEach':8*MIB,
+                      'artifactMemberBytes':MEMBER_MAXIMUM,'artifactAggregateBytes':EVIDENCE_MAXIMUM,
+                      'ownedTreeBytes':OWNED_MAXIMUM,'ownedTreeEntries':32768,'totalSeconds':TOTAL_SECONDS},
+            'gpuExecution':False,'gameExecution':False,'deviceActions':False}
+    verify_frozen(plan,full=True)
+    need(args.plan.parent.resolve() == HERE and not args.plan.exists(), 'Fresh own plan file required')
+    save(args.plan,plan)
+    print('Prepared exact local qualification plan: '+str(args.plan)+' SHA256 '+sha(args.plan))
+
+
+def inventory(output, reserve=TERMINAL_RESERVE, *, live=False):
+    total = evidence = entries = 0
+    disappeared=0
+    prefix_root=output/'wine-prefix'
+    def onerror(error):
+        nonlocal disappeared
+        if live and isinstance(error,FileNotFoundError) and error.errno==errno.ENOENT and error.filename is not None and Path(error.filename).is_relative_to(prefix_root):
+            disappeared+=1;return
+        raise error
+    for directory, dirs, files in os.walk(output,followlinks=False,onerror=onerror):
+        for name in dirs+files:
+            p=Path(directory)/name
+            try:s=p.lstat()
+            except FileNotFoundError as error:
+                if live and error.errno==errno.ENOENT and p.is_relative_to(prefix_root):
+                    disappeared+=1;continue
+                raise
+            entries+=1
+            need(entries <= 32768,'Owned output entry bound exceeded')
+            rel=p.relative_to(output)
+            prefix=rel.parts[0]=='wine-prefix'
+            if stat.S_ISLNK(s.st_mode):
+                need(prefix,'Unexpected output symlink')
+                total+=s.st_size
+                if name in dirs: dirs.remove(name)
+            elif stat.S_ISREG(s.st_mode):
+                need(s.st_nlink == 1,'Unexpected output hardlink')
+                total+=s.st_size
+                if rel.parts[0] not in ('runtime','wine-prefix'):
+                    need(s.st_size <= MEMBER_MAXIMUM,'Evidence member exceeds32MiB')
+                    evidence+=s.st_size
+                    need(evidence <= EVIDENCE_MAXIMUM-reserve,'Evidence aggregate exceeds128MiB including reserved terminal receipt')
+            else: need(stat.S_ISDIR(s.st_mode),'Unknown owned output member')
+            need(total <= OWNED_MAXIMUM,'Owned output aggregate exceeds1GiB')
+    return {'ownedBytes':total,'evidenceBytes':evidence,'entries':entries,'livePrefixDisappearances':disappeared}
+
+def owned_once_imports(imports):
+    libraries={name.lower():values for name,values in imports.items()}
+    need(len(libraries)==len(imports),'Case-aliased caller imports')
+    need('APS5NativeCompilerOnce_nid_no_patch' in libraries.get('libc.prx',[]),'Actual private compiler-once import absent')
+    need(not any('pthread_once' in values for values in libraries.values()),'Owned caller still imports native pthread_once')
+
+
+def command_text(output,label):
+    return tuple((output/(label+'.'+suffix)).read_text(errors='strict') for suffix in ('stdout.log','stderr.log'))
+
+
+def identity_markers(text,expected_path,cache):
+    for marker,value in [('ACTUAL_DRIVER_PATH',expected_path),('ACTUAL_DRIVER_CACHE_SOURCE_VERSION',cache),('ACTUAL_DRIVER_CACHE_FORMAT','28')]:
+        need(re.findall(r'^'+marker+r' ([^\r\n]+)\r?$',text,re.M) == [value],'Exact loaded driver marker differs: '+marker)
+
+
+def replay_markers(text,expected_path,cache,origin):
+    identity_markers(text,expected_path,cache)
+    for marker,value in [('FULL_REQUEST_ORIGIN',origin),('FULL_REQUEST_CANONICAL_SERIALIZATION_VERSION','17'),
+                         ('FULL_REQUEST_CANONICAL_ROUNDTRIP_MATCH','1'),('FULL_REQUEST_ORIGINAL_SERIALIZATION_MATCH','0' if origin=='legacy-ipad-v14-v15' else '1'),
+                         ('ACTUAL_MATERIALIZED_SPIRV_AND_BINDINGS_DUMPED','1')]:
+        need(re.findall(r'^'+marker+r' ([^\r\n]+)\r?$',text,re.M) == [value],'Exact replay marker differs: '+marker)
+    rows=re.findall(r'^ACTUAL_DRIVER_FULL_PREPARE_CAPTURE_MATERIALIZE_PASS words=(\d+) variant=(\d+)\r?$',text,re.M)
+    need(len(rows)==1 and all(int(v)>0 for v in rows[0]),'One nonempty stable prepared/materialized result required')
+    need(not re.search(r'^FULL_REQUEST_REPLAY_FAILURE ',text,re.M),'Replay failure marker')
+    return tuple(map(int,rows[0]))
+
+
+def layout_shape(m,words):
+    need(set(m)=={'schema','scope','variantId','specializationId','spirvWordCount','hostSubgroupSize','targetVulkanVersion','targetSpirvVersion','layout','bindings','fragmentParameters','specialization','pushConstantBytes'},'Complete schema2 layout required')
+    need(m['schema']==2 and m['scope']=='actual_imported_prx_cpu_materialization_not_gpu_execution'
+         and type(m['variantId']) is int and m['variantId']>0 and m['spirvWordCount']==words,
+         'Layout identity/count differs')
+    need(set(m['layout'])=={'descriptorSet','firstBinding','pushConstantOffsetBytes','pushConstantSizeBytes'},'Complete layout fields required')
+    fields={'kind','role','descriptorSet','binding','count','readOnly','imageShape','guestDescriptor','samplerDepthCompare','imageWritten','imageDepthCompare','imageAtomic','imageAtomic64','bufferAtomic','bufferWritten','bufferRead','samplerIntegerBorder','samplerUnnormalized','imageUnnormalizedBaseLevel','imageUnnormalized','imageSamplers','imageLogicalSamples','imageNativeSamples'}
+    need(isinstance(m['bindings'],list) and all(set(b)==fields for b in m['bindings']),'Complete current descriptor fields required')
+    need(all(type(b['readOnly']) is bool for b in m['bindings']),'Typed descriptor read-only flag required')
+    need(isinstance(m['fragmentParameters'],list) and all(set(p)=={'location','sourceLocation','flat','perVertex','custom'} for p in m['fragmentParameters']),'Complete fragment parameters required')
+    need(all(type(p[k]) is bool for p in m['fragmentParameters'] for k in ('flat','perVertex','custom')),'Typed interpolation flags required')
+    need(isinstance(m['specialization'],list) and all(set(s)=={'id','value'} for s in m['specialization']),'Complete specialization required')
+    need(all(type(b) is int and 0<=b<=255 for b in m['pushConstantBytes']),'Push bytes malformed')
+
+
+def validator_target(m):
+    major,minor=m['targetVulkanVersion']>>22,(m['targetVulkanVersion']>>12)&1023
+    need(major==1 and minor in range(5) and m['targetSpirvVersion'] in (0x10000,0x10100,0x10200,0x10300,0x10400,0x10500,0x10600),'Unsupported recorded validation environment')
+    return 'vulkan1.1spv1.4' if (major,minor)==(1,1) and m['targetSpirvVersion']==0x10400 else f'vulkan{major}.{minor}'
+
+
+def replay_artifacts(directory,words):
+    need(tree(directory)==['binding-layout.json','canonical-v17.req','materialized.spv'],'Exact replay output inventory required')
+    for p in directory.iterdir(): need(p.stat().st_size<=MEMBER_MAXIMUM,'Replay output member bound')
+    data=(directory/'materialized.spv').read_bytes()
+    need(len(data)>=20 and len(data)%4==0 and data[:4]==b'\x03\x02\x23\x07' and len(data)//4==words,'Invalid materialized SPIR-V')
+    m=json.loads((directory/'binding-layout.json').read_text());layout_shape(m,words)
+    return m,validator_target(m)
+
+
+def layouts_equal(left,right):
+    # Python dict equality would equate bool false and integer zero.
+    return json.dumps(left,sort_keys=True,separators=(',',':')) == json.dumps(right,sort_keys=True,separators=(',',':'))
+
+
+def import_closure(records,external):
+    """Validate every native import and forwarder against the copied PE set."""
+    need(len(records)==len({n.lower() for n in records}),'Case-aliased runtime libraries')
+    by_name={n.lower():r for n,r in records.items()}
+    count=0
+    for name,row in records.items():
+        requested=[(library,symbol) for library,symbols in row['imports'].items() for symbol in symbols]
+        for forwarded in row['ordinals'].values():
+            if forwarded:
+                library,separator,symbol=forwarded.rpartition('.')
+                need(separator and library and symbol,'Malformed native forwarder')
+                if not library.lower().endswith(('.dll','.prx')):library+='.dll'
+                requested.append((library,int(symbol[1:]) if symbol.startswith('#') else symbol))
+        for library,symbol in requested:
+            count+=1
+            need(Path(library).name==library and not any(c in library for c in ('/','\\',':','\x00')),'Unsafe imported library name')
+            if external(library):continue
+            provider=by_name.get(library.lower())
+            need(provider is not None,'Missing native runtime library: '+library)
+            need(symbol in provider['ordinals' if type(symbol) is int else 'names'],'Unresolved native import/forwarder: '+name+'→'+library)
+    return {'nativeImportsAndForwardersChecked':count,'allCopiedNativeDependenciesResolved':True}
+
+
+def execute(args):
+    checked(args.plan,args.plan_sha); plan=json.loads(args.plan.read_text())
+    need(plan['schema']==1 and plan['status']=='prepared_current_latest16_host_arena_loaded_prx_cpu_qualification_not_executed','Exact prepared latest sixteen-patch plan required')
+    need(plan.get('hostTestArena')==HOST_TEST_ARENA
+         and plan['hleManifest']['build_provenance'].get('host_test_arena')==plan['hostTestArena'],
+         'Immutable plan and actual HLE host arena must match')
+    checked(HERE/'source-review.json',plan['sourceReviewSha256']); verify_frozen(plan,full=True)
+    output=Path(plan['output']);clean_output_path(output)
+    need(shutil.disk_usage(BASE).free>=MIN_FREE,'Initial2GiB reserve unavailable')
+    bounded=load('owned_child',HERE/'bounded_local_process.py')
+    public=load('current_public',RECIPE/'windows_public_fixture.py')
+    proposal=load('request_recipe',RECIPE/'proposal.py')
+    pe=load('prx_pe',ROOT/'tools/runtime-probes/pe_image.py')
+    packing=load('runtime_dependencies',ROOT/'scripts/package-runtime.py')
+    output.mkdir(); runtime=output/'runtime';runtime.mkdir()
+    wine=Path(plan['wine']); prefix=output/'wine-prefix'
+    env={k:v for k,v in os.environ.items() if not k.startswith(('APS5_','ANYPS5_','MADEIRA_','FEX_','MVK_','WINE','VK_','DYLD_','CCACHE_'))}
+    env.update(WINEPREFIX=str(prefix),WINEDEBUG='-all',WINEPATH=proposal.win(TOOLS/'bin'),
+               WINEDLLOVERRIDES='winemenubuilder.exe=d;mscoree,mshtml=d',ANYPS5_NO_SHADER_CACHE='1')
+    env.update(plan['hostTestArena'])
+    result={'schema':1,'status':'failed','planSha256':args.plan_sha,'sourceReviewSha256':plan['sourceReviewSha256'],
+            'hleSha256':plan['hleSha256'],'sourceVersion':plan['sourceVersion'],'cacheSchema':28,
+            'hostTestArena':dict(plan['hostTestArena']),
+            'commands':[],'publicCases':0,'standaloneCases':0,'nullPixelCases':0,'fullReplays':[],
+            'gpuExecution':False,'gameExecution':False,'deviceActions':False,'ownedPrefixJoined':False}
+    failure=None
+    runtime_hashes={}
+    deadline=time.monotonic()+TOTAL_SECONDS
+    live_prefix_disappearances=0
+    def guard():
+        nonlocal live_prefix_disappearances
+        need(time.monotonic()<deadline,'Total7200s qualification deadline exceeded')
+        need(shutil.disk_usage(output).free>=MIN_FREE,'Live2GiB reserve unavailable')
+        live_prefix_disappearances+=inventory(output,live=True)['livePrefixDisappearances']
+    def run(argv,label,expected=0,timeout=180,stream=8*MIB,cleanup=False):
+        print(label,flush=True)
+        if not cleanup: verify_frozen(plan,full=False)
+        try:
+            row=bounded.run(argv,cwd=runtime,env=env,stdout=output/(label+'.stdout.log'),stderr=output/(label+'.stderr.log'),
+                            timeout=timeout,stream_maximum=MIB if cleanup else stream,guard=(lambda:None) if cleanup else guard)
+        except bounded.CommandFailure as error:
+            row=error.result;row.update(label=label,expectedExitCode=expected);result['commands'].append(row);raise
+        row.update(label=label,expectedExitCode=expected);result['commands'].append(row)
+        need(row['captureComplete'] is True and row['processTransportClosed'] is True,'Complete owned capture/transport closure required')
+        need(row['exitCode']==expected,'Unexpected command exit: '+label)
+        return '\n'.join(command_text(output,label))
+    def copy(p,destination):
+        guard()
+        shutil.copy2(p,destination);need(sha(p)==sha(destination),'Runtime copy differs')
+        guard()
+    try:
+        for name in plan['hleManifest']['files']:
+            p=BUILD/'core/libs/libs'/name if name.startswith('unpatched/') else TOOLS/'bin'/Path(name).name
+            copy(p,runtime/Path(name).name)
+        for name in ('agc_unused_barycentric_tests','agc_profile_output_tests'):
+            copy(BUILD/'tests'/(name+'.exe'),runtime/(name+'.exe'))
+        actual=runtime/'libSceAgcDriver.prx';wrong=runtime/'wrong-driver.prx';copy(actual,wrong)
+        need(not os.path.samefile(actual,wrong),'Identity negative needs distinct real file')
+        result['actualDriverSha256']=sha(actual)
+        run([wine.parent/'wineboot','--init'],'prefix-init',timeout=120)
+        run([Path(plan['validator']),'--version'],'validator-version',timeout=30)
+        text=run([wine,proposal.win(runtime/'agc_profile_output_tests.exe')],'profile-output',stream=MIB)
+        need(text.splitlines().count('profile output tests passed')==1,'Profile-output contract absent')
+        label='standalone355'
+        run([wine,proposal.win(runtime/'agc_unused_barycentric_tests.exe')],label,stream=MIB)
+        row=result['commands'][-1]
+        observation=dict(name=public.STANDALONE,status='passed',exit_code=row['exitCode'],own_tree_stopped=row['groupAbsent'],timed_out=row['timedOut'],stdout_discarded=row['stdoutDiscarded'],stderr_discarded=row['stderrDiscarded'])
+        public.validate_public_fixture(public.STANDALONE,observation,*command_text(output,label));result['standaloneCases']=355
+        for command in plan['compileCommands']:
+            run(command['argv'],command['label'],timeout=600)
+        exes={n:runtime/(n+'.exe') for n in ('public538','null12','full-replay')}
+        imports={}
+        for n,p in exes.items():
+            parsed=pe.PEImage(p);imports[n]=parsed.imports()
+            owned_once_imports(imports[n])
+            need('libSceAgcDriver.prx' in imports[n],'Actual production PRX import absent: '+n)
+            need(not any(x.lower().endswith('.dll') and 'agcdriver' in x.lower() for x in imports[n]),'Unexpected substituted shader library')
+        result['callerHashes']={n:sha(p) for n,p in exes.items()};result['callerImports']=imports
+        records={}
+        for p in runtime.iterdir():
+            if p.suffix.lower() in ('.prx','.dll','.exe'):
+                image=pe.PEImage(p);names,ordinals=image.exports()
+                records[p.name]={'names':names,'ordinals':ordinals,'imports':image.imports()}
+        result['runtimeDependencyClosure']=import_closure(records,packing.external)
+        runtime_hashes={p.name:sha(p) for p in runtime.iterdir() if p.is_file()}
+        result['runtimeInputHashes']=runtime_hashes
+        expected_path=proposal.win(actual);cache=plan['sourceVersion']
+        label='loaded538';run([wine,proposal.win(exes['public538']),expected_path],label,stream=MIB)
+        row=result['commands'][-1]
+        observation=dict(name=public.IMPORTED,status='passed',exit_code=row['exitCode'],own_tree_stopped=row['groupAbsent'],timed_out=row['timedOut'],stdout_discarded=row['stdoutDiscarded'],stderr_discarded=row['stderrDiscarded'])
+        public.validate_public_fixture(public.IMPORTED,observation,*command_text(output,label),expected_prx_path=expected_path,expected_cache_source=cache)
+        result['publicCases']=538
+        text=run([wine,proposal.win(exes['public538']),proposal.win(wrong)],'public-wrong-driver',expected=2,stream=MIB)
+        need(text.splitlines().count('ACTUAL_DRIVER_IDENTITY_REJECTED')==1 and 'TOTAL_PASS' not in text,'Public identity negative failed')
+        text=run([wine,proposal.win(exes['null12']),expected_path],'null12',stream=MIB)
+        identity_markers(text,expected_path,cache)
+        need(re.findall(r'^PASS ([^\r\n]+)\r?$',text,re.M)==plan['gates']['nullCaseNames']
+             and re.findall(r'^TOTAL_PASS ([^\r\n]+)\r?$',text,re.M)==['12'],'Exact ordered null12 required')
+        need(text.splitlines().count('GPU_EXECUTION 0')==1 and text.splitlines().count('REGISTER_SHADER_DEVICE_API_EXECUTION 0')==1,'Null CPU scope differs')
+        result['nullPixelCases']=12
+        text=run([wine,proposal.win(exes['null12']),proposal.win(wrong)],'null-wrong-driver',expected=1,stream=MIB)
+        need('TOTAL_PASS' not in text and 'NULL_PIXEL_MATERIALIZATION_FAILURE' in text,'Null identity negative failed')
+        for index,request in enumerate(plan['gates']['requests']):
+            encoded=output/(request['role']+'.b64')
+            stored=(ROOT/request['reqPath']).read_bytes()
+            data=proposal.canonical_request(stored,storage_encoding=request['storageEncoding'],origin=request['origin'],expected_sha256=request['reqSha256'],version=request['requestVersion'])
+            with encoded.open('xb') as f:f.write(data)
+            legacy=output/(request['role']+'-legacy');current=output/(request['role']+'-current17')
+            if index==0:
+                denied=output/'wrong-driver-must-not-materialize'
+                text=run([wine,proposal.win(exes['full-replay']),proposal.win(wrong),proposal.win(encoded),proposal.win(denied),'--legacy-ipad-v14-v15'],'full-wrong-driver',expected=1)
+                need('FULL_REQUEST_REPLAY_FAILURE Actual driver identity rejected' in text and 'ACTUAL_MATERIALIZED' not in text and not denied.exists(),'Full identity negative failed')
+            text=run([wine,proposal.win(exes['full-replay']),expected_path,proposal.win(encoded),proposal.win(legacy),'--legacy-ipad-v14-v15'],'legacy-'+request['role'])
+            words,variant=replay_markers(text,expected_path,cache,'legacy-ipad-v14-v15')
+            metadata,target=replay_artifacts(legacy,words)
+            canonical=legacy/'canonical-v17.req'
+            proposal.canonical_request(canonical.read_bytes(),storage_encoding='canonical-base64-text',origin='request17',expected_sha256=sha(canonical),version=17)
+            run([Path(plan['validator']),'--target-env',target,legacy/'materialized.spv'],'validate-legacy-'+request['role'],timeout=30)
+            text=run([wine,proposal.win(exes['full-replay']),expected_path,proposal.win(canonical),proposal.win(current),'--request17'],'current17-'+request['role'])
+            current_words,current_variant=replay_markers(text,expected_path,cache,'request17')
+            current_metadata,current_target=replay_artifacts(current,current_words)
+            run([Path(plan['validator']),'--target-env',current_target,current/'materialized.spv'],'validate-current17-'+request['role'],timeout=30)
+            need((words,variant)==(current_words,current_variant) and layouts_equal(metadata,current_metadata)
+                 and sha(legacy/'materialized.spv')==sha(current/'materialized.spv')
+                 and canonical.read_bytes()==(current/'canonical-v17.req').read_bytes(),'Current legacy→17 materialization equivalence failed')
+            result['fullReplays'].append({'role':request['role'],'requestSha256':request['reqSha256'],
+                'legacyOrigin':request['origin'],'request17CanonicalRoundtrip':True,'schema2AllFieldsEqual':True,
+                'spirvEqualCurrentReplay':True,'independentValidatorPassedTwice':True,'validatorTarget':target,
+                'spirvSha256':sha(legacy/'materialized.spv'),'layoutSha256':sha(legacy/'binding-layout.json'),
+                'spirvEqualHistorical':sha(legacy/'materialized.spv')==request['previousSpirvSha256'],
+                'layoutEqualHistorical':sha(legacy/'binding-layout.json')==request['previousLayoutSha256']})
+        need(len(result['fullReplays'])==9,'Nine migrated complete replays required')
+        verify_frozen(plan,full=True)
+        need(sha(actual)==result['actualDriverSha256'],'Loaded driver changed')
+        result['status']='fresh_current_loaded_prx_355_538_null12_nine_migration_cpu_passed_not_gpu_or_gameplay'
+        result['historicalOutputComparisonRequiresReview']=any(not r['spirvEqualHistorical'] or not r['layoutEqualHistorical'] for r in result['fullReplays'])
+    except BaseException as error:
+        failure=error;result['status']='failed';result['error']=type(error).__name__+': '+str(error)
+    finally:
+        try:
+            try: run([wine.parent/'wineserver','-w'],'prefix-graceful-wait',timeout=60,cleanup=True)
+            except bounded.CommandFailure as error:
+                need(error.result['timedOut'],'Only timed-out graceful join permits owned prefix kill')
+                run([wine.parent/'wineserver','-k'],'prefix-timeout-kill',timeout=30,cleanup=True)
+                run([wine.parent/'wineserver','-w'],'prefix-post-kill-wait',timeout=60,cleanup=True)
+            result['ownedPrefixJoined']=True
+        except BaseException as error:
+            result['status']='failed';result['prefixCleanupError']=type(error).__name__+': '+str(error)
+            if failure is None:failure=error
+        try:
+            verify_frozen(plan,full=True);result['finalInputHashesAndIdentitiesMatched']=True
+            if runtime_hashes:
+                need(tree(runtime)==sorted(runtime_hashes),'Qualification runtime inventory changed')
+                need(all(sha(runtime/name)==digest for name,digest in runtime_hashes.items()),'Copied runtime/caller bytes changed')
+                result['runtimeInputHashesMatchedAfterClosure']=True
+            result['resourceInventory']=inventory(output,reserve=MIB)
+        except BaseException as error:
+            result['status']='failed';result['finalReplayError']=type(error).__name__+': '+str(error)
+            if failure is None:failure=error
+        result['allOwnedChildrenJoined']=all(r['directChildJoined'] and r['groupAbsent'] and r['streamsJoined'] and r['processTransportClosed'] for r in result['commands'])
+        result['livePrefixDisappearancesObserved']=live_prefix_disappearances
+        if not result['allOwnedChildrenJoined']:result['status']='failed'
+        result['evidenceHashes']={p.relative_to(output).as_posix():sha(p) for p in output.rglob('*') if p.is_file() and not p.is_symlink() and p.relative_to(output).parts[0] not in ('runtime','wine-prefix')}
+        save(output/'results.json',result,maximum=MIB)
+    if failure is not None or result['status']=='failed':raise RuntimeError('Qualification failed; retained '+str(output/'results.json')) from failure
+    print('Closed current PRX CPU qualification: '+str(output/'results.json')+' SHA256 '+sha(output/'results.json'))
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser(description=__doc__)
+    mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--prepare',action='store_true');mode.add_argument('--execute',action='store_true')
+    p.add_argument('--plan',type=Path,required=True);p.add_argument('--plan-sha')
+    p.add_argument('--source-review-sha');p.add_argument('--hle',type=Path,default=BASE/'hle-latest16/hle-runtime.zip');p.add_argument('--hle-sha')
+    p.add_argument('--provenance',type=Path,default=BASE/'hle-latest16/hle-runtime.provenance.json');p.add_argument('--provenance-sha')
+    p.add_argument('--output',type=Path)
+    p.add_argument('--wine',type=Path,default=ROOT/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine')
+    p.add_argument('--validator',type=Path,default=Path('/opt/homebrew/bin/spirv-val'))
+    a=p.parse_args()
+    if a.prepare:
+        need(all(re.fullmatch('[0-9a-f]{64}',v or '') for v in (a.source_review_sha,a.hle_sha,a.provenance_sha)),'Exact reviewed source/HLE/provenance digests required')
+        prepare(a)
+    else:
+        need(re.fullmatch('[0-9a-f]{64}',a.plan_sha or ''),'Exact actual prepared plan digest required');execute(a)

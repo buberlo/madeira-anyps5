@@ -1,0 +1,101 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import errno
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+HERE=Path(__file__).resolve().parent
+def load(name,path):
+    s=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+m=load('v5_prx',HERE/'run.py')
+commands=load('v5_commands',HERE/'compile_v5.py')
+helper=load('v5_hle',m.ROOT/'scripts/build-hle.py')
+
+def registrations():
+    tests=[]
+    for target in m.ADDITIONS:
+        name='windows_compiler_once' if target=='compiler_once_tests' else target.removesuffix('_tests')
+        cmd=['Z:'+str(m.BUILD/'tests'/(target+'.exe'))]
+        if target=='compiler_once_tests':cmd+=['Z:'+str(m.BUILD/'core/libs/libs/unpatched/libc.prx'),'Z:'+str(m.BUILD/'tests/compiler_once_cross.dll')]
+        tests.append({'name':name,'command':cmd})
+    tests=[row for row in tests if row['name']!='agc_shader_memory']
+    for name,args in m.SHADER_MEMORY_CASES.items():
+        env=['ANYPS5_NO_SHADER_CACHE=1']
+        if name=='agc_shader_frontend_pair_off':env+=['APS5_NO_PERF_FRONTEND_PAIR=1']
+        tests.append({'name':name,'command':['Z:'+str(m.BUILD/'tests/agc_shader_memory_tests.exe'),*args],
+                      'properties':[{'name':'ENVIRONMENT','value':env}]})
+    return {'tests':tests}
+
+class V5Routes(unittest.TestCase):
+    def test_seven_fresh_commands_have_new_source_importlibs_and_owned_bridge(self):
+        rows=commands.compile_commands(m.ROOT,Path('/local/wine'),output=m.BASE/('current-prx-qualification-'+'0'*32)/'runtime')
+        self.assertEqual(len(rows),7)
+        links=[r for r in rows if r['label'].startswith('link-current-')]
+        self.assertEqual(len(links),3)
+        for row in links:
+            text=' '.join(row['argv'])
+            self.assertIn('qualification-source-v5',text);self.assertIn('winlibs-build-latest17',text)
+            self.assertEqual(text.count('caller_bridge.cpp'),1)
+            self.assertIn('--exclude-symbols,pthread_once:__imp_pthread_once',text)
+            self.assertNotIn('winlibs-build-attempt2',text)
+    def test_ctest_uses_registered_name_and_real_argument_paths(self):
+        rows=m.registered_additional(helper,json.dumps(registrations()))
+        self.assertEqual(rows['windows_compiler_once'],'compiler_once_tests')
+        self.assertNotIn('compiler_once',rows)
+    def test_ctest_wrong_libc_path_refused(self):
+        value=registrations();row=next(t for t in value['tests'] if t['name']=='windows_compiler_once')
+        row['command'][1]=row['command'][1].replace('winlibs-build-latest17','winlibs-build-attempt2')
+        with self.assertRaisesRegex(ValueError,'actual registered'):m.registered_additional(helper,json.dumps(value))
+    def test_missing_additional_registration_refused(self):
+        value=registrations();value['tests'].pop()
+        with self.assertRaises(ValueError):m.registered_additional(helper,json.dumps(value))
+    def test_owned_private_import_and_native_route_refusal(self):
+        m.owned_once_imports({'libc.prx':['APS5NativeCompilerOnce_nid_no_patch']})
+        for imports in ({'libc.prx':[]},{'other.prx':['APS5NativeCompilerOnce_nid_no_patch']},
+            {'libc.prx':['APS5NativeCompilerOnce_nid_no_patch'],'libwinpthread-1.dll':['pthread_once']}):
+            with self.subTest(imports=imports),self.assertRaises(ValueError):m.owned_once_imports(imports)
+    def test_exact_transport_closing_helper(self):
+        self.assertEqual(hashlib.sha256((HERE/'bounded_local_process.py').read_bytes()).hexdigest(),
+            'ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6')
+
+class LivePrefix(unittest.TestCase):
+    def scenario(self,path_under_prefix,live):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'wine-prefix').mkdir();file=root/('wine-prefix/transient' if path_under_prefix else 'artifact')
+            file.write_bytes(b'x');original=Path.lstat
+            def disappearing(path):
+                if path==file:raise FileNotFoundError(errno.ENOENT,'gone',str(path))
+                return original(path)
+            with patch.object(Path,'lstat',disappearing):return m.inventory(root,live=live)
+    def test_live_owned_prefix_disappearance_recorded(self):self.assertEqual(self.scenario(True,True)['livePrefixDisappearances'],1)
+    def test_final_prefix_disappearance_fatal(self):
+        with self.assertRaises(FileNotFoundError):self.scenario(True,False)
+    def test_live_artifact_disappearance_fatal(self):
+        with self.assertRaises(FileNotFoundError):self.scenario(False,True)
+    def test_unknown_walk_error_not_suppressed(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            def denied(*args,**kw):
+                kw['onerror'](PermissionError(errno.EACCES,'denied',str(root/'wine-prefix')))
+                return iter(())
+            with patch.object(m.os,'walk',side_effect=denied),self.assertRaises(PermissionError):m.inventory(root,live=True)
+    def test_only_own_live_walk_enoent_permitted(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            def gone(*args,**kw):
+                kw['onerror'](FileNotFoundError(errno.ENOENT,'gone',str(root/'wine-prefix/child')))
+                return iter(())
+            with patch.object(m.os,'walk',side_effect=gone):self.assertEqual(m.inventory(root,live=True)['livePrefixDisappearances'],1)
+            with patch.object(m.os,'walk',side_effect=gone),self.assertRaises(FileNotFoundError):m.inventory(root)
+    def test_live_retry_does_not_relax_resource_quotas(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'wine-prefix').mkdir();(root/'wine-prefix/large').write_bytes(b'123')
+            with patch.object(m,'OWNED_MAXIMUM',2),self.assertRaisesRegex(ValueError,'aggregate'):m.inventory(root,live=True)
+
+if __name__=='__main__':unittest.main()

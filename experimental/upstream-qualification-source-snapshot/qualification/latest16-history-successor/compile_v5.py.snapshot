@@ -1,0 +1,90 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+"""Pure command/request preparation. Never launches a tool or writes a request."""
+import base64
+import hashlib
+from pathlib import Path
+import re
+
+REQUEST_MAXIMUM = 65536
+
+def need(value, message):
+    if not value:
+        raise ValueError(message)
+
+def canonical_request(stored, *, storage_encoding, origin, expected_sha256, version):
+    need(isinstance(stored, bytes) and 8 <= len(stored) <= REQUEST_MAXIMUM,
+         'Bounded stored request required')
+    need(re.fullmatch('[0-9a-f]{64}', expected_sha256 or '') is not None
+         and hashlib.sha256(stored).hexdigest() == expected_sha256,
+         'Frozen stored request bytes differ')
+    if storage_encoding == 'binary':
+        payload = stored
+    elif storage_encoding == 'canonical-base64-text':
+        encoded = stored.rstrip(b'\r\n')
+        payload = base64.b64decode(encoded, validate=True)
+        need(base64.b64encode(payload) == encoded, 'Noncanonical Base64 storage')
+    else:
+        raise ValueError('Unknown storage encoding')
+    need(len(payload) >= 8 and payload[:4] == b'5SPA'
+         and type(version) is int and int.from_bytes(payload[4:8], 'little') == version,
+         'Exact request signature and recorded version required')
+    if origin == 'request17':
+        need(version == 17, 'Current request17 origin required')
+    elif origin == 'legacy-ipad-v14-v15':
+        need(version in (14, 15), 'Recorded legacy iPad14/15 origin required')
+    else:
+        raise ValueError('Explicit recorded request origin required')
+    return base64.b64encode(payload) + b'\n'
+
+def win(path):
+    path = Path(path)
+    need(path.is_absolute(), 'Absolute host path required')
+    return 'Z:' + str(path).replace('/', '\\')
+
+def compile_commands(root, wine, *, output):
+    """Exact fresh-build import-library route; returned commands are inert."""
+    root, output, wine = Path(root), Path(output), Path(wine)
+    need(root.is_absolute() and output.is_absolute() and wine.is_absolute(),
+         'Absolute local command paths required')
+    base = root / 'build/anyps5-full-main-update-20261012'
+    source = base / 'qualification-source-v5'
+    build = base / 'winlibs-build-v5'
+    here = base / 'current-prx-shader-qualification-proposal'
+    need(output.is_relative_to(base) and output not in (base, here, build, source),
+         'Separate output under the update folder required')
+    compiler = root / 'build/toolchains/winlibs/mingw64/bin/g++.exe'
+    includes = [here, root / 'tools/checks/native-shader', source / 'core/libs',
+                source / 'core/libs/prx/libSceAgcDriver/tests', source / 'core/shader/recompiler',
+                build / 'core/libs/prx/libSceAgcDriver/shader_recompiler_agc_driver_generated',
+                build / 'core/libs/prx/libSceAgcDriver/generated',
+                source / '3rdparty/Vulkan-Headers/include', source / '3rdparty/SPIRV-Headers/include',
+                source / '3rdparty/glslang',
+                *sorted((source / 'core/shader/recompiler').glob('*/include'))]
+    common = [str(wine), str(compiler), '-O3', '-DNDEBUG', '-std=c++20',
+              '-fno-asynchronous-unwind-tables', '-DANYPS5_ENABLE_SPIRV_TOOLS=0',
+              '-DAPS5_ENABLE_TIMING_LOG=0', *['-I' + win(p) for p in includes]]
+    libraries = [win(build / 'core/libs/libs/implib/liblibSceAgcDriver.dll.a'),
+                 win(build / 'core/libs/libs/implib/liblibc.dll.a')]
+    libraries += ['-l' + n for n in ('kernel32', 'user32', 'gdi32', 'winspool', 'shell32',
+                                    'ole32', 'oleaut32', 'uuid', 'comdlg32', 'advapi32')]
+    bridge=source/'core/libs/prx/libc/src/specifics/windows/caller_bridge.cpp'
+    fixture = output / 'public-fixture.obj'
+    commands = [dict(label='compile-current-public-cases', argv=common +
+                     ['-Dmain=CandidateFixtureMain', '-c', win(root / 'build/current-prx-latest16-historical-binding-successor-proposal/loaded-public-cases.cpp'),
+                      '-o', win(fixture)])]
+    for name, inputs in (
+        ('public538', [fixture, here / 'actual-driver-identity.cpp']),
+        ('full-replay', [here / 'complete-private-replay.cpp']),
+        ('null12', [here / 'null-pixel-materialization.cpp']),
+    ):
+        executable = output / (name + '.exe')
+        commands.append(dict(label='link-current-' + name,
+                             argv=common + [win(p) for p in inputs] + [win(bridge),
+                                 '-Wl,--exclude-symbols,pthread_once:__imp_pthread_once:APS5CompilerOnceBridge:APS5CompilerOnceResolvedTarget']
+                                 + libraries + ['-o', win(executable)]))
+        commands.append(dict(label='unwind-current-' + name, argv=[str(wine),
+                             str(compiler.with_name('objcopy.exe')), '--rename-section',
+                             '.eh_frame=.ehfram', win(executable)]))
+    return commands
