@@ -11,18 +11,21 @@ The current source is complete merged AnyPS5 main at `a11c8f7f`, including
 all 1,721 commits after `c963432d` and the merged Apple #1776/#1831/#2015
 implementations. The preceding eleven reconciled patches apply and reverse exactly;
 95 host/relinker tests and six native shader suites pass. All 47 Windows HLE libraries and their selected test targets compile.
-The twelve raw-log cases pass; linked-runtime qualification then stops at
-`windows_exception_tests` when `call_once` throws through runtime DLL frames.
+The first build stopped at compiler-once exception unwinding. The production
+repair now passes the unchanged original Windows exception fixture. The current
+qualification stops later at a placeholder reservation rejected by local Wine;
+no memory assertion or reservation requirement has been disabled.
 The existing prepared
 game package is not relabelled as a build of this update.
 [Refresh details](UPSTREAM-REFRESH-20261012.md).
 
-The twelve-patch source now adds a scoped compiler-once repair. Its isolated
+The current thirteen-patch source includes a scoped compiler-once repair. Its isolated
 actual build preserves libc's existing exports, routes both owned direct and
 import-slot calls, and passes the unchanged original Windows exception fixture
 plus all eight focused cases. Every command and the owned Wine prefix closes;
-independent readback verifies the actual images and dependency records. A fresh
-complete 47-library build is running. This result repairs the observed once
+independent readback verifies the actual images and dependency records. The complete 47-library build compiles and passes the original exception
+fixture. A fixture-only correction also passes empty-path utimes errors and
+unchanged-directory-timestamp checks without writing the timestamp. This result repairs the observed once
 boundary; it does not qualify the full runtime, GPU or game.
 [Scoped execution result](../experimental/compiler-once-execution/direct-attempt-observation.json),
 [implementation](../patches/anyps5/0012-native-compiler-once.patch).
@@ -41,7 +44,7 @@ native archive inputs, embedded translator and signing entitlements verified.
 It isolates an EC continuation candidate; its HLE payload remains the older
 installed package. It has not yet been installed or executed, and does not
 establish a repair of Native59's fault. The current 47-library HLE update still
-requires its independent exception and shader qualification.
+requires complete memory/runtime and production-shader qualification.
 [Candidate implementation and local build](../experimental/native-ec-continuation/README.md).
 
 ## Preceding package and Windows results

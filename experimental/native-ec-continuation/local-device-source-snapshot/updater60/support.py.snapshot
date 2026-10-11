@@ -1,0 +1,140 @@
+"""Native60 signed target, signed59 rollback and preserved accepted59 source view."""
+from pathlib import Path
+import hashlib,importlib.util,json,os,plistlib,re,struct,sys,uuid
+_tool_spec=importlib.util.spec_from_file_location("exact_current_python_tool",Path(__file__).resolve().parent.parents[1]/'native59-device-prep/exact-current-python-observed58-diagnostic-update-proposal/current_tooling.py')
+tool=importlib.util.module_from_spec(_tool_spec);_tool_spec.loader.exec_module(tool)
+sys.dont_write_bytecode=True
+HERE=Path(__file__).resolve().parent;ROOT=HERE.parents[3]
+OLD58=ROOT/'build/minigolf-upstream-20261010/native58-device-prep'
+OLD50=ROOT/'build/minigolf-upstream-20261010/cpu-device-probe-prep/native58-complete-provider-sealed-lineage-continuing-collector-proposal'
+OLD50_SHA='8f2def43d00138bb733b0ee0aab28ba3ade285bb40172de5bb0c8dbca5eca795'
+SIGNED=ROOT/'build/native-ec-continuation-native60-build-20261012/signature-verification-attempt2/signed-build-receipt.json';BUILD_DIR=SIGNED.parents[1]
+COMMON=ROOT/'build/native-rpm-critical-owner-diagnostic59-packaging-proposal-20261012/common59.py';COMMON_SHA='013c9c0174dc890fd05569fa6ae8e2a710bfa259455ccdf5c0a8a42cec437dbc'
+SIGNED58=ROOT/'build/native-critical-suspend-native58-build-20261011/signed-build-receipt.json'
+SIGNED58_SHA='5d39ce81a46b331d0b1f72991f1f356da436443f858422e7299834c12d98dcef'
+INSTALL58=OLD58/'current-native57-reference-update-proposal/installation-binding.json'
+INSTALL58_SHA='e52cdbde1b8452274693e9feeace15eecda398c85d7269f874e3bdc508ef4b0f'
+FEX_SHA='e47acaff7211fc1d2dde26b22c5fb7fb0c23f8f14a8ec945e761ef035c8630f5'
+CPU_FREEZE='6d7718b775d286ec788936b16251aa413ffecaa413c7818d29159ce2e1d95b92'
+OWNER_REVIEW_SHA='c7b13ea1095813c1a611ac0471ce9a5b694d06bb482afffae356beb0886c34ee'
+BUNDLE='com.buberlo.anyps5ipad';TEAM='<LOCAL_TEAM>'
+STATUS='actual_closed_native60_preserved_install_bound_not_jit_or_cpu_ready'
+def need(v,m):
+ if not v:raise ValueError(m)
+def regular(p):
+ p=Path(p).absolute();need(p.is_relative_to(ROOT) and p==p.resolve() and p.is_file() and not any(q.is_symlink() for q in [p,*p.parents]) and p.stat().st_nlink==1,'Strict single-link project provider');return p
+def sha(p):
+ h=hashlib.sha256()
+ with Path(p).open('rb') as f:
+  for b in iter(lambda:f.read(1<<20),b''):h.update(b)
+ return h.hexdigest()
+def replay(values):
+ for p,h in values.items():need(sha(p)==h,'Exact declared provider bytes changed: '+str(p))
+def load(p):return json.loads(regular(p).read_text())
+def module(p,digest,name):
+ need(re.fullmatch('[0-9a-f]{64}',digest) and sha(regular(p))==digest,'Exact held module source');sp=importlib.util.spec_from_file_location(name,p);m=importlib.util.module_from_spec(sp);sp.loader.exec_module(m);return m
+def merge(dst,extra):
+ for p,d in extra.items():need(type(p)is str and re.fullmatch('[0-9a-f]{64}',d) and (p not in dst or dst[p]==d),'Conflicting input');dst[p]=d
+def file_map(directory,expected):
+ actual={}
+ for p in directory.rglob('*'):
+  need(not p.is_symlink() and (p.is_dir() or p.is_file()),'No linked/special source/app member')
+  if p.is_file():actual[p.relative_to(directory).as_posix()]=sha(regular(p))
+ need(actual==expected,'Complete exact source/app map');return {str(directory/k):v for k,v in actual.items()}
+def adapter():
+ p=OLD58/'declared-nm-clang-provider-update-proposal/fingerprints.py';return module(p,'6ef8f79159353a2a1022ada201b47fd85e39f5e0f153582c51244bb24e604868','held_declared_input_admission')
+PRIMITIVES={'/Applications/Xcode.app/Contents/Developer/usr/bin/devicectl':'05a638489cc6dad93bb1ed73e90ee1e55af6d103f2b70387c5c6a800e5f09cec','<LOCAL_HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12':'4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc'}
+
+OLD59=ROOT/'build/minigolf-upstream-20261010/native59-device-prep/exact-current-python-observed58-diagnostic-update-proposal'
+INSTALL59=OLD59/'installation-binding.json'
+INSTALL59_SHA='811cd15b15f726aa4d41d73985b2044de567ee1284d139725ae6416606810682'
+RESULT59_SHA='88d13c938b91f2c54ad9a6df4c616d3eed698c60b79eac7bccfdc409464716f7'
+SIGNED_SHA='2358ba4baeaa2450770d0e578ceb29ca81ba69d5343c8b36aafb399e3f7936e5'
+SIGNED59=ROOT/'build/native-rpm-critical-owner-diagnostic59-build-20261012-attempt2/signed-build-receipt.json'
+SIGNED59_SHA='63776e4f3ba7a0ec2d0b796e75603d5243f6db318d0e7d794877b737bdb62f37'
+PREPARED_SHA='7517c47921464bf6a41252ac7c1e5e725360b5d07c405c8cb8cfa298d20f5f46'
+_providers=importlib.util.spec_from_file_location('native60_exact_preserved_sources',HERE/'providers.py');pv=importlib.util.module_from_spec(_providers);_providers.loader.exec_module(pv)
+def source_view():return pv.view()
+def physical_map(values):return source_view().physical_map(values)
+def old59():return module(OLD59/'support.py','8a17fadd848883c00a82ea94d5ecd5a1ac3b497c6c8e50eec32aefbc2bbc3f75','held59_support')
+def accepted59():
+ need(sha(INSTALL59)==INSTALL59_SHA,'Actual installed59 binding identity')
+ b=load(INSTALL59);need(len(b['inputs'])==67527 and b['observedBuild']=='59' and b['signedNative59ReceiptSha256']==SIGNED59_SHA and b['compositeInstallationResultSha256']==RESULT59_SHA,'Exact genuine accepted59 closure')
+ result=regular(ROOT/b['compositeInstallationResult']);need(sha(result)==RESULT59_SHA,'Genuine actual59 result')
+ r=load(result);view=b['collectorProtectedDataView'];payload=Path(b['retainedProtectedPayload'])
+ v=source_view();values=v.physical_map(b['inputs']);a=adapter();declared=declarations(SIGNED_SHA)
+ replay_inputs(values,declared);v.final()
+ reader=module(OLD59/'binding.py','4d417d50c04fc09e943a9c99c2e177917e8e73accc0e501ecfb0c9d3e49b0cf6','unchanged_actual59_claims')
+ reader.installation_claims(b,r,b['inputs'],view,payload)
+ merge(values,{str(INSTALL59):INSTALL59_SHA,str(result):RESULT59_SHA,str(HERE/'source-relocations.json'):pv.MAP_SHA})
+ return b,values,view,payload
+
+def replay_inputs(values,declared):
+ a=adapter();before=a.fingerprints(values,declared)
+ for path,h in values.items():a.verified_input_path(a.input_key(path,h,declared),h,declared)
+ need(a.fingerprints(values,declared)==before,'Complete final lexical/leaf source identity drift');return before
+
+def signed59_contract():
+ v=source_view();old=v.module(OLD59/'support.py','8a17fadd848883c00a82ea94d5ecd5a1ac3b497c6c8e50eec32aefbc2bbc3f75','private_signed59_retained_sources')
+ r,values=old.signed_contract(SIGNED59,SIGNED59_SHA);v.final();return r,v.physical_map(values)
+
+def signed_shape(r,i):
+ need(r.get('schemaVersion')==3 and r.get('status')=='built_signed_verified_not_installed' and r.get('appBuild')=='60' and r.get('bundleID')==BUNDLE and r.get('team')==TEAM,'Exact actual signed60 identity')
+ for k in ['deepStrictCodesignVerified','dsymUuidMatches','signedEntitlementsEqualNative59','helperEntitlementsEqualNative59','profilesEqualNative59','native59RollbackPreserved','actualNativeLinkInputsVerified','appCoreStateConsumersVerified','freshFEXBridgeCompiled']:need(r.get(k)is True,'Actual signed60 gate: '+k)
+ for k in ['installed','launched','deviceOperations','deviceTested','runtimeAccepted','full803Qualified','cpuEightQualified','gamePlayable','diagnosticOnly']:need(r.get(k)is False,'Signing is not runtime/CPU acceptance')
+ need((r.get('freshNativeFexObjectCount'),r.get('freshNativeFexArchiveCount'),r.get('reusedNativeFexArchiveCount'),r.get('freshNativeWineObjectCount'),r.get('reusedNativeWineArchiveCount'))==(50,1,6,0,2),'Exact full frame-consumer rebuild and preserved Wine archives')
+ need(i.get('status')=='isolated_native60_inputs_verified'and i.get('buildVersion')==60 and len(i['sourceFiles'])==7480 and i['nativeFexSourceFileCount']==6973 and i['nativeFexGeneratedHeaderCount']==5 and i['appCoreStateConsumersRequired']==['FEXBridge'],'Exact prepared60 source/frame route')
+ need(r['native59RollbackSigningReceiptSha256']==SIGNED59_SHA and r['embeddedPEComponents']==i['embeddedPEComponents']and r['embeddedPEComponents']['xtajit64.dll']['sha256']==FEX_SHA,'Exact new EC FEX and preserved59 rollback')
+ need(r['nativeECContinuationReceiptSha256']=='fdbd160c776a110172ecd9dfddc3a50be4c7e65e22bf71b9ded70567ed2e0ae2'and r['nativeECContinuationSourceFreezeSha256']=='57156d21da90f6db968c1f41945738d457746e4e559645e4aca2e044c37428bf'and r['signatureVerificationSourceReviewSha256']=='6cd3d04f95158953219848914b5454bd84439cecbbac5bea3e9782e2836ec707','Actual fresh EC/native and same-app verifier lineage')
+ return True
+
+SIGNATURE_OBSERVATION_SHA='c1ac36e825caf5313c610fba1b2e179963a2642507834c3a4f27d9f87b7d4f58'
+def signed_contract(path,digest):
+ need(sha(HERE/'signature-observation.json')==SIGNATURE_OBSERVATION_SHA,'Exact independent signed artifact observation');observation=load(HERE/'signature-observation.json');replay(observation['inputHashes'])
+ need(regular(path)==SIGNED and digest==SIGNED_SHA and sha(path)==digest,'Exact actual signed60 receipt required')
+ r=load(path);i=load(BUILD_DIR/'inputs.json');need(sha(BUILD_DIR/'inputs.json')==r['inputReceiptSha256']==PREPARED_SHA,'Actual prepared60 manifest');signed_shape(r,i)
+ values={str(path):digest,str(BUILD_DIR/'inputs.json'):PREPARED_SHA,str(HERE/'signature-observation.json'):SIGNATURE_OBSERVATION_SHA};merge(values,observation['inputHashes']);v=source_view()
+ for m in [i['providerInputs'],i['recipeInputs'],r['signatureVerificationSourceInputs'],r['finishDriverInputs']]:merge(values,v.physical_map(m))
+ common=v.module(ROOT/'build/native-ec-continuation-native60-packaging-proposal-20261012/common60.py',sha(ROOT/'build/native-ec-continuation-native60-packaging-proposal-20261012/common60.py'),'held60_common_with_explicit_preserved_source_routes')
+ need(common.verify_inputs(BUILD_DIR,PREPARED_SHA)==i,'Every prepared60 source/provider byte remains exact')
+ appendix=SIGNED.parent;need(str(appendix)==r['signatureVerificationAppendix'],'Exclusive actual signature appendix')
+ for command in appendix.glob('*-command.json'):
+  row=load(command);need(row['cwd']==str(ROOT)and type(row['exitCode'])is int and row['exitCode']==0 and row['ownedChildReaped']is True and row['deviceOperations']is False and row.get('error')is None,'Actual completed signature/readback command')
+  need(len(row['outputs'])==2 and all(Path(p).parent==appendix for p in row['outputs']),'Exact appendix command outputs');merge(values,row['outputs']);values[str(command)]=sha(command)
+ need(len(list(appendix.glob('*-command.json')))==13,'Complete actual signature readback commands')
+ build=load(BUILD_DIR/'xcodebuild-result.json');cmd=load(BUILD_DIR/'xcodebuild-command.json')
+ need(build['status']=='native60_xcodebuild_pass_pending_signature_verification'and build['exitCode']==0 and build['inputReceiptSha256']==PREPARED_SHA and build['commandSha256']==sha(BUILD_DIR/'xcodebuild-command.json')and cmd['argv']==common.planned_argv(BUILD_DIR)and cmd['ownedChildReaped']is True and cmd['exitCode']==0 and cmd['outputs']==build['outputHashes'],'Actual joined Native60 build')
+ merge(values,cmd['outputs'])
+ for name in ['xcodebuild-result.json','xcodebuild-command.json']:values[str(BUILD_DIR/name)]=sha(BUILD_DIR/name)
+ need('** BUILD SUCCEEDED **'in (BUILD_DIR/'xcodebuild.stdout').read_text(),'Actual completed host build marker')
+ closure=appendix/'app-file-hashes.json';need(sha(closure)==r['appFileHashesSha256'],'Exact complete signed60 app map');app=regular(r['app']+'/Madeira').parent
+ need(app==BUILD_DIR/'DerivedData/Build/Products/Debug-iphoneos/Madeira.app','Only actual signed60 app')
+ merge(values,file_map(app,load(closure)));merge(values,file_map(BUILD_DIR/'layout',i['sourceFiles']));values[str(closure)]=sha(closure)
+ old=old59();need(sha(app/'Madeira')==r['appMachOSha256']and old.macho_uuid((app/'Madeira').read_bytes())==r['uuid'],'Actual60 Mach-O bytes/UUID')
+ for component,bid in [(app,BUNDLE),(app/'PlugIns/MadeiraJITHelper.appex',BUNDLE+'.JITHelper')]:
+  q=plistlib.loads((component/'Info.plist').read_bytes());need(q['CFBundleIdentifier']==bid and q['CFBundleVersion']=='60','Actual host/helper60 identities')
+ need(sha(app/'Info.plist')==r['appInfoSha256']and sha(app/'PlugIns/MadeiraJITHelper.appex/MadeiraJITHelper')==r['helperMachOSha256'],'Actual signed host/helper bytes')
+ for label in ['host','helper']:
+  need(plistlib.loads((appendix/(label+'-entitlements.stdout')).read_bytes())==plistlib.loads((SIGNED59.parent/(label+'-entitlements.stdout')).read_bytes()),'Actual retained59 entitlements')
+  need(plistlib.loads((appendix/(label+'-profile.stdout')).read_bytes())==plistlib.loads((SIGNED59.parent/(label+'-profile.stdout')).read_bytes()),'Actual retained59 profile values')
+ for name,row in r['embeddedPEComponents'].items():need(sha(app/'arm64ec-windows'/name)==row['sha256']and (app/'arm64ec-windows'/name).stat().st_size==row['bytes'],'Actual signed PE bytes')
+ cores=load(appendix/'app-core-state-consumers.json');need(set(cores)=={'FEXBridge'}and sha(appendix/'app-core-state-consumers.json')==r['appCoreStateReadbackSha256'],'Actual sole fresh app CoreState consumer')
+ for row in cores.values():
+  need(sha(row['dependencyFile'])==row['dependencySha256']and sha(row['object'])==row['objectSha256']and len(row['actualFexHeaders'])==47,'Fresh FEXBridge actual dependency/object bytes');merge(values,row['actualFexHeaders']);merge(values,{row['dependencyFile']:row['dependencySha256'],row['object']:row['objectSha256']})
+ link=load(appendix/'native-link-input-readback.json');need(link['uniqueResolutionVerified']is True and len(link['selectedArchives'])==9,'Actual nine unique native link archives')
+ for row in link['selectedArchives'].values():merge(values,{row['path']:row['sha256']})
+ finish=load(appendix/'finish-receipt.json');need(finish['status']=='native60_signature_and_provenance_pass_not_installed'and finish['signedReceiptSha256']==digest,'Actual successful same-app final verifier')
+ for name in ['native-link-input-readback.json','app-core-state-consumers.json','finish-receipt.json']:values[str(appendix/name)]=sha(appendix/name)
+ replay(values);v.final();return r,values
+
+def declarations(digest):
+ need(digest==SIGNED_SHA,'Only actual signed60 declarations')
+ d={}
+ for signed,path,h in [(SIGNED,BUILD_DIR,PREPARED_SHA),(SIGNED59,SIGNED59.parent,load(SIGNED59)['inputReceiptSha256'])]:
+  need(sha(path/'inputs.json')==h,'Exact prepared declaration origin');merge(d,load(path/'inputs.json')['providerInputs'])
+ need(sha(SIGNED58)==SIGNED58_SHA,'Exact retained signed58 declaration origin');old58=load(SIGNED58);need(sha(SIGNED58.parent/'inputs.json')==old58['inputReceiptSha256'],'Exact old58 declaration manifest');merge(d,load(SIGNED58.parent/'inputs.json')['providerInputs']);merge(d,PRIMITIVES);return d
+
+def artifact(signed,digest):
+ build=BUILD_DIR if signed['appBuild']=='60'else SIGNED59.parent;appendix=SIGNED.parent if signed['appBuild']=='60'else build;receipt=SIGNED if signed['appBuild']=='60'else SIGNED59
+ closure=appendix/'app-file-hashes.json'
+ return {'app':signed['app'],'receipt':str(receipt),'receiptSha256':digest,'closure':str(closure),'closureSha256':signed['appFileHashesSha256'],'fileCount':len(load(closure)),'signedEntitlements':signed['signedEntitlements'],'profileSha256':[r['sha256']for r in signed['profiles']],'helperSignedEntitlements':plistlib.loads((appendix/'helper-entitlements.stdout').read_bytes()),'hostEntitlementsSha256':sha(appendix/'host-entitlements.stdout'),'helperEntitlementsSha256':sha(appendix/'helper-entitlements.stdout')}

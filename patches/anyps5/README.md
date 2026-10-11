@@ -1,6 +1,6 @@
 # AnyPS5 full main reconciliation
 
-Apply all twelve adjacent patches in lexical order to upstream
+Apply all thirteen adjacent patches in lexical order to upstream
 `a11c8f7f70a0ed4e71504a89de69e8cdae687817`. They replace the prior c963
 local series. The merged upstream implementations of LDS device memory,
 descriptor snapshots and typed placeholder images are retained; only the
@@ -13,7 +13,7 @@ handling, strict request17/cache28 image policy, original-IR interpolation
 proofs, bounded AudioOut tracing/pacing, grouped color transfers, grouped
 depth/stencil contracts, descriptor/resource lifetime, device/PSO profiles,
 guarded module lifecycle/relinker, integration/regression tests, and scoped
-native compiler-once exception delivery. All twelve are required together.
+native compiler-once exception delivery. All thirteen are required together.
 The upstream gitlinks remain unchanged.
 
 Patch 0012 routes newly linked owned MinGW callers' direct `pthread_once`
@@ -21,9 +21,15 @@ calls and import slots through a four-byte Windows once provider with DWARF
 cleanup. Guest once objects and native compiler DLL internals are unchanged.
 It preserves the original 1,061 libc exports and appends one private,
 NID-exempt provider. The original Windows exception fixture and all eight
-focused once cases pass in the isolated actual build. The fresh complete
-47-library build is running; full runtime qualification is still pending.
+focused once cases pass in the isolated actual build. The complete 47-library build compiles and its original Windows exception
+fixture passes. Full runtime qualification is still pending at the fixed
+guest-arena placeholder-reservation test.
 [Actual scoped result](../../experimental/compiler-once-execution/direct-attempt-observation.json).
+
+Patch 0013 checks empty-path utimes errors and unchanged directory timestamps
+without attempting to write the working directory timestamp. The original
+kernel already returns ENOENT; this is a test correction. The fresh fixture
+passes after the correction.
 
 Native compilation and all six shader suites pass, including the 538-case
 extended public guard suite. All 95 native host/relinker tests pass. The
@@ -46,7 +52,8 @@ this source; grouped depth transfer remains rejected. Existing real
 capability and format checks remain required.
 
 The private proposal provenance records every changed file and source/receipt
-digest. The first eleven patches were fully applied and reversed. The new
-seven-file patch separately passes application and reversal; all 2,136 files
-of the fresh twelve-patch build source match the canonical patched source.
+digest. An independent fresh application and reversal of all thirteen patches
+passes all 52 commands. All 2,136 resulting source entries, including modes,
+match the canonical patched source, and reversal restores the exact base.
+[Complete roundtrip](../../docs/evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
 No GitHub Actions were used.

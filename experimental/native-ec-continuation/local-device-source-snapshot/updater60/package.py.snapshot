@@ -1,0 +1,30 @@
+"""Unchanged historical Original50 decisions through exact36+673 physical views."""
+import importlib.util,types
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('package60_support',HERE/'support.py');s=importlib.util.module_from_spec(sp);sp.loader.exec_module(s)
+OLD=s.ROOT/'build/minigolf-upstream-20261010/cpu-device-probe-prep/complete-retained-package-provider-proposal/providers.py'
+OLD_SHA='5c4fdab22c359d3a93de5bb5083a42ef55eee333768b76d406ba4be2b272684a'
+SELECT=s.ROOT/'build/minigolf-upstream-20261010/cpu-device-probe-prep/qualified-reconciliation-consumer-proposal/package-selection.json'
+def selected_package(path=SELECT):
+ s.need(Path(path)==SELECT,'Only exact historical CPU selection')
+ old=s.module(OLD,OLD_SHA,'held_complete36_package_definitions');v=s.source_view();prior=old.resolver()
+ class Combined:
+  rows=prior.rows
+  def file(self,p):
+   name=Path(p).absolute().relative_to(s.ROOT).as_posix()
+   return prior.file(p)if name in prior.rows else v.file(p)
+  def physical_map(self,logical):
+   first=prior.physical_map(logical);absolute=v.physical_map(first)
+   return{Path(k).relative_to(s.ROOT).as_posix():h for k,h in absolute.items()}
+  def final(self):prior.final();v.final()
+ r=Combined();original_namespace=old.namespace
+ def namespace(path,name,resolver=None):
+  m=original_namespace(path,name,resolver)
+  old_sha=getattr(m,'sha',None);old_regular=getattr(m,'regular',None)
+  if old_sha:m.sha=lambda p:v.digest(p)if str(Path(p).absolute())in v.rows else old_sha(p)
+  if old_regular:m.regular=lambda p,*a,**kw:r.file(p)if str(Path(p).absolute())in v.rows else old_regular(p,*a,**kw)
+  return m
+ readers=v.clone(old.readers,namespace=namespace)
+ selected=v.clone(old.selected_package,resolver=lambda:r,readers=readers,namespace=namespace)
+ a,b,logical=selected(path);physical=v.physical_map(logical);physical[str(HERE/'source-relocations.json')]=s.pv.MAP_SHA;physical[str(HERE/'package.py')]=s.sha(HERE/'package.py');r.final();return a,b,{Path(k).relative_to(s.ROOT).as_posix():h for k,h in physical.items()}

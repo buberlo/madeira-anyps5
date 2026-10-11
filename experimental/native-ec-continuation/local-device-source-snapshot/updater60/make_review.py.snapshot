@@ -1,0 +1,28 @@
+"""Emit only a local source review; no plan/installer/signing/hardware operation."""
+import importlib.util,json,os,subprocess,sys
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+sp=importlib.util.spec_from_file_location('review60source',HERE/'support.py');s=importlib.util.module_from_spec(sp);sp.loader.exec_module(s)
+def main():
+ v=s.source_view();values={}
+ for name in ['providers.py','support.py','reference.py','install.py','binding.py','package.py','test_native60.py','README.md','make_review.py','source-relocations.json','signature-observation.json','package-replay.json']:
+  p=s.regular(HERE/name);values[str(p)]=s.sha(p)
+ for logical,r in v.rows.items():values[str(v.file(logical))]=r['sha256']
+ for p in [s.OLD59/'source-review-freeze.json',s.ROOT/'build/native-ec-continuation-native60-final-verifier-attempt2-proposal-20261012/source-review-freeze.json',s.ROOT/'build/minigolf-upstream-20261010/cpu-device-probe-prep/complete-retained-package-provider-proposal/source-review-freeze.json']:
+  r=s.load(p);s.merge(values,{str(p):s.sha(p)});s.merge(values,v.physical_map({n:h for n,h in r.get('inputHashes',r.get('inputs',{})).items()if Path(n).is_relative_to(s.ROOT)}))
+ replay=s.load(HERE/'package-replay.json');s.need(replay['helperSha256']==values[str(HERE/'package.py')]and len(replay['package']['files'])==63 and replay['package']['files']['raw/guest_raise_exception_tests.exe']=='34ec640f54c8581ae833e8ff6d5276b9dea456ad5ca699460221e47f87dddb20','Actual retained63/34ec local package replay')
+ for p in [s.INSTALL59,s.ROOT/s.load(s.INSTALL59)['compositeInstallationResult'],s.SIGNED,s.SIGNED59]:s.merge(values,{str(p):s.sha(p)})
+ ref=s.module(HERE/'reference.py',values[str(HERE/'reference.py')],'review_only_current59_diagnostic_reference');_,_,_,_,extra=ref.failed_origin()
+ # Retain all actual evidence but not a new full historical input-map replay here.
+ for n,h in extra.items():
+  if str(ref.FAILED)in n:s.merge(values,{n:h})
+ s.merge(values,s.load(HERE/'signature-observation.json')['inputHashes'])
+ stamps={n:s.pv.seven(s.regular(n).stat())for n in values};log=HERE/'offline-tests.log'
+ argv=[s.tool.PYTHON,'-I','-B','-m','unittest','discover','-s',str(HERE),'-p','test_native60.py']
+ with log.open('x')as f:run=subprocess.run(argv,stdout=f,stderr=subprocess.STDOUT,timeout=60)
+ s.need(run.returncode==0,'Meaningful source/temp controls');s.replay(values);s.need({n:s.pv.seven(s.regular(n).stat())for n in values}==stamps,'Reviewed input identities changed');values[str(log)]=s.sha(log);stamps[str(log)]=s.pv.seven(log.stat());v.final()
+ proof={'schema':1,'status':'source_only_native60_preserved59_update_reader_not_executed','caseCount':19,'inputHashes':values,'inputFingerprints':stamps,'currentToolInputs':{s.tool.PYTHON:s.tool.CURRENT},'oldLogicalSourceMapSha256':s.pv.MAP_SHA,'oldLogicalSourceCount':673,'actualRetainedPackageReplaySha256':s.sha(HERE/'package-replay.json'),'actualSignedNative60ReceiptSha256':s.SIGNED_SHA,'actualAcceptedNative59BindingSha256':s.INSTALL59_SHA,'deviceActions':False,'executionPlanCreated':False,'installed60':False,'cpuQualified':False,'historicalExpectedHashesRewritten':False}
+ p=HERE/'source-review-freeze.json'
+ with p.open('x')as f:json.dump(proof,f,indent=2);f.write('\n')
+ print(json.dumps({'sourceReview':str(p),'sha256':s.sha(p),'caseCount':19,'inputCount':len(values),'bytes':sum(Path(n).stat().st_size for n in values)}))
+if __name__=='__main__':main()

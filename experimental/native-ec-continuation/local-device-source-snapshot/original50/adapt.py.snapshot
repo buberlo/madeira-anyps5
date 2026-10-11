@@ -1,0 +1,22 @@
+"""Exact raw qualifying probe; native60 provenance literals only."""
+import ast,hashlib,types
+from pathlib import Path
+HERE=Path(__file__).resolve().parent
+PROBE_SHA='359979e9964d157c6c43864f6c4debb3f82d7fb7d15edd9985bc036a8d93b25d'
+OLD_INSTALL_STATUS='actual_closed_native58_composite_install_bound_not_jit_or_launch_ready'
+NEW_INSTALL_STATUS='actual_closed_native60_preserved_install_bound_not_jit_or_cpu_ready'
+class Literals(ast.NodeTransformer):
+ def visit_Constant(self,n):
+  if type(n.value)is str:n.value={OLD_INSTALL_STATUS:NEW_INSTALL_STATUS,'58':'60'}.get(n.value,n.value.replace('native58','native60').replace('Native58','Native60').replace('accepted58','accepted60').replace('own58','own60'))
+  return n
+p=HERE/'probe.py';source=p.read_bytes()
+if hashlib.sha256(source).hexdigest()!=PROBE_SHA:raise ValueError('Original50 probe bytes changed')
+tree=ast.fix_missing_locations(Literals().visit(ast.parse(source)))
+# The retained probe records its own raw, unchanged source identity. The adapter
+# is an additional declared source provider, rather than a replacement identity.
+__file__=str(p)
+exec(compile(tree,str(p),'exec'),globals())
+_raw_prepare=prepare
+# No output or package replay while genuine installed tuple is pending.
+def prepare(*args,**kwargs):
+ module(RUNTIME,'actual60_preparation_pin_gate').require_runtime();return _raw_prepare(*args,**kwargs)

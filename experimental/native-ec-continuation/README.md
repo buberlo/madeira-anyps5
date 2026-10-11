@@ -158,3 +158,13 @@ remains retained. Native60 is now locally built and signed, and has not been
 installed or CPU-qualified at this observation. The older installed Native59
 HLE bytes remain packaged; the new a11c HLE runtime is not substituted.
 [Signed local build observation](../../docs/evidence/native60-local-build-signature-20261012.json).
+
+[The additive local-device source snapshot](local-device-source-snapshot/README.md)
+preserves the authored Native60 preserving updater, provider reader and pending
+Original50 adapter. It retains the prior installation's source bytes through
+explicit local source views, requires complete current-data readback, and keeps
+signed rollback and process closure. Its 19 updater controls and 24 Original50
+controls are source checks. The snapshot omits private inventories, signing,
+pairing, packages and logs; it requires the unpublished local bindings and is
+not an executable fresh-clone recipe. Actual device results are recorded
+separately from these source snapshots.

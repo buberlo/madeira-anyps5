@@ -1,0 +1,72 @@
+"""Private exact execution-tool routing. No device action or global SHA alias."""
+import copy, types
+from pathlib import Path
+import importlib.util, hashlib
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[3]
+ORIGINAL = ROOT / 'build/minigolf-upstream-20261010/native56-device-prep/accessible-backup-proposal/native56.py'
+ORIGINAL_SHA = '6bd6f243ddc83d66b6eb0e07f0cc306a485c9d93c8161421b74ba643bbac77dc'
+OLD_PLAN = ORIGINAL.with_name('plan.json')
+OLD_PLAN_SHA = 'f2977cdfc19f78ed700c413c601c602d257e2f9c3559dde0ca5de4da5f63e020'
+PROBE_SHA = '359979e9964d157c6c43864f6c4debb3f82d7fb7d15edd9985bc036a8d93b25d'
+TOOL = ROOT / 'build/minigolf-upstream-20261010/native59-device-prep/exact-current-python-observed58-diagnostic-update-proposal/current_tooling.py'
+TOOL_SHA = 'cf6d2982bfc7b73d6d82b54a8d918e2b8885b355bba434213dc73471ab3be4d7'
+
+def need(value, message):
+    if not value:
+        raise ValueError(message)
+
+def sha(path):
+    h = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda: stream.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+
+def held_tool():
+    need(sha(TOOL) == TOOL_SHA, 'Exact current-tooling definition required')
+    spec = importlib.util.spec_from_file_location('held4158_execution_tool', TOOL)
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    return tool
+
+def native_view(native):
+    """Same native verify_plan code; exact old JSON SHA still checked before load.
+
+    The private plan loader changes only the already-declared interpreter digest.
+    Other native/helper/source/runtime/signature checks remain the held code.
+    Native functions and module globals outside this returned view are untouched.
+    """
+    need(Path(native.__file__) == ORIGINAL and sha(ORIGINAL) == ORIGINAL_SHA
+         and sha(OLD_PLAN) == OLD_PLAN_SHA, 'Exact original helper/f297 plan required')
+    tool = held_tool()
+    historical = native.load(OLD_PLAN)
+    current = tool.current_original_plan(historical)
+    def exact_plan_load(path):
+        need(Path(path) == OLD_PLAN and sha(OLD_PLAN) == OLD_PLAN_SHA,
+             'Private loader admits only immutable f297 plan')
+        need(native.load(OLD_PLAN) == historical, 'Historical plan changed during verification')
+        tool.verify_current_python()
+        return copy.deepcopy(current)
+    view = types.SimpleNamespace(**vars(native))
+    view.verify_plan = tool.scoped_clone(native.verify_plan, {'load': exact_plan_load})
+    return view
+
+def execute_function(probe):
+    """Keep held async execution code; route only its exact native helper load."""
+    need(Path(probe.__file__) == HERE / 'probe.py' and sha(probe.__file__) == PROBE_SHA
+         and probe.ORIGINAL == ORIGINAL and probe.ORIGINAL_SHA == ORIGINAL_SHA
+         and probe.OLD_PLAN == OLD_PLAN and probe.OLD_PLAN_SHA == OLD_PLAN_SHA,
+         'Exact unchanged diagnostic probe and original helper declarations')
+    original_loader = probe.module
+    def loader(path, name):
+        loaded = original_loader(path, name)
+        if Path(path) == ORIGINAL:
+            need(name == 'original_cpu_device_primitives', 'Only exact execution native load adapted')
+            return native_view(loaded)
+        return loaded
+    return held_tool().scoped_clone(probe.execute, {'module': loader})
+
+def main_function(probe):
+    return held_tool().scoped_clone(probe.main, {'execute': execute_function(probe)})

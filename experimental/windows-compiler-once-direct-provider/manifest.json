@@ -1,6 +1,6 @@
 {
   "files": {
-    "CHECKPOINT.md": "d3e8c106b1222a9c501a300783c402a35f03c6dc3cf24c9c2c90aa4943bc045c",
+    "CHECKPOINT.md": "d223b656d76eadbfa0497db4cfaee79cda9e8d907852a1ec6edb84f3286e4ab1",
     "CompilerOnceTests.cpp": "10f9380bde14cae7f654cda077ad0d6877ad911d226625b7f90f9851c549d2e4",
     "README.md": "7a170c7c32ce35c6589c0b30d66df1e17f69bdd8f939d12db9aa0a4408065875",
     "caller_bridge.cpp": "fab4cc6fb91408d14cc9beb474382db9b7363ed3f9229f1baf67e004f46b95a7",
@@ -16,5 +16,7 @@
   "originSourceReviewSha256": "186dc6e6ed9b98009b7387f5c2a8fee0c652a672211ac54a2b8a18c404744fc3",
   "privateInputsIncluded": false,
   "schema": 1,
-  "status": "public_source_snapshot_not_runtime_qualified"
+  "status": "public_source_snapshot_with_separate_scoped_pass_not_full_runtime_qualified",
+  "scopedLocalWineExecutionPassed": true,
+  "productionSourceIntegrated": true
 }

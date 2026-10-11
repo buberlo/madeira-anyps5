@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "status": "source_only_thirteen_patch_roundtrip_with_fixture_only_enoent_nonmutation_regression_pass",
+  "all52ActualApplyAndReverseChecksZeroExit": true,
+  "appliedEntries": 2136,
+  "appliedTreeDigest": "f7bf5bf22062bc1a01384e650c435d8c0fea90e8f12b9198eaafee6b265149b2",
+  "baseCommit": "a11c8f7f70a0ed4e71504a89de69e8cdae687817",
+  "baseTreeDigest": "55644b511bd30e3f3679fe43c1794bbb2f63ebb616cd4d9a0762dffb74cb86ef",
+  "reverseTreeDigest": "55644b511bd30e3f3679fe43c1794bbb2f63ebb616cd4d9a0762dffb74cb86ef",
+  "compilerWineDeviceExecuted": false,
+  "existingKernelEnoentEarlyReturnVerified": true,
+  "productionFilesChangedByProposal": false,
+  "proposedFixtureSha256": "460c14df2a51197068e31f762633a0cd5d7c9660a62f73ee20593d11addcf1d1",
+  "actualReceiptSha256": "ddc52f3966aea5641548983b298e5c019c78e0d351680859b624036292b5bfba",
+  "patchCount": 13,
+  "targetedRuntimeFixturePassedSubsequently": true,
+  "fullRuntimeQualified": false,
+  "sourceOnlyRoundtripNotRuntimePass": true
+}

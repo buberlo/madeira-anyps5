@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Exact launch-only argv correction; every other query uses frozen Session.query."""
+import asyncio
+import os
+
+DEVICE='<LOCAL_DEVICE_UDID>'
+BUNDLE='com.buberlo.anyps5ipad'
+LABEL='launch-own-single-use-cpu'
+
+
+def device_arguments(args, expected_payload):
+    expected=['process','launch','--payload-url',expected_payload,'--',BUNDLE,
+              '-madeiraJITMethod','builtIn']
+    if type(expected_payload) is not str or not expected_payload.startswith('anyps5ipad://play?exe='):
+        raise ValueError('Exact reviewed CPU payload URL required')
+    if type(args) is not list or args != expected:
+        raise ValueError('Only the exact reviewed CPU launch grammar is permitted')
+    return [*args[:4],'--device',DEVICE,*args[4:]]
+
+
+def session_type(n, p):
+    expected_payload=p['launchURL']
+    # Resolve the exact immutable module before any query. No broad launch mode.
+    n.require(n.DEVICE==DEVICE and n.BUNDLE==BUNDLE, 'Exact immutable device/bundle primitive required')
+
+    class LaunchSession(n.Session):
+        async def query(self,args,label,cap=25):
+            if label != LABEL:
+                n.require(type(args) is list and args[:2]!=['process','launch'],
+                          'Unreviewed launch label refused')
+                return await super().query(args,label,cap)
+            # Match and rearrange before guard/counter/log creation or subprocess.
+            command_args=device_arguments(args,expected_payload)
+            limit=min(cap,int(self.guard()))
+            n.require(limit>0,'No remaining device command budget')
+            self.counter+=1
+            path=self.stage/(f'{self.counter:03d}-'+label+'.json')
+            env={k:v for k,v in os.environ.items() if not k.startswith('DEVICECTL_CHILD_')
+                 and k not in ['PYMOBILEDEVICE3_TUNNEL','PYMOBILEDEVICE3_NATIVE','PYMOBILEDEVICE3_USERSPACE']}
+            env['DEVELOPER_DIR']='/Applications/Xcode.app/Contents/Developer'
+            argv=[str(n.DEVICETL),'--timeout',str(limit),'--json-output',str(path),
+                  '--quiet','device',*command_args]
+            n.save(path.with_suffix('.command.json'),{'schema':1,'label':label,'argv':argv,
+                   'deviceOptionBeforeArgumentBoundary':True,
+                   'appArguments':['-madeiraJITMethod','builtIn']})
+            with path.with_suffix('.log').open('xb') as log:
+                child=await asyncio.create_subprocess_exec(*argv,env=env,stdout=log,
+                                                          stderr=asyncio.subprocess.STDOUT)
+                try:
+                    code=await asyncio.wait_for(child.wait(),limit+2)
+                except BaseException:
+                    if child.returncode is None:
+                        child.kill()
+                    await asyncio.wait_for(child.wait(),3)
+                    raise
+            n.require(code==0,'Device command failed: '+label)
+            report=n.load(path)
+            n.require(report.get('info',{}).get('outcome')=='success',
+                      'Device command did not succeed: '+label)
+            return report['result']
+
+    return LaunchSession

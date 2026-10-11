@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "status": "independent_current_twelve_patch_apply_canonical_match_and_reverse_pass_not_runtime_qualification",
+  "baseCommit": "a11c8f7f70a0ed4e71504a89de69e8cdae687817",
+  "patchCount": 12,
+  "baseSourceEntries": 2055,
+  "baseTreeDigest": "55644b511bd30e3f3679fe43c1794bbb2f63ebb616cd4d9a0762dffb74cb86ef",
+  "appliedSourceEntries": 2136,
+  "appliedTreeDigest": "df70707f74e6228735467ec9e35afe03e6e54ccb000d3833e4aed0ff7767feee",
+  "canonicalMatchedBytes": 20518393,
+  "reverseTreeDigest": "55644b511bd30e3f3679fe43c1794bbb2f63ebb616cd4d9a0762dffb74cb86ef",
+  "all48ApplyReverseCommandsZeroExit": true,
+  "canonicalBeforeAfterHeadUnchanged": true,
+  "canonicalSourceModifiedByReviewer": false,
+  "nestedDependencySourceOrGitlinksModified": false,
+  "patchesBeforeAfterUnchanged": true,
+  "temporaryApplyRootOutsideAnyGitRepositoryConfirmed": true,
+  "compilerWineDeviceCalled": false,
+  "fullHleRuntimeQualified": false,
+  "actualReceiptSha256": "89fe79fa92a8d69703801e8fe98f70a2bdd406d993693f10a222af48d61cd231",
+  "privateInputsIncluded": false,
+  "rawLogsIncluded": false
+}

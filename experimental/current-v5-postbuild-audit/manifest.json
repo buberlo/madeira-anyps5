@@ -1,0 +1,25 @@
+{
+  "actualQualificationClaimed": false,
+  "files": {
+    "README.md": {
+      "checkpointSha256": "11df94ea52a8f1568913187aec7c2270903cc1cd285b3c5fc66ff2fe66205d92",
+      "exactSourceSnapshot": false,
+      "sanitizedDocumentation": true,
+      "sourceSha256": "38e28217a2bb41e64a44aa2fe4311d6e58782a28e4da1469ded6903a36c42edc"
+    },
+    "audit.py": {
+      "checkpointSha256": "a8781dfe1a7e67178b706bf5468e71bd1eb16af69982ebefad2c1e79392628b9",
+      "exactSourceSnapshot": true,
+      "sourceSha256": "a8781dfe1a7e67178b706bf5468e71bd1eb16af69982ebefad2c1e79392628b9"
+    },
+    "test_audit.py": {
+      "checkpointSha256": "6f951c77567b361f91f0a7ba08d11a192b1c2aef0a48dc8acffa6f24ec878781",
+      "exactSourceSnapshot": true,
+      "sourceSha256": "6f951c77567b361f91f0a7ba08d11a192b1c2aef0a48dc8acffa6f24ec878781"
+    }
+  },
+  "kind": "public_v5_postbuild_audit_source_snapshot",
+  "originSourceReviewSha256": "c6ae44320d2f1ecdffc7057ee4032c22a77cb8d98f15b24c6f4b5979dbd3cecb",
+  "privateInputsOrPlansIncluded": false,
+  "schema": 1
+}

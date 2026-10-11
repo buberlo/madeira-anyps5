@@ -24,8 +24,14 @@ executable modes. All eleven nested dependency pins remain exact.
 
 A twelfth patch integrates the scoped compiler-once repair described below.
 It changes seven files and passes its separate application/reversal controls.
-The fresh twelve-patch build source contains 2,136 files, all read back against
-the canonical patched source; the prior eleven-patch proof remains historical.
+The complete twelve-patch series also passes independent fresh application and
+reversal: all 48 commands succeed, all 2,136 source entries including modes
+match canonical, and reversal restores the exact upstream base. The prior
+eleven-patch proof remains historical.
+[Twelve-patch source roundtrip](evidence/anyps5-twelve-patch-roundtrip-20261012.json).
+The subsequent fixture-only correction also passes a complete thirteen-patch
+roundtrip: all 52 commands succeed and all 2,136 source entries match.
+[Thirteen-patch source roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
 
 - The merged Apple fixes, including #1776 LDS spill, #1831 descriptor arrays
   and the now-merged #2015 image handling, come from the complete upstream
@@ -94,8 +100,13 @@ dependency records and the PE export/import contracts.
 [Actual scoped execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
 [production integration](../patches/anyps5/0012-native-compiler-once.patch).
 
-The complete 47-library build is now running from that fresh twelve-patch
-source. The fixture and cleanup assertions remain enabled. Full linked-runtime qualification, the
+The complete 47-library build compiles with the production once provider, and
+its original Windows exception fixture passes. A thirteenth patch corrects
+the filesystem fixture: it asserts ENOENT and an unchanged directory timestamp
+without writing that timestamp. This fixture now passes. The next memory
+fixture stops before an assertion because local Wine refuses the exact lazy
+placeholder reservation at `0x200000000`, with `ERROR_INVALID_ADDRESS`. The
+reservation and memory assertions remain enabled. Full linked-runtime qualification, the
 new prepared game package, Windows GPU run and iPad game run remain separate
 steps. The earlier 54-case runtime and 538-case
 production-driver results belong to the preceding source and are not reused as
