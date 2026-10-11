@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "status": "host_api_observation_only_not_runtime_qualification",
+  "actualReceiptSha256": "fa6038b8d4bb7cc496d18236b35b9e44c76a57f8c3d473a4fc126e1e229b1c44",
+  "commandCount": 10,
+  "allCommandsZeroExit": true,
+  "ownedPrefixJoined": true,
+  "providersUnchanged": true,
+  "runtimeQualified": false,
+  "deviceExecuted": false,
+  "observations": [
+    {
+      "case": "bare-0x200000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=0"
+    },
+    {
+      "case": "bare-0x200000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x200000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x0 error=487"
+    },
+    {
+      "case": "bare-0x200000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "bare-0x2000000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=0"
+    },
+    {
+      "case": "bare-0x2000000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x2000000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x0 error=487"
+    },
+    {
+      "case": "bare-0x2000000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "bare-0x7400000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=0"
+    },
+    {
+      "case": "bare-0x7400000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x7400000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x7400000000 error=0"
+    },
+    {
+      "case": "bare-0x7400000000",
+      "line": "RELEASE label=VirtualAlloc2-fixed-placeholder pointer=0x7400000000 success=1 error=0"
+    },
+    {
+      "case": "bare-0x7400000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "bare-0xc00000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=0"
+    },
+    {
+      "case": "bare-0xc00000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0xc00000000 size=0x10000000 flags=0x42000 protection=0x1 result=0xc00000000 error=0"
+    },
+    {
+      "case": "bare-0xc00000000",
+      "line": "RELEASE label=VirtualAlloc2-fixed-placeholder pointer=0xc00000000 success=1 error=0"
+    },
+    {
+      "case": "bare-0xc00000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "hle-0x200000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=1"
+    },
+    {
+      "case": "hle-0x200000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x200000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x0 error=487"
+    },
+    {
+      "case": "hle-0x200000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "hle-0x2000000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=1"
+    },
+    {
+      "case": "hle-0x2000000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x2000000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x0 error=487"
+    },
+    {
+      "case": "hle-0x2000000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "hle-0x7400000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=1"
+    },
+    {
+      "case": "hle-0x7400000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0x7400000000 size=0x10000000 flags=0x42000 protection=0x1 result=0x7400000000 error=0"
+    },
+    {
+      "case": "hle-0x7400000000",
+      "line": "RELEASE label=VirtualAlloc2-fixed-placeholder pointer=0x7400000000 success=1 error=0"
+    },
+    {
+      "case": "hle-0x7400000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    },
+    {
+      "case": "hle-0xc00000000",
+      "line": "HOST wine=11.0 alloc2=1 alloc2fromapp=1 hleLoaded=1"
+    },
+    {
+      "case": "hle-0xc00000000",
+      "line": "ALLOC label=VirtualAlloc2-fixed-placeholder requested=0xc00000000 size=0x10000000 flags=0x42000 protection=0x1 result=0xc00000000 error=0"
+    },
+    {
+      "case": "hle-0xc00000000",
+      "line": "RELEASE label=VirtualAlloc2-fixed-placeholder pointer=0xc00000000 success=1 error=0"
+    },
+    {
+      "case": "hle-0xc00000000",
+      "line": "DIAGNOSTIC_COMPLETE structurallyComplete=1 qualification=0"
+    }
+  ],
+  "chosenExplicitLocalTestBase": "0x7400000000",
+  "noRuntimeOrMemoryCheckDisabled": true
+}

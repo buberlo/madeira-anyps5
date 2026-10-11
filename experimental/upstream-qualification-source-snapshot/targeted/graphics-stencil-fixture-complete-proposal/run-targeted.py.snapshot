@@ -1,0 +1,48 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, os, subprocess, time
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+here = Path(__file__).resolve().parent
+source = base/'qualification-source-v5/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp'
+candidate = here/'candidate/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp'
+before = '4c17adfbd64dc145fc5ebf0b8a6deb9cfd3c8793743895a1f981ff4c64e31b34'
+after = '9ad74327f92e66a8e629d3373560705bace4da610b41fe2f15619c91bf9c60b2'
+digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+assert digest(source) == before and digest(candidate) == after
+out = here/'actual-targeted-run'
+out.mkdir()
+(out/'Graphics.before.cpp').write_bytes(source.read_bytes())
+source.write_bytes(candidate.read_bytes())
+winebin = root/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin'
+env = dict(os.environ, WINEPREFIX=str(base/'wine-prefix-v5'), WINEDEBUG='-all',
+           APS5_GUEST_ARENA_BASE='0x7400000000', APS5_GUEST_ARENA_SIZE='0x100000000',
+           APS5_GUEST_ARENA_LAZY='1', APS5_GUEST_ARENA_CHUNK='0x10000000')
+win = lambda p: 'Z:'+str(p).replace('/', '\\')
+path = ';'.join(win(p) for p in [root/'build/toolchains/winlibs/mingw64/bin',
+    base/'winlibs-build-v5/core/libs/libs/unpatched', base/'winlibs-build-v5/tests'])
+commands = [
+ ('build', 'cmake --build "'+win(base/'winlibs-build-v5')+'" --target agc_driver_graphics_tests --parallel 2', 600),
+ ('state-only', '"'+win(base/'winlibs-build-v5/tests/agc_driver_graphics_tests.exe')+'" --state-only', 90),
+ ('full', '"'+win(base/'winlibs-build-v5/tests/agc_driver_graphics_tests.exe')+'"', 90)]
+records = []
+try:
+    for name, command, timeout in commands:
+        cmd = out/(name+'.cmd')
+        cmd.write_bytes(('@echo off\r\nset "PATH='+path+';%PATH%"\r\n'+command+'\r\nexit /b %ERRORLEVEL%\r\n').encode())
+        started = time.monotonic()
+        with (out/(name+'.log')).open('wb') as log:
+            result = subprocess.run([str(winebin/'wine'), 'cmd', '/c', win(cmd)],
+                                    env=env, stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
+        records.append({'name':name, 'exit':result.returncode, 'seconds':time.monotonic()-started})
+        print(records[-1], flush=True)
+        if result.returncode: break
+finally:
+    joined = subprocess.run([str(winebin/'wineserver'), '-w'], env=env, timeout=45).returncode
+    (out/'receipt.json').write_text(json.dumps({'candidateSha256':after,'commands':records,
+        'wineJoined':joined==0,'runtimeChanged':False,'deviceVerified':False}, indent=2)+'\n')
+    print('Wine prefix joined:', joined==0, flush=True)
+raise SystemExit(0 if len(records)==3 and all(r['exit']==0 for r in records) and joined==0 else 1)

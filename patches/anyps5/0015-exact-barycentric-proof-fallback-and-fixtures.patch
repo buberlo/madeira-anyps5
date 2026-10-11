@@ -1,0 +1,293 @@
+--- a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
+@@ -21,6 +21,12 @@
+ #include "ControlFlow/RequestSerializer.hpp"
+ #include "CacheKey.hpp"
+ #include "Optimization/ResourceProgram.hpp"
++#include "ControlFlow/GraphBuilder.hpp"
++#include "ControlFlow/Structurizer.hpp"
++#include "RdnaDecoder/RdnaInstructionDecoder.hpp"
++#include "Translation/InstructionTranslator.hpp"
++#include "Translation/ShaderInputInfoBuilder.hpp"
++#include "Translation/FixedFunctionInterpolationRejected.hpp"
+ #include "BdaAbi.hpp"
+ #include "prx/libc/include/general/VabiMacros.hpp"
+ #include <spirv/unified1/spirv.hpp>
+@@ -102,6 +108,28 @@
+         return;
+     }
+     throw std::runtime_error("expected graphics rejection: " + std::string(reason));
++}
++
++void expectFixedFunctionRejection(const ShaderRecompiler::RecompileRequest& request) {
++    using namespace ShaderRecompiler;
++    Require(request.shader.stage == ShaderStage::Fragment && !request.target.fragmentShaderBarycentricEnabled, "the fixed-function negative fixture must be a pixel shader without the extension");
++    const auto decoded = RdnaInstructionDecoder{}.Decode(request.shader.code);
++    auto cfg = GraphBuilder{}.Build(decoded);
++    Structurizer{}.Structurize(cfg);
++    TranslateOptions options{};
++    options.stage = ShaderStageKind::Pixel;
++    options.waveSize = request.context.waveSize;
++    options.userDataBaseRegister = request.context.userDataBaseRegister;
++    options.userDataCount = static_cast<std::uint32_t>(request.context.userData.size());
++    options.inputInfo = BuildShaderStageInputInfo(options.stage, request.context, request.target.subgroupSize);
++    options.floatMode = request.context.floatMode;
++    try {
++        static_cast<void>(InstructionTranslator{}.Translate(decoded, cfg, options));
++    } catch (const FixedFunctionInterpolationRejected& error) {
++        Require(std::string_view(error.what()).starts_with("fixed-function interpolation requires"), "the typed fixed-function rejection lost its diagnostic");
++        return;
++    }
++    throw std::runtime_error("the fixed-function guard accepted raw barycentric arithmetic");
+ }
+ 
+ void hdrComponentSwapTests() {
+@@ -3491,7 +3519,7 @@
+     for (std::uint32_t location = 0; location < 11u; ++location) crowded.push_back({location, location, false, true});
+     expectFailure([&] { static_cast<void>(LayoutBarycentricEmulation(crowded, {true, false, false})); }, "exceed 32 locations");
+ 
+-    const auto compile = [&](std::span<const std::uint32_t> code, bool barycentric, std::uint32_t secondInput = 0xffffffffu) {
++    const auto requestFor = [&](std::span<const std::uint32_t> code, bool barycentric, std::uint32_t secondInput = 0xffffffffu) {
+         auto queue = makeState();
+         queue.context[0x1b3] = 0x2u;
+         queue.context[0x1b4] = 0x2u;
+@@ -3508,7 +3536,10 @@
+         request.target.fragmentShaderBarycentricEnabled = barycentric;
+         request.layout.pushConstantSizeBytes = 128;
+         request.useCache = false;
+-        return Recompile(request);
++        return request;
++    };
++    const auto compile = [&](std::span<const std::uint32_t> code, bool barycentric, std::uint32_t secondInput = 0xffffffffu) {
++        return Recompile(requestFor(code, barycentric, secondInput));
+     };
+     const auto decorations = [](const RecompileResult& result, spv::Decoration decoration) {
+         const auto& words = result.spirv.Words();
+@@ -3533,6 +3564,10 @@
+     static constexpr std::array<std::uint32_t, 5> interpolates{0xc8080000u, 0xc8090001u, 0xf800180fu, 0x02020202u, 0xbf810000u};
+     static constexpr std::array<std::uint32_t, 4> readsVertex{0xc80a0000u, 0xf800180fu, 0x02020202u, 0xbf810000u};
+     static constexpr std::array<std::uint32_t, 6> shiftsIj{0x060000f0u, 0xc8080000u, 0xc8090001u, 0xf800180fu, 0x02020202u, 0xbf810000u};
++    expectFixedFunctionRejection(requestFor(readsIj, false));
++    auto invalidWave = requestFor(readsIj, false);
++    invalidWave.context.waveSize = 63u;
++    expectFailure([&] { static_cast<void>(Recompile(invalidWave)); }, "shader translation requires wave32 or wave64, got 63");
+     auto fragment = compile(readsIj, false);
+     Require(fragment.barycentricEmulation.active && fragment.barycentricEmulation.smooth && !fragment.barycentricEmulation.linear, "reading the I/J VGPRs without the extension did not emulate barycentrics");
+     const auto builtins = decorations(fragment, spv::DecorationBuiltIn);
+@@ -4005,9 +4040,14 @@
+     faulting.target.supportedExtensions = bdaExtensions;
+     faulting.target.bdaAbiVersion = ShaderRecompiler::BdaAbi::Version;
+     // This synthetic address calculation reads raw perspective-center I from
+-    // v0. Fixed-function interpolation cannot preserve that arithmetic; test
+-    // the interlock fault exits with explicit barycentrics and keep the guard.
+-    expectFailure([&] { static_cast<void>(ShaderRecompiler::Recompile(faulting)); }, "fixed-function interpolation requires");
++    // v0. It must still fail the fixed-function proof, while the exact upstream
++    // emulation preserves the arithmetic and all interlock fault exits.
++    expectFixedFunctionRejection(faulting);
++    const auto emulated = ShaderRecompiler::Recompile(faulting);
++    Require(emulated.barycentricEmulation.active, "a raw-I address calculation silently used fixed-function interpolation");
++    std::size_t emulatedKills = 0;
++    const auto emulatedExits = interlockExits(emulated.spirv.Words(), emulatedKills);
++    Require(emulatedExits.empty() && emulatedKills == 6u, "emulated barycentrics changed primitive-ordered BDA fault exits");
+     const std::array<std::uint32_t, 6> barycentricBdaInterlock{spv::CapabilityShader, spv::CapabilityFragmentShaderPixelInterlockEXT, spv::CapabilityInt64, spv::CapabilityPhysicalStorageBufferAddresses, spv::CapabilityStorageBuffer8BitAccess, spv::CapabilityFragmentBarycentricKHR};
+     const std::array<std::string_view, 3> barycentricBdaExtensions{"SPV_KHR_physical_storage_buffer", "SPV_KHR_8bit_storage", "SPV_KHR_fragment_shader_barycentric"};
+     faulting.target.fragmentShaderBarycentricEnabled = true;
+--- a/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp
+@@ -426,10 +426,27 @@
+  need(std::equal(staged->spirv.Words().begin(),staged->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end())&&std::equal(captured->spirv.Words().begin(),captured->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end()),"equivalent final-stage SPIR-V differs");
+  need(sameBindings(staged->bindings,regular.bindings)&&sameBindings(captured->bindings,regular.bindings),"equivalent final-stage binding closure differs");
+ }
++// These fixtures test whether fixed-function replacement is proved safe.
++// A failed proof may be valid for exact barycentric emulation, so negatives
++// must test this original-instruction gate rather than unrelated BDA/ABI state.
++void fixedFunctionProfile(const std::string& name,const RdnaProgram& decoded,
++                          const ControlFlowGraph& cfg,const RecompileRequest& request,bool expected){
++ const auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,request.context,request.target.subgroupSize);
++ bool admitted=false;
++ try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);admitted=true;}
++ catch(const FixedFunctionInterpolationRejected& e){
++  need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" lost the typed proof diagnostic");
++ }
++ need(admitted==expected,name+" wrong direct fixed-function proof result");
++}
++void stageAdmitted(const std::string& name,const RecompileRequest& request){
++ try{stage(request);}catch(const std::exception& e){throw std::runtime_error(name+" staged failure: "+e.what());}
++}
++
+ void check(const std::string& name,const Code& code,bool expected,std::function<void(RdnaProgram&,ControlFlowGraph&)> change={}){
+  auto decoded=RdnaInstructionDecoder{}.Decode(code);auto cfg=GraphBuilder{}.Build(decoded);if(change)change(decoded,cfg);
+  if(UnusedBarycentricProof::Prove(decoded,cfg,{0,1})!=expected){std::cerr<<RdnaProgramToString(decoded)<<"\n"<<GraphToString(cfg);for(const auto& i:decoded.instructions)std::cerr<<"pc="<<i.programCounter<<" enum="<<static_cast<unsigned>(i.op)<<" sourceCount="<<i.sourceCount<<" is64="<<i.is64Bit<<" footprint="<<static_cast<bool>(UnusedBarycentricProof::EffectsFor(i))<<"\n";throw std::runtime_error(name+" wrong proof result");}
+- if(!change){PixelRequest p(code);bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){if(expected)throw std::runtime_error(name+" staged failure: "+e.what());need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());}need(accepted==expected,name+" wrong staged result");}
++ if(!change){PixelRequest p(code);fixedFunctionProfile(name,decoded,cfg,p.request,expected);if(expected)stageAdmitted(name,p.request);}
+  ++passes;std::cout<<"PASS "<<name<<"\n";
+ }
+ void checkMrtZ(const std::string& name,const Code& code,bool expected){
+@@ -440,25 +457,19 @@
+  // I/J in v0/v1 and PositionZ in v2, with no native barycentric capability.
+  pixel.inputAddr|=PixelInputBit(PixelInput::PositionZ);pixel.posZ=true;
+  pixel.depthExportEnable=true;pixel.targetOutputMode.fill(0);
+- bool accepted=false;
+- try{
+-  stage(p.request);accepted=true;
+-  if(expected){
+-   const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
+-   bool depthReplacing=false,depthOutput=false;std::uint32_t depthVariable=0;
+-   for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
+-    const auto op=static_cast<spv::Op>(words[at]&0xffffu);
+-    if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModeDepthReplacing)depthReplacing=true;
+-    if(op==spv::OpDecorate&&words[at+2]==spv::DecorationBuiltIn&&words[at+3]==spv::BuiltInFragDepth)depthVariable=words[at+1];
+-    if(op==spv::OpStore&&depthVariable&&words[at+1]==depthVariable)depthOutput=true;
+-   }
+-   need(depthReplacing&&depthOutput,name+" did not retain the actual fragment-depth export");
++ fixedFunctionProfile(name,decoded,cfg,p.request,expected);
++ if(expected){
++  stageAdmitted(name,p.request);
++  const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
++  bool depthReplacing=false,depthOutput=false;std::uint32_t depthVariable=0;
++  for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
++   const auto op=static_cast<spv::Op>(words[at]&0xffffu);
++   if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModeDepthReplacing)depthReplacing=true;
++   if(op==spv::OpDecorate&&words[at+2]==spv::DecorationBuiltIn&&words[at+3]==spv::BuiltInFragDepth)depthVariable=words[at+1];
++   if(op==spv::OpStore&&depthVariable&&words[at+1]==depthVariable)depthOutput=true;
+   }
+- }catch(const std::exception& e){
+-  if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
+-  need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
+- }
+- need(accepted==expected,name+" wrong MRTZ staged result");
++  need(depthReplacing&&depthOutput,name+" did not retain the actual fragment-depth export");
++ }
+  ++passes;std::cout<<"PASS "<<name<<"\n";
+ }
+ void checkOrderedMessage(const std::string& name,const Code& code,bool ordered){
+@@ -501,10 +512,8 @@
+   const std::array<std::uint32_t,4> descriptor{0x910000u,0u,16u,0x31016facu};
+   const std::array<MemoryRegion,1> memory{{{0x910000u,std::as_bytes(std::span(constants))}}};
+   p.request.context.userData=descriptor;p.request.context.memory=memory;
+-  bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){
+-   if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
+-   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
+-  }need(accepted==expected,name+" wrong scalar-buffer/packed staged result");
++  fixedFunctionProfile(name,decoded,cfg,p.request,expected);
++  if(expected)stageAdmitted(name,p.request);
+  }++passes;std::cout<<"PASS "<<name<<"\n";
+ }
+ void checkQuad(const PublicQuadCases::Case& item){
+@@ -541,10 +550,8 @@
+   pixel.request.context.userData=userData;pixel.request.context.memory=memory;
+   pixel.request.target.supportedCapabilities=capabilities;pixel.request.target.supportedExtensions=extensions;
+   pixel.request.target.bdaAbiVersion=1;
+-  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& e){
+-   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+e.what());
+-   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+e.what());
+-  }need(accepted==item.expected,item.name+" wrong staged outcome");
++  fixedFunctionProfile(item.name,decoded,cfg,pixel.request,item.expected);
++  if(item.expected)stageAdmitted(item.name,pixel.request);
+  }
+  ++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+@@ -557,10 +564,8 @@
+  need(UnusedBarycentricProof::Prove(decoded,cfg,item.rawRegisters)==item.expected,item.name+" wrong color export proof decision");
+  if(!item.change){
+   PixelRequest pixel(item.code);pixel.request.context.pixel->targetOutputMode.fill(4u);
+-  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& error){
+-   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+error.what());
+-   need(std::string(error.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+error.what());
+-  }need(accepted==item.expected,item.name+" wrong color export staged result");
++  fixedFunctionProfile(item.name,decoded,cfg,pixel.request,item.expected);
++  if(item.expected)stageAdmitted(item.name,pixel.request);
+  }++passes;std::cout<<"PASS "<<item.name<<"\n";
+ }
+ 
+@@ -642,17 +647,15 @@
+  Code interp{0xc8100000u,0xc8110001u,0xf800180fu,0x04040404u,0xbf810000u};
+  auto decoded=RdnaInstructionDecoder{}.Decode(interp);auto cfg=GraphBuilder{}.Build(decoded);PixelRequest p(interp,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+  ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);++passes;std::cout<<"PASS unchanged_complete_P1_P2_guard\n";
+- decoded.instructions[1].op=RdnaOpcode::VMovB32;bool rejected=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);}catch(const std::exception&){rejected=true;}need(rejected,"incomplete P1/P2 accepted");++passes;std::cout<<"PASS unchanged_incomplete_P1_P2_guard\n";
++ decoded.instructions[1].op=RdnaOpcode::VMovB32;bool rejected=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);}catch(const FixedFunctionInterpolationRejected&){rejected=true;}need(rejected,"incomplete P1/P2 accepted");++passes;std::cout<<"PASS unchanged_incomplete_P1_P2_guard\n";
+  for(const auto& item:PublicInstrumentationProofCases::cases())check(item.name,item.code,item.expected,item.change);
+  for(const auto& item:PublicInstrumentationProofCases::pairCases()){
+   auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
+   PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
+   bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
+-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected proof failure");}
++  catch(const FixedFunctionInterpolationRejected& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected proof failure");}
+   need(validated==item.expected,item.name+" incorrect P1/P2 guard");
+-  bool staged=false;try{stage(p.request);staged=true;}
+-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");}
+-  need(staged==item.expected,item.name+" incorrect staged P1/P2 guard");
++  if(item.expected)stageAdmitted(item.name,p.request);
+   ++passes;std::cout<<"PASS "<<item.name<<"\n";
+  }
+  for(const auto& item:PublicQuadCases::cases())checkQuad(item);
+--- a/core/shader/recompiler/Recompiler.cpp
++++ b/core/shader/recompiler/Recompiler.cpp
+@@ -44,6 +44,7 @@
+ #endif
+ #include "SpirvBackend/SpirvMemory/SpirvInputOutput.hpp"
+ #include "Translation/include/Translation/InstructionTranslator.hpp"
++#include "Translation/include/Translation/FixedFunctionInterpolationRejected.hpp"
+ #include "Translation/include/Translation/ShaderInputInfoBuilder.hpp"
+ #include <exception>
+ #include <stdexcept>
+@@ -183,7 +184,20 @@
+         embeddedFetch = EmbeddedVertexFetchAnalyzer{}.Analyze(decoded, inputInfo.vertex->fetchAttribReg, inputInfo.vertex->fetchBufferReg, request.context.userDataBaseRegister, static_cast<std::uint32_t>(request.context.userData.size()), request.context.waveSize);
+         translateOptions.embeddedFetch = &embeddedFetch;
+     }
+-    auto program = translator.Translate(decoded, cfg, translateOptions);
++    auto program = [&] {
++        try {
++            return translator.Translate(decoded, cfg, translateOptions);
++        } catch (const FixedFunctionInterpolationRejected&) {
++            if (stageKind != ShaderStageKind::Pixel || translateOptions.fragmentShaderBarycentricEnabled) throw;
++            // A rejected original-IR proof cannot use fixed-function lowering.
++            // Translate every original I/J read and P1/P2 operation exactly;
++            // the existing geometry/capability validation governs emulation.
++            translateOptions.fragmentShaderBarycentricEnabled = true;
++            auto exact = translator.Translate(decoded, cfg, translateOptions);
++            exact.Metadata().barycentricEmulation = true;
++            return exact;
++        }
++    }();
+     // Debug aid: APS5_DUMP_IR=<hex code address> (or "all") prints the program after each front-end pass.
+     const auto dumpIr = [&](const char* pass) {
+         static const std::string list = [] { const char* text = std::getenv("APS5_DUMP_IR"); return text ? std::string(text) : std::string(); }();
+--- a/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
++++ b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolation.hpp
+@@ -15,6 +15,7 @@
+ #include <stdexcept>
+ 
+ #include "OptionalInterpolationGroupsProof.hpp"
++#include "FixedFunctionInterpolationRejected.hpp"
+ namespace ShaderRecompiler {
+ 
+ // The existing native interpolation lowering drops P1 and replaces P2 with an
+@@ -35,7 +36,7 @@
+         if (input == PixelInput::PerspectiveCenter || input == PixelInput::LinearCenter) centers.insert(base);
+     }
+     std::uint32_t pc = 0;
+-    const auto fail = [&] { throw std::runtime_error("fixed-function interpolation requires unmodified center I/J pairs and complete P1/P2 sequences on a proven entry/discard path (pc=" + std::to_string(pc) + ")"); };
++    const auto fail = [&] { throw FixedFunctionInterpolationRejected(pc); };
+     const bool hasInterpolation = std::any_of(decoded.instructions.begin(), decoded.instructions.end(), [](const auto& i) {
+         return i.op == RdnaOpcode::VInterpP1F32 || i.op == RdnaOpcode::VInterpP2F32 || i.op == RdnaOpcode::VInterpMovF32;
+     });
+--- /dev/null
++++ b/core/shader/recompiler/Translation/include/Translation/FixedFunctionInterpolationRejected.hpp
+@@ -0,0 +1,16 @@
++#pragma once
++#include <cstdint>
++#include <stdexcept>
++#include <string>
++
++namespace ShaderRecompiler {
++
++// Failure of the original-instruction proof rejects fixed-function lowering,
++// not the exact translation used for barycentric emulation.
++class FixedFunctionInterpolationRejected final : public std::runtime_error {
++public:
++    explicit FixedFunctionInterpolationRejected(std::uint32_t pc)
++        : std::runtime_error("fixed-function interpolation requires unmodified center I/J pairs and complete P1/P2 sequences on a proven entry/discard path (pc=" + std::to_string(pc) + ")") {}
++};
++
++}

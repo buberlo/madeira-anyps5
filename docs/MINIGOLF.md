@@ -7,45 +7,45 @@ stroke are not established.
 
 ## Current full upstream refresh, 2026-10-12
 
-The current source is complete merged AnyPS5 main at `a11c8f7f`, including
-all 1,721 commits after `c963432d` and the merged Apple #1776/#1831/#2015
-implementations. The preceding eleven reconciled patches apply and reverse exactly;
-95 host/relinker tests and six native shader suites pass. All 47 Windows HLE libraries and their selected test targets compile.
-The first build stopped at compiler-once exception unwinding. The production
-repair now passes the unchanged original Windows exception fixture. The current
-qualification stops later at a placeholder reservation rejected by local Wine;
-no memory assertion or reservation requirement has been disabled.
-The existing prepared
-game package is not relabelled as a build of this update.
-[Refresh details](UPSTREAM-REFRESH-20261012.md).
+The complete AnyPS5 source is now pinned at **`0a8b1d32`**, including all
+1,735 merged commits after `c963432d` and Apple fixes #1776/#1831/#2015.
+All sixteen local patches apply and reverse exactly. Both the canonical
+checkout and actual build checkout match all 2,137 source entries and eleven
+initialized, clean dependency trees. Madeira main and official FEX main/
+FEX-2610 were already current; the FEX iOS port and #6021 bounds repair remain.
+[Exact source and scoped results](evidence/anyps5-0a8b-source-integration-20261012.json),
+[technical reconciliation](UPSTREAM-REFRESH-20261012.md).
 
-The current thirteen-patch source includes a scoped compiler-once repair. Its isolated
-actual build preserves libc's existing exports, routes both owned direct and
-import-slot calls, and passes the unchanged original Windows exception fixture
-plus all eight focused cases. Every command and the owned Wine prefix closes;
-independent readback verifies the actual images and dependency records. The complete 47-library build compiles and passes the original exception
-fixture. A fixture-only correction also passes empty-path utimes errors and
-unchanged-directory-timestamp checks without writing the timestamp. This result repairs the observed once
-boundary; it does not qualify the full runtime, GPU or game.
-[Scoped execution result](../experimental/compiler-once-execution/direct-attempt-observation.json),
-[implementation](../patches/anyps5/0012-native-compiler-once.patch).
+The new typed interpolation fallback repairs a concrete integration conflict:
+an unsafe fixed-function replacement now reaches upstream's exact barycentric
+emulator. It catches only the specific original-instruction proof failure;
+wave, BDA, format, capability and resource failures remain errors. All six
+fresh native shader suites pass. Their 355/538 public profiles combine direct
+proof checks with full compilation of admitted profiles; they do not claim
+that every negative profile compiles. The complete ShaderMemory fixture also
+passes, including the new sRGB depth-comparison checks.
 
-Native59 is installed. Its fresh 45-second CPU diagnostic captures an unhandled
-native read at address 2, with PC/LR=2 after context restoration. Both valid
-ownership samples have a free allocator lock and zero native critical depth;
-the earlier Native57 spin does not prove this failure's cause. No completed
-interruption delivery or normal guest exit is captured. Library restoration,
-protected metadata and closure of the owned process pass. Correct CPU delivery
-remains required before this iPad can qualify the new MiniGolf package.
+The full 47-library build and all 49 selected test executable targets are
+being qualified separately. The preceding build already passed memory and
+exception tests with the explicitly probed `0x7400000000` test-host arena.
+That result does not prove fixed-address allocation on the iPad. Stale graphics
+fixtures were corrected for real tiled MSAA backing, upstream stencil clears
+and cross-block XOR coordinates. Production memory/graphics validations stay
+active. No package prepared from older tools is relabelled as this update.
+
+**Native59 remains the installed host.** Its bounded CPU diagnostic recorded
+an unhandled read at address 2 with PC/LR=2 after context restoration. The
+observed allocator lock was free; the causative write remains unproved.
 [Actual device observation](evidence/native59-owner-sampler-observation-20261012.json).
 
-Native60 is now built and signed, with its current FEXBridge dependencies,
-native archive inputs, embedded translator and signing entitlements verified.
-It isolates an EC continuation candidate; its HLE payload remains the older
-installed package. It has not yet been installed or executed, and does not
-establish a repair of Native59's fault. The current 47-library HLE update still
-requires complete memory/runtime and production-shader qualification.
-[Candidate implementation and local build](../experimental/native-ec-continuation/README.md).
+Native60 is built and signed with an experimental EC continuation repair and
+matching FEXBridge/translator/native inputs. It deliberately retains the older
+HLE payload to isolate CPU behavior. Its preserving updater refused before
+installation when Native59 reappeared during preflight. No accepted Native60
+installation, Original50 delivery result or MiniGolf execution is claimed.
+The next device steps are a preserving update, the complete original 50-delivery
+probe, all CPU phases, then GPU and game testing.
+[Candidate and build boundaries](../experimental/native-ec-continuation/README.md).
 
 ## Preceding package and Windows results
 

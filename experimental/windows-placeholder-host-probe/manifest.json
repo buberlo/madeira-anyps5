@@ -1,0 +1,13 @@
+{
+  "files": {
+    "README.md": "c462ca09459b4c19342775f93bf82007ab55f0b55f40f95aa1eaf511b90c13a6",
+    "actual-observation.json": "c5ebb955bde53d4136d9c01ce1b49572b962a1b53b89523c32bb810beac91b21",
+    "first/placeholder_probe.c": "82a1b8734b28a831be0830360ea24caec4138021f14d2170b53979fb3d0a47ee",
+    "first/run.py.snapshot": "59591c7221d6d49853d270deba4830c9d175c56b589b3a7b7e06ae19340b3e5c",
+    "four-base/placeholder_probe.c": "c71c7eb1b855a89cd78aca22065a4aa4afb890afb2031f7167b855f4632e4bd2",
+    "four-base/run.py.snapshot": "bd36629f096d1ec1c06037fb1c473200981d99652383794d3eb85728c20537aa"
+  },
+  "runtimeQualified": false,
+  "schema": 1,
+  "sourceOnlyRunners": true
+}

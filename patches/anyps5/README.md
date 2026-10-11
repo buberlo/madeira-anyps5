@@ -1,59 +1,43 @@
-# AnyPS5 full main reconciliation
+# AnyPS5 main reconciliation
 
-Apply all thirteen adjacent patches in lexical order to upstream
-`a11c8f7f70a0ed4e71504a89de69e8cdae687817`. They replace the prior c963
-local series. The merged upstream implementations of LDS device memory,
-descriptor snapshots and typed placeholder images are retained; only the
-remaining local policy, lifetime, compatibility and sample-group changes
-are applied here. This is a complete main update, including the new
-upstream runtime and shader architecture.
+Apply all **sixteen** adjacent `.patch` files in lexical order to
+`0a8b1d32b12a6d6a3acd462787750b482bf78884`. They form one reconciled series;
+archived subdirectories describe earlier pins and are not applied to this one.
+The complete merged upstream includes Apple fixes #1776/#1831/#2015.
 
-The patches group runtime compatibility, bounded exception/context
-handling, strict request17/cache28 image policy, original-IR interpolation
-proofs, bounded AudioOut tracing/pacing, grouped color transfers, grouped
-depth/stencil contracts, descriptor/resource lifetime, device/PSO profiles,
-guarded module lifecycle/relinker, integration/regression tests, and scoped
-native compiler-once exception delivery. All thirteen are required together.
-The upstream gitlinks remain unchanged.
+Patches 0001–0011 preserve runtime/exception compatibility, protected guest
+memory, request17/cache28 policy, exact original-instruction interpolation
+proofs, audio pacing, grouped transfer restrictions, resource ownership,
+device/PSO identity and deferred module lifecycle. Upstream implementations are
+retained where they supersede local code. Real capability and format checks
+remain required; general guest multisample depth transfer is not established.
 
-Patch 0012 routes newly linked owned MinGW callers' direct `pthread_once`
-calls and import slots through a four-byte Windows once provider with DWARF
-cleanup. Guest once objects and native compiler DLL internals are unchanged.
-It preserves the original 1,061 libc exports and appends one private,
-NID-exempt provider. The original Windows exception fixture and all eight
-focused once cases pass in the isolated actual build. The complete 47-library build compiles and its original Windows exception
-fixture passes. Full runtime qualification is still pending at the fixed
-guest-arena placeholder-reservation test.
-[Actual scoped result](../../experimental/compiler-once-execution/direct-attempt-observation.json).
+- **0012** routes owned MinGW direct and imported `pthread_once` calls through
+  a shared four-byte provider with DWARF exception cleanup. It preserves all
+  1,061 existing libc exports and appends one private NID-exempt provider.
+  Original destructor/retry coverage remains alongside upstream guest-frame
+  tests. Guest once objects and native compiler DLL internals stay unchanged.
+- **0013** checks empty-path utimes errors and unchanged timestamps without
+  writing the current directory timestamp.
+- **0014** corrects stale graphics fixtures for tiled MSAA storage, upstream
+  single-sample stencil-clear behavior and reserved-register error diagnostics.
+  Production validations and negative cases remain.
+- **0015** catches only the typed fixed-function proof rejection and uses
+  upstream exact barycentric emulation. Other errors propagate; original I/J
+  arithmetic and interlock fault exits remain. Proof-negative fixtures test
+  the guard directly; admitted profiles retain full compiler execution.
+- **0016** retains global coordinate bits in the 4-KiB XOR test oracle and adds
+  explicit cross-block X32/Y32 assertions. Production tiling is unchanged.
 
-Patch 0013 checks empty-path utimes errors and unchanged directory timestamps
-without attempting to write the working directory timestamp. The original
-kernel already returns ENOENT; this is a test correction. The fresh fixture
-passes after the correction.
+All 64 apply/check/reverse commands pass; all 2,137 candidate entries and modes
+match, reversal restores 2,055 base entries, and eleven gitlinks remain exact.
+The actual canonical/build trees and initialized dependencies are independently
+compared. Six fresh native shader suites and complete ShaderMemory pass.
+The 355/538 public totals combine direct proof checks and admitted compiler
+profiles; full linked-runtime, loaded-PRX, native Windows GPU and physical-iPad
+qualification remain separate.
+[Current source and scoped results](../../docs/evidence/anyps5-0a8b-source-integration-20261012.json),
+[technical details and limits](../../docs/UPSTREAM-REFRESH-20261012.md).
 
-Native compilation and all six shader suites pass, including the 538-case
-extended public guard suite. All 95 native host/relinker tests pass. The
-last two Graphics.cpp API argument corrections separately pass syntax.
-These checks do not prove full HLE, Windows/iOS runtime, GPU execution or
-gameplay. Original historical receipts and failures remain unchanged.
-
-Request17 and cache28 carry the local image/sample policy and fixed push
-slot identity. Default decoding follows the strict upstream layout.
-Retained private14/15 requests require the explicit
-`--legacy-ipad-v14-v15` loader option and are not altered. Profile/cache/PSO
-keys separate grouped samples, actual null-image capability, placeholder
-policy, GPL choice and per-stage push offsets. Explicit sample groups
-disable GPL before profile construction; other profiles retain GPL.
-
-Single-sample depth/stencil clear semantics follow upstream. Grouped
-clears retain the stricter sample-equivalence proof. General guest depth
-import, CPU-dirty depth refresh and depth writeback are not established by
-this source; grouped depth transfer remains rejected. Existing real
-capability and format checks remain required.
-
-The private proposal provenance records every changed file and source/receipt
-digest. An independent fresh application and reversal of all thirteen patches
-passes all 52 commands. All 2,136 resulting source entries, including modes,
-match the canonical patched source, and reversal restores the exact base.
-[Complete roundtrip](../../docs/evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
-No GitHub Actions were used.
+No GitHub Actions are used. Private shader requests, provider maps and game
+assets are excluded from this series.

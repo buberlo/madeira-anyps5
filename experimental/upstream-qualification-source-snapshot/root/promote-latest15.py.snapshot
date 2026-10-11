@@ -1,0 +1,57 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, os, subprocess, sys
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+proposal = base/'latest-0a8b-fifteen-patch-proposal'
+review_path = proposal/'source-candidate-review.json'
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(review_path) == '5bc7fc8a7de26b471ecd88d5c1df02aeb18028f6cd054406988d4a1b7f91deed'
+review = json.loads(review_path.read_text())
+destination = Path(sys.argv[1]).resolve()
+assert destination in (root/'upstreams/AnyPS5', base/'qualification-source-v5')
+git = lambda *args: subprocess.check_output(['git', '-C', str(destination), *args])
+assert git('rev-parse', 'HEAD').decode().strip() == '4be9c255192bca142dfa349b81caf71b08ebb607'
+out = base/('promotion15-'+destination.name+'-retry1')
+out.mkdir()
+subprocess.run(['/bin/cp', '-cR', str(destination), str(out/'before-source')], check=True)
+diff = git('diff', 'HEAD', '--binary')
+(out/'before-tracked.diff').write_bytes(diff)
+untracked = [n.decode() for n in git('ls-files', '--others', '--exclude-standard', '-z').split(b'\0') if n]
+assert all(n in review['sourceTree'] for n in untracked), 'Do not remove any unrelated authored file'
+for name, record in review['sourceTree'].items():
+    p = proposal/'source'/name
+    assert p.is_file() and not p.is_symlink() and sha(p) == record['sha256'], name
+for name, digest in review['patches'].items():
+    assert sha(proposal/'patches'/name) == digest, name
+subprocess.run(['git', '-C', str(destination), 'fetch', '--no-recurse-submodules', str(proposal/'source'), review['upstreamCommit']], check=True)
+if diff:
+    subprocess.run(['git', '-C', str(destination), 'apply', '-R', str(out/'before-tracked.diff')], check=True)
+for name in untracked:
+    p = destination/name
+    assert p.is_file() and not p.is_symlink()
+    p.unlink()
+subprocess.run(['git', '-C', str(destination), 'checkout', review['upstreamCommit']], check=True)
+for name in sorted(review['patches']):
+    subprocess.run(['git', '-C', str(destination), 'apply', str(proposal/'patches'/name)], check=True)
+for name, record in review['sourceTree'].items():
+    p = destination/name
+    actual_mode = '100755' if p.stat().st_mode & 0o111 else '100644'
+    assert p.is_file() and not p.is_symlink() and sha(p) == record['sha256'] and actual_mode == record['mode'], name
+initialized = {}
+for line in review['thirdPartyGitlinks']:
+    declaration, relative = line.split('\t')
+    commit = declaration.split()[2]
+    p = destination/relative
+    actual = subprocess.check_output(['git', '-C', str(p), 'rev-parse', 'HEAD']).decode().strip()
+    assert actual == commit and not subprocess.check_output(['git', '-C', str(p), 'status', '--porcelain'])
+    initialized[relative] = actual
+(out/'receipt.json').write_text(json.dumps({'upstreamCommit':review['upstreamCommit'],
+    'source':str(destination), 'sourceEntryCount':len(review['sourceTree']),
+    'allSourceHashesAndModesMatch':True, 'patches':review['patches'],
+    'initializedDependencies':initialized, 'previousSourcePreserved':True,
+    'runtimeQualified':False, 'gameplayVerified':False}, indent=2)+'\n')
+print('Promoted and compared', len(review['sourceTree']), 'source entries and', len(initialized), 'dependencies')

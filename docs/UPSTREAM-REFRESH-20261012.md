@@ -1,160 +1,126 @@
 # Complete upstream refresh, 2026-10-12
 
-AnyPS5 now uses the complete merged main branch at
-[`a11c8f7f`](https://github.com/boykopovar/AnyPS5/commit/a11c8f7f70a0ed4e71504a89de69e8cdae687817),
-including all **1,721 commits** after `c963432d`. This is a complete source
-refresh, with the remaining local changes reconciled across 60 overlapping
-files. The app still runs relinked Windows PE programs through Wine and FEX;
-graphics follow Vulkan → MoltenVK → Metal.
+The project now includes the complete checked AnyPS5 `main` snapshot at
+[`0a8b1d32`](https://github.com/boykopovar/AnyPS5/commit/0a8b1d32b12a6d6a3acd462787750b482bf78884):
+**1,735 merged commits after `c963432d`**, including Apple fixes #1776,
+#1831 and #2015. Both the canonical checkout and actual build checkout match
+all **2,137 source files and modes**. Eleven nested dependencies are initialized
+at their recorded commits and clean. All sixteen local patches pass the full
+64-command application/check/reversal roundtrip.
+[Actual source and scoped-test record](evidence/anyps5-0a8b-source-integration-20261012.json).
 
-Madeira main remains `48f97642`. Official FEX main and the latest monthly
-release, FEX-2610, remain `14c92681`; the reconciled iOS-port baseline remains
-`3bec2ac4`. These heads were queried again during this refresh. The existing
-FEX ARM64EC bounds correction and local iOS integration remain applied. An
-unchanged upstream head is not an omitted update. See [exact pins](UPSTREAMS.md).
+Madeira main remains `48f97642`. Official FEX main and FEX-2610 remain
+`14c92681`; Madeira's FEX iOS-port baseline remains `3bec2ac4`. These match
+the queried heads. The FEX #6021 ARM64EC table-bounds correction and the
+reconciled iOS integration remain included. Open Madeira experiments are
+separate from a complete merged-source update. [Exact pins](UPSTREAMS.md).
 
-## Reconciliation
+## Runtime and shader integration
 
-The first eleven patches describe the remaining local runtime, exception,
-shader, audio, resource, pipeline and relinker behavior. The preceding eleven
-patches are retained under `patches/anyps5/legacy-c963432d/` and are not applied
-to the new pin. Fresh application matches all **2,130 source files**, including
-the 227 files changed locally; complete reversal restores upstream bytes and
-executable modes. All eleven nested dependency pins remain exact.
+The first eleven reconciled patches preserve the remaining local runtime,
+exception, audio, resource-lifetime, pipeline and relinker behavior. Existing
+upstream Apple implementations are used instead of duplicate local versions.
+The preceding series and its actual test results remain archived separately.
 
-A twelfth patch integrates the scoped compiler-once repair described below.
-It changes seven files and passes its separate application/reversal controls.
-The complete twelve-patch series also passes independent fresh application and
-reversal: all 48 commands succeed, all 2,136 source entries including modes
-match canonical, and reversal restores the exact upstream base. The prior
-eleven-patch proof remains historical.
-[Twelve-patch source roundtrip](evidence/anyps5-twelve-patch-roundtrip-20261012.json).
-The subsequent fixture-only correction also passes a complete thirteen-patch
-roundtrip: all 52 commands succeed and all 2,136 source entries match.
-[Thirteen-patch source roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
+- **Compiler exceptions:** patch 0012 routes owned MinGW direct calls and IAT
+  slots through one four-byte Windows once provider with DWARF cleanup.
+  An exceptional callback resets the once state and wakes waiters before
+  rethrowing; successful callbacks publish writes. Native compiler DLL internals
+  and guest once objects are unchanged. The existing 1,061 libc exports are
+  preserved and one private NID-exempt provider is appended. Reconciliation
+  retains the original destructor/retry regression alongside upstream's new
+  guest-frame exception checks.
+- **Exact interpolation:** patch 0015 gives the original-instruction guard a
+  specific error type. Only that error in a pixel shader without native
+  barycentrics selects upstream's exact emulation. Original I/J reads and
+  P1/P2 operations are translated rather than replaced by an unproved shortcut.
+  Other failures propagate. Geometry, device capability, BDA and resource
+  validation remain in force. Raw-I address calculations retain the checked
+  interlock fault exits in both emulated and native paths.
+- **Requests and caches:** request version 17 and cache format 28 include local
+  placeholder/sample policy and pipeline identity. Old cache entries are
+  rejected. Historical private version 14/15 requests require the explicit
+  `--legacy-ipad-v14-v15` replay mode and are never silently rewritten.
+- **Graphics resources:** pipe/bank XOR, logical sample count, descriptor
+  ownership and real transfer restrictions remain. Grouped-sample profiles use
+  separate device/cache/pipeline identity and disable GPL before construction;
+  normal profiles retain GPL. Single-sample depth clears use upstream semantics.
+  General guest Z/HTILE import, CPU refresh and multisample depth writeback are
+  not claimed where the implementation still rejects those combinations.
+- **CPU and platform contracts:** protected memory, AVX/flags preservation,
+  lazy allocation, save behavior, exact deferred module arguments and honest
+  unsupported Audio3d errors remain. Native thread teardown unbinds its wait
+  state before freeing it. Optional 60-Hz waits use TimedWait's own clock.
 
-- The merged Apple fixes, including #1776 LDS spill, #1831 descriptor arrays
-  and the now-merged #2015 image handling, come from the complete upstream
-  snapshot. Local device-limit, typed-image, descriptor ownership and policy
-  validation remain; duplicate implementations are removed.
-- New upstream shader requests and the historical local request tails had
-  overlapping version numbers. The current writer uses **request version 17**;
-  disk-cache format **28** includes local policy and pipeline-layout identity.
-  Historical local version 14/15 requests require the explicit
-  `--legacy-ipad-v14-v15` replay mode. Old cache entries are rejected.
-- Normal graphics-pipeline-library support remains available. An explicitly
-  selected grouped-sample profile uses a separate device/cache/pipeline identity
-  because its push layout differs. Pipe/bank XOR is retained alongside logical
-  sample count; unsupported GPU transfer combinations fail rather than use
-  incorrect addresses.
-- Upstream single-sample depth clears are retained. Grouped depth/stencil paths
-  keep their stricter guest-memory restrictions. This merge does not establish
-  general guest Z/HTILE import, CPU refresh or writeback for every depth format.
-- Protected memory, AVX/flags preservation, lazy allocation, save behavior and
-  honest unsupported Audio3d errors remain. Deferred module initialization
-  receives nonzero LoadStart arguments exactly once, including nested loads.
-  Native thread teardown unbinds its wait-state pointer before releasing it.
-- The HLE builder verifies the actual configured CMake target types and registered
-  test inventory. It refuses an exported source folder that would inherit the
-  parent repository's Git identity. Bundled dependencies are explicit; a prior
-  HLE archive selects names only and supplies no old runtime binaries.
+## Test corrections and actual results
 
-## Actual local checks
+Patch 0013 tests ENOENT and an unchanged directory timestamp without writing
+the current directory's timestamp. Patch 0014 supplies real R64KB_X backing
+for multisampled color fixtures, tests upstream stencil-clear semantics, and
+retains reserved-register rejection. Patch 0016 corrects a test oracle that
+masked global X coordinates in 4-KiB XOR layouts. Explicit X32/Y32 assertions
+now retain the cross-block bit contributions. These changes do not relax
+production tiling, MSAA, depth or reserved-register validation.
 
-The fresh ARM64 host relinker and NID patcher build successfully. **95/95
-registered relinker tests pass**, including Windows lifecycle, module identity,
-direct Media discovery, malformed input and 16-KiB virtual section isolation.
-Upstream's zero-tail trimming is tested without requiring an unnecessary
-16-KiB raw file allocation.
+All **six freshly compiled native shader suites pass**: placeholder images,
+device profiles, cache/request identity, unused barycentrics, LDS CPU behavior
+and extended public profiles. The latter suites retain their ordered **355
+and 538** cases. Unsafe fixed-function profiles test the original-instruction
+proof directly with the typed rejection; admitted profiles still execute
+Prepare/Capture/Materialize/Recompile and compare final SPIR-V and bindings.
+Forged metadata and nonstandard raw-register controls retain their direct proof
+assertions. These totals are mixed proof/compiler coverage, not a claim that
+all negative profiles compile through exact emulation.
 
-Six freshly compiled native shader suites pass: placeholder policy, device
-profile, request/cache identity and compatibility, unused barycentrics, LDS
-CPU behavior, and extended public compilation. Graphics test source also passes
-its separate syntax check. The build-helper and result-validator controls pass
-**54 tests**. Failed initial attempts are recorded separately from these passes.
+The complete no-argument **ShaderMemory** fixture also passes, including the
+new sRGB depth-comparison checks. GPU execution on the iPad is separate.
+Earlier failed attempts and their logs remain unchanged locally.
+[Authored qualification source snapshots](../experimental/upstream-qualification-source-snapshot/README.md).
 
-The fresh complete **47-library Windows HLE build compiles** with the selected
-test executables. The raw-log fixture passes twelve cases; the next fixture,
-`windows_exception_tests`, terminates with an unhandled `through runtime frames`
-exception from `std::call_once`. The supplied compiler runtime DLLs carry native
-SEH tables while our custom unwinder reads DWARF metadata; a bounded diagnostic
-now identifies the first missing frame in `libwinpthread`'s `pthread_once`, at
-RVA `0x851d`. Its native unwind entry has no handler flags, but the implementation
-still holds a mutex and a stack cleanup-list node across the callback. Merely
-walking past that frame would lose required cleanup. The isolated diagnostic
-compiles and links, preserves the original providers, captures exit 3 and joins
-its Wine prefix; it does not repair the failure.
-[First missing-frame observation](evidence/windows-compiler-once-first-miss-20261012.json).
+The complete **47-library Windows HLE rebuild** is being qualified with all
+42 default plus seven additional test executable targets, including all four
+registered ShaderMemory cases. No test target is skipped. The local test host
+uses the independently probed lazy arena at `0x7400000000`, 4 GiB reserved in
+256-MiB chunks. Earlier complete-refresh memory and exception tests passed with
+this arena; that result does not establish allocation on the iPad.
+[Actual test-host observations](../experimental/windows-placeholder-host-probe/actual-observation.json),
+[preceding runtime attempt](evidence/anyps5-latest-memory-host-run-20261012.json).
 
-The direct-and-IAT repair now passes an actual isolated build. It keeps the
-original 1,061 libc export names, ordinals and data classifications, adds one
-private NID-exempt provider and leaves guest once objects and native compiler
-DLL internals unchanged. Both direct calls and owned import slots use the same
-four-byte once state: exceptional callbacks reset and wake waiters before
-rethrowing; successful callbacks publish writes and wake waiters. The unchanged
-original Windows exception fixture and all eight focused cases pass, including
-cross-module identity, destructors/retry, concurrent publication and wait
-failures. All 17 commands close successfully, including the graceful Wine
-prefix wait. Independent readback verifies the 56 actual output files, all six
-dependency records and the PE export/import contracts.
-[Actual scoped execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
-[production integration](../patches/anyps5/0012-native-compiler-once.patch).
+The earlier **95 host/relinker passes**, scoped once-provider execution and
+older 47-library/production-PRX results retain their source identities. They
+are not automatically results of the final sixteen-patch runtime.
+[Scoped once execution](../experimental/compiler-once-execution/direct-attempt-observation.json),
+[historical thirteen-patch roundtrip](evidence/anyps5-thirteen-patch-roundtrip-20261012.json).
 
-The complete 47-library build compiles with the production once provider, and
-its original Windows exception fixture passes. A thirteenth patch corrects
-the filesystem fixture: it asserts ENOENT and an unchanged directory timestamp
-without writing that timestamp. This fixture now passes. The next memory
-fixture stops before an assertion because local Wine refuses the exact lazy
-placeholder reservation at `0x200000000`, with `ERROR_INVALID_ADDRESS`. The
-reservation and memory assertions remain enabled. Full linked-runtime qualification, the
-new prepared game package, Windows GPU run and iPad game run remain separate
-steps. The earlier 54-case runtime and 538-case
-production-driver results belong to the preceding source and are not reused as
-results for this update.
+## Physical iPad and MiniGolf
 
-## MiniGolf and the physical iPad
+**Native59 remains installed.** Its bounded diagnostic captured an unhandled
+native read with PC/LR equal to 2 after context restoration. The sampled
+allocator lock was free and native critical depth was zero; neither observation
+proves the cause. The collector restores its library and protected metadata,
+closes its own process and releases the device.
+[Actual observation](evidence/native59-owner-sampler-observation-20261012.json).
 
-Native59 is installed. A fresh 45-second synthetic CPU diagnostic captures an
-unhandled native read fault with PC/LR equal to `2` after context restoration.
-The main thread waits in Wine's server path. Both valid ownership samples show
-a free allocator lock and zero native critical depth; the earlier Native57 lock
-spin does not establish this failure's cause. The causative write is not yet
-proved. The collector restores the original library and protected metadata,
-closes its own process and releases the device. [Actual observation](evidence/native59-owner-sampler-observation-20261012.json).
-
-MiniGolf is **not yet demonstrated playable**. Boot reports for other titles on
-other CPU/OS/GPU paths do not qualify this iPad's Wine/FEX context delivery or
-MiniGolf's Unity rendering. The next checks are the fresh linked runtime, native
-Windows comparison, corrected iPad CPU delivery, then course rendering and a
-complete offline course. No graphics or exception guard is disabled to claim
-success. [MiniGolf records](MINIGOLF.md).
-
-All builds and tests run locally. GitHub Actions remain disabled. Game data,
-pairing and raw diagnostic captures stay outside Git.
-
-The current patch stack also updates four write-tracking mappings for the new
-explicit GPU argument, fixes one renamed filesystem-test variable without
-changing its timestamp comparison, and moves the optional 60-Hz vblank wait to
-TimedWait’s own absolute nanosecond clock. The normal rational vblank path and
-stop/failure predicate stay intact. The HLE helper resolves the Wine executable
-before changing directories for tests; five executable-path controls cover that
-repair. [Experimental EC continuation snapshot](../experimental/native-ec-continuation/README.md) preserves the narrower FEX candidate and its
-local controls; it remains outside the default patch series.
-
-The experimental FEX continuation candidate now also completes the production
-build: 187 ARM64EC objects, 50 fresh native objects and nine retained FEXCore
-members. All 104 native continuation commands join successfully; the old frame
-size/offsets, 30 exports, 12-DLL import symbols and native public symbol contract
-remain unchanged. The original failed import postcondition and terminal capture
-are retained separately. A fresh Native60 app now compiles and passes local
-signature/provenance verification with its new FEXBridge object and 47 actual
-FEX headers, all nine native archives, retained Native59 helpers/profiles and
-matching dSYM UUID. The same-app parser successor fixes Swift's four-record
-Make dependency readback without rebuilding or resigning. Independent readback
-checks all 382 app files and 13 completed verifier command outputs. Native60 is
-built and signed, but not installed or CPU-qualified. It retains the older
-installed Native59 HLE bytes rather than substituting the new a11c runtime.
-These results do not establish the cause of Native59's fault or repair
-MiniGolf's startup.
+**Native60 is built and signed, with CPU execution pending.** Its experimental
+EC continuation candidate compiles 187 ARM64EC objects, 50 fresh native objects
+and nine retained FEXCore members. The app is built against matching FEXBridge
+headers and archives, with its translator bytes, signature, entitlements and
+dSYM identity verified. It retains the older installed HLE payload to isolate
+CPU behavior. The preserving updater refused before installation when Native59
+reappeared during preflight. No successful installation or delivery result is
+inferred from that refusal.
 [Actual native build](evidence/native-ec-continuation-native-build-20261012.json),
-[signed Native60 observation](evidence/native60-local-build-signature-20261012.json).
+[signed app](evidence/native60-local-build-signature-20261012.json),
+[candidate source](../experimental/native-ec-continuation/README.md).
+
+MiniGolf is **not yet demonstrated playable**. Next are complete linked-runtime
+and loaded-PRX qualification, fresh twelve-ELF preparation, the preserving host
+update and full CPU probes, then course rendering and a complete offline course.
+Boots on another CPU/OS/GPU path do not qualify this iPad's Wine/FEX context
+handling or Unity rendering. [MiniGolf records](MINIGOLF.md).
+
+All builds and tests run locally. **GitHub Actions remain disabled.** Dumps,
+pairing and raw diagnostics stay outside Git. The storage cleanup freed
+68,189,360,128 allocated bytes; required MiniGolf inputs, authored source,
+toolchains and active preservation providers remain.
+[Cleanup record](evidence/local-storage-cleanup-20261012.json).

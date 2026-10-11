@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "status": "latest_4be9_thirteen_patch_source_candidate_applied_and_reversed_not_runtime_qualified",
+  "upstreamCommit": "4be9c255192bca142dfa349b81caf71b08ebb607",
+  "previousUpstreamCommit": "a11c8f7f70a0ed4e71504a89de69e8cdae687817",
+  "newCommitCount": 2,
+  "patchCount": 13,
+  "sourceEntryCount": 2136,
+  "unchangedSourceEntryCount": 2135,
+  "thirdPartyGitlinkCount": 11,
+  "thirdPartyGitlinksUnchanged": true,
+  "patchFilesUnchanged": true,
+  "patchHunkOverlaps": [],
+  "reverseRestoresExactLatestUpstream": true,
+  "reverseSourceEntryCount": 2055,
+  "roundtripCommandCount": 52,
+  "compilerOnceRetested": false,
+  "windowsExceptionRetested": false,
+  "fullHleQualified": false,
+  "runtimeQualified": false,
+  "deviceExecuted": false,
+  "gameplayVerified": false,
+  "upstreamChangedFiles": {
+    "core/libs/prx/libc/src/exception/Unwind.cpp": {
+      "addedLines": 12,
+      "newSha256": "814d19cdb0a4f7c0e738c92cab37b483c08d90d1a3c450aa7b888c0bb0e7dcbe",
+      "oldSha256": "9b04e81399cbb2dc74271df69663cc9bc22dc726740c61b48f10f790912e6852",
+      "removedLines": 0
+    }
+  },
+  "actualSourceCandidateReceiptSha256": "a93f21acc451483bd686de7e8af96fd971b59ab5705999af55dd0dc0e80f20ba",
+  "productionCheckoutsReadbackMatch": true,
+  "preparationSha256": "f1b7de96ceadbe42be63a261b367e265957ad94796e634c583e81914fa2dc708"
+}

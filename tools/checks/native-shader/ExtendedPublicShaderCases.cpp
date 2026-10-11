@@ -426,10 +426,27 @@ void stage(const RecompileRequest& r){
  need(std::equal(staged->spirv.Words().begin(),staged->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end())&&std::equal(captured->spirv.Words().begin(),captured->spirv.Words().end(),regular.spirv.Words().begin(),regular.spirv.Words().end()),"equivalent final-stage SPIR-V differs");
  need(sameBindings(staged->bindings,regular.bindings)&&sameBindings(captured->bindings,regular.bindings),"equivalent final-stage binding closure differs");
 }
+// These fixtures test whether fixed-function replacement is proved safe.
+// A failed proof may be valid for exact barycentric emulation, so negatives
+// must test this original-instruction gate rather than unrelated BDA/ABI state.
+void fixedFunctionProfile(const std::string& name,const RdnaProgram& decoded,
+                          const ControlFlowGraph& cfg,const RecompileRequest& request,bool expected){
+ const auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,request.context,request.target.subgroupSize);
+ bool admitted=false;
+ try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);admitted=true;}
+ catch(const FixedFunctionInterpolationRejected& e){
+  need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" lost the typed proof diagnostic");
+ }
+ need(admitted==expected,name+" wrong direct fixed-function proof result");
+}
+void stageAdmitted(const std::string& name,const RecompileRequest& request){
+ try{stage(request);}catch(const std::exception& e){throw std::runtime_error(name+" staged failure: "+e.what());}
+}
+
 void check(const std::string& name,const Code& code,bool expected,std::function<void(RdnaProgram&,ControlFlowGraph&)> change={}){
  auto decoded=RdnaInstructionDecoder{}.Decode(code);auto cfg=GraphBuilder{}.Build(decoded);if(change)change(decoded,cfg);
  if(UnusedBarycentricProof::Prove(decoded,cfg,{0,1})!=expected){std::cerr<<RdnaProgramToString(decoded)<<"\n"<<GraphToString(cfg);for(const auto& i:decoded.instructions)std::cerr<<"pc="<<i.programCounter<<" enum="<<static_cast<unsigned>(i.op)<<" sourceCount="<<i.sourceCount<<" is64="<<i.is64Bit<<" footprint="<<static_cast<bool>(UnusedBarycentricProof::EffectsFor(i))<<"\n";throw std::runtime_error(name+" wrong proof result");}
- if(!change){PixelRequest p(code);bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){if(expected)throw std::runtime_error(name+" staged failure: "+e.what());need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());}need(accepted==expected,name+" wrong staged result");}
+ if(!change){PixelRequest p(code);fixedFunctionProfile(name,decoded,cfg,p.request,expected);if(expected)stageAdmitted(name,p.request);}
  ++passes;std::cout<<"PASS "<<name<<"\n";
 }
 void checkMrtZ(const std::string& name,const Code& code,bool expected){
@@ -440,25 +457,19 @@ void checkMrtZ(const std::string& name,const Code& code,bool expected){
  // I/J in v0/v1 and PositionZ in v2, with no native barycentric capability.
  pixel.inputAddr|=PixelInputBit(PixelInput::PositionZ);pixel.posZ=true;
  pixel.depthExportEnable=true;pixel.targetOutputMode.fill(0);
- bool accepted=false;
- try{
-  stage(p.request);accepted=true;
-  if(expected){
-   const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
-   bool depthReplacing=false,depthOutput=false;std::uint32_t depthVariable=0;
-   for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
-    const auto op=static_cast<spv::Op>(words[at]&0xffffu);
-    if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModeDepthReplacing)depthReplacing=true;
-    if(op==spv::OpDecorate&&words[at+2]==spv::DecorationBuiltIn&&words[at+3]==spv::BuiltInFragDepth)depthVariable=words[at+1];
-    if(op==spv::OpStore&&depthVariable&&words[at+1]==depthVariable)depthOutput=true;
-   }
-   need(depthReplacing&&depthOutput,name+" did not retain the actual fragment-depth export");
+ fixedFunctionProfile(name,decoded,cfg,p.request,expected);
+ if(expected){
+  stageAdmitted(name,p.request);
+  const auto result=Recompile(p.request);const auto& words=result.spirv.Words();
+  bool depthReplacing=false,depthOutput=false;std::uint32_t depthVariable=0;
+  for(std::size_t at=5;at<words.size()&&(words[at]>>16u)!=0;at+=words[at]>>16u){
+   const auto op=static_cast<spv::Op>(words[at]&0xffffu);
+   if(op==spv::OpExecutionMode&&words[at+2]==spv::ExecutionModeDepthReplacing)depthReplacing=true;
+   if(op==spv::OpDecorate&&words[at+2]==spv::DecorationBuiltIn&&words[at+3]==spv::BuiltInFragDepth)depthVariable=words[at+1];
+   if(op==spv::OpStore&&depthVariable&&words[at+1]==depthVariable)depthOutput=true;
   }
- }catch(const std::exception& e){
-  if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
-  need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
+  need(depthReplacing&&depthOutput,name+" did not retain the actual fragment-depth export");
  }
- need(accepted==expected,name+" wrong MRTZ staged result");
  ++passes;std::cout<<"PASS "<<name<<"\n";
 }
 void checkOrderedMessage(const std::string& name,const Code& code,bool ordered){
@@ -501,10 +512,8 @@ void checkBufferPack(const std::string& name,const Code& code,bool expected,
   const std::array<std::uint32_t,4> descriptor{0x910000u,0u,16u,0x31016facu};
   const std::array<MemoryRegion,1> memory{{{0x910000u,std::as_bytes(std::span(constants))}}};
   p.request.context.userData=descriptor;p.request.context.memory=memory;
-  bool accepted=false;try{stage(p.request);accepted=true;}catch(const std::exception& e){
-   if(expected)throw std::runtime_error(name+" staged failure: "+e.what());
-   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,name+" unexpected rejection: "+e.what());
-  }need(accepted==expected,name+" wrong scalar-buffer/packed staged result");
+  fixedFunctionProfile(name,decoded,cfg,p.request,expected);
+  if(expected)stageAdmitted(name,p.request);
  }++passes;std::cout<<"PASS "<<name<<"\n";
 }
 void checkQuad(const PublicQuadCases::Case& item){
@@ -541,10 +550,8 @@ void checkQuad(const PublicQuadCases::Case& item){
   pixel.request.context.userData=userData;pixel.request.context.memory=memory;
   pixel.request.target.supportedCapabilities=capabilities;pixel.request.target.supportedExtensions=extensions;
   pixel.request.target.bdaAbiVersion=1;
-  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& e){
-   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+e.what());
-   need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+e.what());
-  }need(accepted==item.expected,item.name+" wrong staged outcome");
+  fixedFunctionProfile(item.name,decoded,cfg,pixel.request,item.expected);
+  if(item.expected)stageAdmitted(item.name,pixel.request);
  }
  ++passes;std::cout<<"PASS "<<item.name<<"\n";
 }
@@ -557,10 +564,8 @@ void checkColorExport(const PublicColorExportCases::Case& item){
  need(UnusedBarycentricProof::Prove(decoded,cfg,item.rawRegisters)==item.expected,item.name+" wrong color export proof decision");
  if(!item.change){
   PixelRequest pixel(item.code);pixel.request.context.pixel->targetOutputMode.fill(4u);
-  bool accepted=false;try{stage(pixel.request);accepted=true;}catch(const std::exception& error){
-   if(item.expected)throw std::runtime_error(item.name+" staged failure: "+error.what());
-   need(std::string(error.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged rejection: "+error.what());
-  }need(accepted==item.expected,item.name+" wrong color export staged result");
+  fixedFunctionProfile(item.name,decoded,cfg,pixel.request,item.expected);
+  if(item.expected)stageAdmitted(item.name,pixel.request);
  }++passes;std::cout<<"PASS "<<item.name<<"\n";
 }
 
@@ -642,17 +647,15 @@ int main(int argc,char** argv){try{
  Code interp{0xc8100000u,0xc8110001u,0xf800180fu,0x04040404u,0xbf810000u};
  auto decoded=RdnaInstructionDecoder{}.Decode(interp);auto cfg=GraphBuilder{}.Build(decoded);PixelRequest p(interp,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
  ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);++passes;std::cout<<"PASS unchanged_complete_P1_P2_guard\n";
- decoded.instructions[1].op=RdnaOpcode::VMovB32;bool rejected=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);}catch(const std::exception&){rejected=true;}need(rejected,"incomplete P1/P2 accepted");++passes;std::cout<<"PASS unchanged_incomplete_P1_P2_guard\n";
+ decoded.instructions[1].op=RdnaOpcode::VMovB32;bool rejected=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);}catch(const FixedFunctionInterpolationRejected&){rejected=true;}need(rejected,"incomplete P1/P2 accepted");++passes;std::cout<<"PASS unchanged_incomplete_P1_P2_guard\n";
  for(const auto& item:PublicInstrumentationProofCases::cases())check(item.name,item.code,item.expected,item.change);
  for(const auto& item:PublicInstrumentationProofCases::pairCases()){
   auto decoded=RdnaInstructionDecoder{}.Decode(item.code);auto cfg=GraphBuilder{}.Build(decoded);
   PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
   bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected proof failure");}
+  catch(const FixedFunctionInterpolationRejected& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected proof failure");}
   need(validated==item.expected,item.name+" incorrect P1/P2 guard");
-  bool staged=false;try{stage(p.request);staged=true;}
-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");}
-  need(staged==item.expected,item.name+" incorrect staged P1/P2 guard");
+  if(item.expected)stageAdmitted(item.name,p.request);
   ++passes;std::cout<<"PASS "<<item.name<<"\n";
  }
  for(const auto& item:PublicQuadCases::cases())checkQuad(item);
@@ -663,14 +666,12 @@ int main(int argc,char** argv){try{
   if(item.change)item.change(decoded,cfg);
   PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
   bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
+  catch(const FixedFunctionInterpolationRejected& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
   need(validated==item.expected,item.name+" incorrect SCC skip guard");
   // Mutated decoder/CFG metadata controls are guard-only; exact encoded controls
-  // additionally execute production Prepare/Capture/Materialize and Recompile.
+  // admitted positives additionally execute production Prepare/Capture/Materialize and Recompile.
   if(!item.change){
-   bool staged=false;try{stage(p.request);staged=true;}
-   catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");}
-   need(staged==item.expected,item.name+" incorrect staged SCC skip guard");
+   if(item.expected)stageAdmitted(item.name,p.request);
   }
   ++passes;std::cout<<"PASS "<<item.name<<"\n";
  }
@@ -687,10 +688,10 @@ int main(int argc,char** argv){try{
   if(item.change)item.change(decoded,cfg);
   PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
   bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
+  catch(const FixedFunctionInterpolationRejected& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected guard failure");}
   need(validated==item.expected,item.name+" incorrect mandatory DAG guard");
   // Mutated metadata controls qualify the exact decoder/CFG guard only.
-  // Every encoded non-overflow case also calls production staged APIs.
+  // Every admitted encoded non-overflow case also calls production staged APIs.
   if(!item.change){
    const std::array<std::uint32_t,13> capabilities{
     spv::CapabilityShader,spv::CapabilityInt64,spv::CapabilityGroupNonUniform,spv::CapabilityGroupNonUniformBallot,
@@ -708,12 +709,7 @@ int main(int argc,char** argv){try{
    p.request.context.userData=userData;
    p.request.target.supportedCapabilities=capabilities;p.request.target.supportedExtensions=extensions;
    p.request.target.bdaAbiVersion=1;
-   bool staged=false;try{stage(p.request);staged=true;}
-   catch(const std::runtime_error& e){
-    if(item.expected)throw std::runtime_error(item.name+" unexpected staged failure: "+e.what());
-    need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected staged failure");
-   }
-   need(staged==item.expected,item.name+" incorrect staged mandatory DAG result");
+   if(item.expected)stageAdmitted(item.name,p.request);
   }
   ++passes;std::cout<<"PASS "<<item.name<<"\n";
  }
@@ -726,7 +722,7 @@ int main(int argc,char** argv){try{
   if(item.change)item.change(decoded,cfg);
   PixelRequest p(item.code,1);auto info=BuildShaderStageInputInfo(ShaderStageKind::Pixel,p.request.context,64);
   bool validated=false;try{ValidateFixedFunctionInterpolation(decoded,cfg,*info.pixel);validated=true;}
-  catch(const std::runtime_error& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected optional-group guard failure");}
+  catch(const FixedFunctionInterpolationRejected& e){need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected optional-group guard failure");}
   need(validated==item.expected,item.name+" incorrect optional-group guard");
   if(!item.change){
    const std::array<std::uint32_t,13> capabilities{
@@ -745,12 +741,7 @@ int main(int argc,char** argv){try{
    const std::array<MemoryRegion,1> memory{{{0x930000u,std::as_bytes(std::span(values))}}};
    p.request.context.userData=userData;p.request.context.memory=memory;
    p.request.target.supportedCapabilities=capabilities;p.request.target.supportedExtensions=extensions;p.request.target.bdaAbiVersion=1;
-   bool staged=false;try{stage(p.request);staged=true;}
-   catch(const std::runtime_error& e){
-    if(item.expected)throw std::runtime_error(item.name+" unexpected optional-group staged failure: "+e.what());
-    need(std::string(e.what()).find("fixed-function interpolation")!=std::string::npos,item.name+" unexpected optional-group staged rejection");
-   }
-   need(staged==item.expected,item.name+" incorrect optional-group staged result");
+   if(item.expected)stageAdmitted(item.name,p.request);
   }
   ++passes;std::cout<<"PASS "<<item.name<<"\n";
  }

@@ -1,0 +1,35 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, subprocess, time
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+source = base/'qualification-source-v5'
+assert subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD']).decode().strip() == '0a8b1d32b12a6d6a3acd462787750b482bf78884'
+review = json.loads((base/'latest-0a8b-fifteen-patch-proposal/source-candidate-review.json').read_text())
+for name, digest in review['sourceFiles'].items():
+    assert hashlib.sha256((source/name).read_bytes()).hexdigest() == digest, name
+out = base/'native-build-latest15'
+out.mkdir()
+commands = [
+ ('configure', ['/opt/homebrew/bin/cmake','-S',str(base/'native-source'),'-B',str(out),'-G','Ninja',
+   '-DCMAKE_BUILD_TYPE=Release','-DANYPS5_SOURCE='+str(source),'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'], 90),
+ ('build', ['/opt/homebrew/bin/cmake','--build',str(out),'--parallel','2'], 600),
+ ('tests', ['/opt/homebrew/bin/ctest','--test-dir',str(out),'--output-on-failure','--parallel','1',
+   '--output-junit',str(out/'tests.xml')], 600)]
+results = []
+try:
+    for name, argv, timeout in commands:
+        started = time.monotonic()
+        with (out/(name+'.log')).open('wb') as log:
+            code = subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT,timeout=timeout).returncode
+        results.append({'name':name,'argv':argv,'exit':code,'seconds':time.monotonic()-started})
+        print({k:v for k,v in results[-1].items() if k!='argv'},flush=True)
+        if code: break
+finally:
+    (out/'actual-receipt.json').write_text(json.dumps({'commands':results,'sourceReviewSha256':
+        hashlib.sha256((base/'latest-0a8b-fifteen-patch-proposal/source-candidate-review.json').read_bytes()).hexdigest(),
+        'gpuExecuted':False,'deviceExecuted':False,'gameplayVerified':False},indent=2)+'\n')
+raise SystemExit(0 if len(results)==3 and all(r['exit']==0 for r in results) else 1)

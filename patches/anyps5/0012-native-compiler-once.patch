@@ -1422,3 +1422,54 @@
 +        if (fail) throw std::runtime_error("cross-module once");
 +    });
 +}
+--- a/core/libs/tests/WindowsExceptions.cpp
++++ b/core/libs/tests/WindowsExceptions.cpp
+@@ -177,6 +177,30 @@
+     }
+ }
+ 
++// Retain the owned compiler-once provider regression alongside upstream guest
++// frames. This does not qualify exceptions through foreign native DLL frames.
++static int onceDestroyed;
++struct OnceGuard { ~OnceGuard() { ++onceDestroyed; } };
++static void ThrowThroughOnce(int depth) {
++    OnceGuard guard;
++    if (depth) { ThrowThroughOnce(depth - 1); return; }
++    std::once_flag flag;
++    std::call_once(flag, [] { throw std::runtime_error("through runtime frames"); });
++}
++
++static void testUnwindThroughRuntimeModules() {
++    for (int depth : {0, 1, 7, 64}) {
++        onceDestroyed = 0;
++        try {
++            ThrowThroughOnce(depth);
++            throw std::logic_error("call_once did not propagate");
++        } catch (const std::runtime_error& error) {
++            if (std::strcmp(error.what(), "through runtime frames")) throw;
++        }
++        if (onceDestroyed != depth + 1) throw std::runtime_error("unwinding through runtime DLL frames skipped a destructor");
++    }
++}
++
+ int main() {
+     TestTypeInfoVtables();
+     testExceptionPointer();
+@@ -184,6 +208,7 @@
+     testMadeExceptionPointer();
+     testUncaughtExceptions();
+     testUnwindThroughGuestFrames();
++    testUnwindThroughRuntimeModules();
+     try {
+         Rethrow();
+         return 1;
+--- a/docs/dev/TechnicalDebt.md
++++ b/docs/dev/TechnicalDebt.md
+@@ -399,6 +399,7 @@
+ - [setcontext](../../core/libs/prx/libkernel/System/src/UserContext.cpp) (libkernel) and [longjmp](../../core/libs/prx/libc/src/JumpBuffer.cpp) (libc) on Windows set the thread's stack bounds in the TEB to the stack they switch to: a `makecontext` stack, or else the committed region around the target stack pointer. A switch to any other guest stack, such as a context built by hand, gets the bounds of that region only
+ - [sceKernelInstallExceptionHandler](../../core/libs/prx/libkernel/System/src/Exception.cpp) records the handler, but a host fault still ends the process: only signals raised with `sceKernelRaiseException` are delivered. Unity's PS5Util module installs a SIGUSR1 handler that reads `uc_mcontext.mc_rsp` (offset 0xf8 of the context) and raises SIGUSR1 on other threads to stop them for garbage collection
+ - The Windows libc exception unwinder reads the project's `.ehmeta` and `.ehfram` tables, not PE `.pdata`/`.xdata`. WinLibs GCC 15.2's `libstdc++-6.dll` and `libwinpthread-1.dll` have empty `.eh_frame` sections, so guest exceptions cannot currently cross their frames (for example, the `std::call_once` path through `pthread_once`); `RtlVirtualUnwind` stepping and Windows cleanup handlers are not implemented
++- Local owned Windows libc-linked callers route direct `pthread_once` and its `__imp_pthread_once` slot to the explicit four-byte compiler-once provider. Its callback, exceptional reset and retry stay within owned DWARF frames. This bridge does not qualify native DLL-internal once calls, cancellation or general foreign-frame unwinding
+ - [sceKernelRaiseException](../../core/libs/prx/libkernel/System/src/Exception.cpp) on Linux sends the host SIGUSR1, which the library takes over, to the target thread, so the handler runs wherever the thread was interrupted, emulator code included. On the console kernel objects are system calls and libthr defers signals while a thread holds its internal locks; here a handler that needs a host lock the interrupted code holds deadlocks, and a thread that the handler keeps waiting keeps its host locks. Host waits resume after the handler. The host calls Linux does not restart end early: sleeps that do not retry return before their time, and the poll of `sceNetEpollWait` and socket calls with a send or receive timeout return `EINTR` to the guest
+ - [sceKernelRaiseException](../../core/libs/prx/libkernel/System/src/Exception.cpp) builds the handler's `ucontext` with FreeBSD's amd64 layout (16-byte sigmask, `mcontext` at 0x40, `mc_rsp` at 0xf8); the console's layout is not verified beyond the fields PS5Util reads
+ - [sceKernelRaiseException](../../core/libs/prx/libkernel/System/src/Exception.cpp) does not consult the target thread's signal mask

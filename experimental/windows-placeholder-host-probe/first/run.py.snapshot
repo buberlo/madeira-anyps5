@@ -1,0 +1,116 @@
+"""Small root-owned API diagnostic. Import never compiles or launches Wine."""
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import time
+
+HERE = Path(__file__).resolve().parent
+RECIPE = HERE/'recipe.json'
+BORROWED = HERE.parent/'unwind-first-miss-execution-attempt2-proposal'
+LIFETIME_SHA = '717fb9edf65a428eb70dd78cb2bd10d0a78148819de104d769cfe5ae6a1ed410'
+CHILD_SHA = 'ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6'
+
+
+def load(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def contract(digest):
+    r = load(BORROWED/'run.py', 'placeholder_lifetime')
+    r.read(BORROWED/'run.py', LIFETIME_SHA)
+    r.read(BORROWED/'bounded_local_process.py', CHILD_SHA)
+    r.read(RECIPE, digest)
+    q = json.loads(RECIPE.read_text())
+    r.need(q['status'] == 'inert_placeholder_host_probe_no_runtime_qualification', 'Inert API probe')
+    r.replay(q['inputs'])
+    r.read(q['toolProviderPlan'], q['toolProviderPlanSha256'])
+    old = json.loads(Path(q['toolProviderPlan']).read_text())
+    tools = {k:v for k,v in old['inputs'].items() if '/build/toolchains/' in k}
+    r.replay(tools)
+    r.OUT = Path(q['output']); r.ARTIFACT_MAX = 16*1024**2
+    r.need(r.OUT == HERE.parent/'guest-memory-placeholder-host-probe-build-attempt1', 'Exact owned output')
+    return q, r, tools
+
+
+def execute(digest):
+    q, r, tools = contract(digest)
+    out = r.OUT
+    r.need(not out.exists() and not out.is_symlink(), 'Fresh diagnostic output')
+    r.need(shutil.disk_usage(HERE).free >= r.MIN_FREE, 'Initial 2GiB reserve')
+    out.mkdir()
+    bounded = load(BORROWED/'bounded_local_process.py', 'placeholder_child')
+    started = time.monotonic(); failure = None
+    result = {'status':'failed', 'recipeSha256':digest, 'commands':[],
+              'runtimeQualified':False, 'deviceExecuted':False, 'ownedPrefixJoined':False}
+    env = r.environment({'wine':q['wine'], 'ownedPrefix':str(out/'wine-prefix')})
+    # Explicit runtime search route, also sufficient for the Windows compiler.
+    env['WINEPATH'] = ';'.join(r.win(Path(p)) for p in q['windowsSearchDirectories'])
+    env.pop('ANYPS5_NO_SHADER_CACHE', None)
+    def guard():
+        r.need(time.monotonic()-started < 360, 'Total 360s API probe deadline')
+        r.need(shutil.disk_usage(out).free >= r.MIN_FREE, 'Live 2GiB reserve')
+        r.inventory(live=True)
+    def command(name, argv, seconds, cleanup=False):
+        try:
+            row = bounded.run(argv, cwd=out, env=env, stdout=out/(name+'.stdout'),
+                stderr=out/(name+'.stderr'), timeout=seconds, stream_maximum=256*1024,
+                guard=(lambda:None) if cleanup else guard, cleanup_seconds=3)
+        except bounded.CommandFailure as error:
+            row = error.result; row['name'] = name; result['commands'].append(row)
+            raise
+        row['name'] = name; result['commands'].append(row)
+        return row
+    try:
+        for row in q['commands']:
+            guard()
+            obs = command(row['name'], [q['wine'], *row['windowsArgv']], row['timeoutSeconds'])
+            r.need(obs['exitCode'] == 0, 'API probe structure/compile failed: '+row['name'])
+        result['status'] = 'host_api_observation_only_not_runtime_qualification'
+    except BaseException as error:
+        failure = error; result['error'] = type(error).__name__+': '+str(error)
+    finally:
+        try:
+            try:
+                row = command('prefix-graceful-wait', [q['wineserver'],'-w'], 30, True)
+                r.need(row['exitCode'] == 0, 'Own graceful prefix join')
+            except bounded.CommandFailure as error:
+                r.need(error.result['timedOut'], 'Only join timeout permits own prefix kill')
+                killed = command('prefix-timeout-kill', [q['wineserver'],'-k'], 15, True)
+                result['forceCloseExitCode'] = killed['exitCode']
+                row = command('prefix-final-wait', [q['wineserver'],'-w'], 15, True)
+                r.need(row['exitCode'] == 0, 'Final own prefix join')
+            result['ownedPrefixJoined'] = True
+        except BaseException as error:
+            failure = failure or error; result['cleanupError'] = repr(error)
+        try:
+            r.replay(q['inputs']); r.replay(tools)
+            result['providersUnchanged'] = True
+            result['outputInventory'] = r.inventory()
+            result['outputs'] = {str(p):r.read(p) for p in out.iterdir() if p.is_file() and not p.is_symlink()}
+        except BaseException as error:
+            failure = failure or error; result['finalReplayError'] = repr(error)
+        if failure is not None: result['status'] = 'failed'
+        result['elapsedSeconds'] = time.monotonic()-started
+        payload = (json.dumps(result,sort_keys=True,indent=2)+'\n').encode()
+        r.need(len(payload) <= 512*1024, 'Receipt quota')
+        with (out/'receipt.json').open('xb') as f:
+            f.write(payload); f.flush(); os.fsync(f.fileno())
+    return result
+
+
+if __name__ == '__main__':
+    p = argparse.ArgumentParser(); p.add_argument('--execute',action='store_true')
+    p.add_argument('--recipe-sha',required=True); a = p.parse_args()
+    if a.execute:
+        result = execute(a.recipe_sha); print(json.dumps(result))
+        raise SystemExit(1 if result['status'] == 'failed' else 0)
+    q, r, tools = contract(a.recipe_sha)
+    print(json.dumps({'status':'read_only_api_probe_contract_passed', 'commands':len(q['commands']),
+                      'toolProviders':len(tools), 'commandsExecuted':False}))

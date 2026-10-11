@@ -1,0 +1,89 @@
+--- a/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
++++ b/core/libs/prx/libSceAgcDriver/tests/Graphics.cpp
+@@ -832,7 +832,7 @@
+     Require(blend.srcColorBlendFactor == VK_BLEND_FACTOR_ZERO && blend.dstColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR, "alpha saturation with an opaque destination");
+     Require(blend.dstAlphaBlendFactor == VK_BLEND_FACTOR_ZERO, "an opaque destination left a destination-color alpha factor");
+     queue.context[0x31d] = 0x40000u;
+-    expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "destination alpha override");
++    expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "color FMASK layout or reserved attributes is unsupported");
+ }
+ 
+ void DisabledColorTests() {
+@@ -1026,7 +1026,28 @@
+     // proof; a generalized maintenance clear must not bypass that boundary.
+     grouped = true;
+     queue.context[0x010] |= 2u << 2u;
++    // The grouped clear keeps a written four-sample color target. Its layout
++    // must be R64KB_X with a complete aligned backing block, not makeState's
++    // single-sample linear 1 KiB allocation.
++    const AgcDriver::Graphics::ColorTargetLayout multisampleLayout(
++        64, 4, AgcDriver::Graphics::ColorTileMode::RenderTarget, 4, 0, 4);
++    std::vector<std::byte> multisampleStorage(
++        multisampleLayout.Bytes() + multisampleLayout.Alignment() - 1u);
++    const auto multisampleAddress =
++        (reinterpret_cast<std::uintptr_t>(multisampleStorage.data()) +
++         multisampleLayout.Alignment() - 1u) &
++        ~static_cast<std::uintptr_t>(multisampleLayout.Alignment() - 1u);
++    queue.context[0x318] = static_cast<std::uint32_t>(multisampleAddress >> 8u);
++    queue.context[0x390] = static_cast<std::uint32_t>(multisampleAddress >> 40u);
++    queue.context[0x3b8] |=
++        static_cast<std::uint32_t>(AgcDriver::Graphics::ColorTileMode::RenderTarget) << 14u;
+     queue.context[0x31d] = (2u << 12u) | (2u << 15u);
++    const auto multisampleColor = AgcDriver::Graphics::DecodeColorBuffer(queue.context, 0);
++    Require(multisampleColor.tileMode == AgcDriver::Graphics::ColorTileMode::RenderTarget &&
++            multisampleColor.samples == 4 && multisampleColor.fragments == 4 &&
++            multisampleColor.address == multisampleAddress &&
++            multisampleColor.bytes == multisampleLayout.Bytes(),
++            "grouped stencil clear has no complete four-sample R64KB_X color target");
+     queue.context[0x2f8] = 2u | (6u << 13u) | (2u << 20u);
+     queue.context[0x201] = 0x2222u;
+     queue.context[0x292] |= 1u;
+@@ -1039,6 +1060,7 @@
+         expectFailure([&] { AgcDriver::Graphics::DecodeState(queue, false, grouped); }, reason);
+         queue.context[offset] = previous;
+     };
++    reject(0x3b8, 0x09000000u, "multisampled color targets require R64KB_X tiling");
+     reject(0x00a, 0x7b, "stencil clear");
+     reject(0x10c, 0xff7fff7a, "stencil clear"); // partial front write mask
+     reject(0x10d, 0xffffff7b, "stencil clear"); // different back reference
+@@ -1163,17 +1185,21 @@
+     queue.context[0x002] = 0;
+     queue.context[0x00b] = 0;
+     queue.context[0x000] = 0x22;
+-    expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "stencil clear is not equivalent");
++    // A single-sample maintenance clear overrides ordinary stencil state.
++    // The grouped path above retains its separate equivalence negatives.
++    state = AgcDriver::Graphics::DecodeState(queue);
++    const auto clears = [](const VkStencilOpState& face) {
++        return face.compareOp == VK_COMPARE_OP_ALWAYS && face.passOp == VK_STENCIL_OP_REPLACE && face.failOp == VK_STENCIL_OP_REPLACE && face.depthFailOp == VK_STENCIL_OP_REPLACE && face.writeMask == 0xff && face.reference == 7;
++    };
++    Require(state.stencilTest && clears(state.stencilFront) && clears(state.stencilBack), "single-sample stencil clear did not override ordinary stencil operations");
+     queue.context[0x10b] = 0x333333;
+     queue.context[0x10c] = queue.context[0x10d] = 0x07ffff07;
+     queue.context[0x200] = 0x007007f1;
+     state = AgcDriver::Graphics::DecodeState(queue);
+-    const auto clears = [](const VkStencilOpState& face) {
+-        return face.compareOp == VK_COMPARE_OP_ALWAYS && face.passOp == VK_STENCIL_OP_REPLACE && face.failOp == VK_STENCIL_OP_REPLACE && face.depthFailOp == VK_STENCIL_OP_REPLACE && face.writeMask == 0xff && face.reference == 7;
+-    };
+     Require(state.stencilTest && clears(state.stencilFront) && clears(state.stencilBack), "a STENCIL_CLEAR_ENABLE draw does not store DB_STENCIL_CLEAR");
+     queue.context[0x200] = 0;
+-    expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "stencil clear is not equivalent");
++    state = AgcDriver::Graphics::DecodeState(queue);
++    Require(state.stencilTest && clears(state.stencilFront) && clears(state.stencilBack), "single-sample stencil clear without a stencil test did not store DB_STENCIL_CLEAR");
+     queue.context[0x200] = 0x007007f1;
+     queue.context[0x002] = 0x02000000;
+     expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "writable stencil plane");
+@@ -1195,7 +1221,12 @@
+     queue.context[0x10d] = 0x090000ff;
+     for (const auto control : {0u, 1u, 0x81u}) {
+         queue.context[0x200] = control;
+-        expectFailure([&] { AgcDriver::Graphics::DecodeState(queue); }, "stencil clear is not equivalent");
++        state = AgcDriver::Graphics::DecodeState(queue);
++        Require(state.stencilTest && clears(state.stencilFront) && clears(state.stencilBack), "single-sample stencil clear used the overridden stencil operations");
++        Require(state.depth && !state.depthTest && !state.depthWrite, "single-sample stencil clear changed depth state");
++        Require(state.colors.size() == 2 && state.blends.size() == 2 && state.colors[1].address == secondColor && state.blends[0].colorWriteMask == 3 && state.blends[1].colorWriteMask == 0xf, "single-sample stencil clear lost MRT color writes");
++        Require(state.scissor.offset.x == 1 && state.scissor.offset.y == 0 && state.scissor.extent.width == 2 && state.scissor.extent.height == 2, "single-sample stencil clear changed scissor coverage");
++        Require(AgcDriver::Graphics::DrawRejection(queue, false).empty(), "precheck rejected combined single-sample color/stencil clear");
+     }
+     queue.context[0x10b] = 0x333333;
+     queue.context[0x10c] = queue.context[0x10d] = 0x07ffff07;

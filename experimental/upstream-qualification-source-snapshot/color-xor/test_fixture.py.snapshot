@@ -1,0 +1,63 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+"""Pure source/table checks; these do not execute the C++ fixture."""
+import hashlib
+import re
+import unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+BASE = HERE.parent / 'latest-0a8b-fifteen-patch-proposal/source'
+TEST = BASE / 'core/libs/prx/libSceAgcDriver/tests/ColorTargetLayout.cpp'
+HEADER = BASE / 'core/libs/prx/libSceAgcDriver/Graphics/include/TextureSwizzleEquations.hpp'
+ADDED = ('        // XOR equations retain global coordinate bits across macroblocks.\n'
+         '        // These independent 32 bpp literals catch an oracle that masks x or y.\n'
+         '        Require(expected(32u, 0u) == 0x400u && expected(0u, 32u) == 0x800u, "4 KiB XOR cross-block coordinate contributions changed");\n')
+
+def bits(mode):
+    row = re.search(r'\{%du, 4u, \{([^}]+)\}\}' % mode, HEADER.read_text())
+    if row is None:
+        raise ValueError('Missing exact current 32 bpp equation')
+    return [int(v.strip().removesuffix('u'), 16) for v in row[1].split(',')]
+
+def equation(mode, x, y):
+    return sum((((x & mask & 0xfff) ^ ((y << 12) & mask & 0xfff000)).bit_count() & 1) << bit
+               for bit, mask in enumerate(bits(mode)))
+
+class Fixture(unittest.TestCase):
+    def test_only_oracle_coordinate_and_explicit_cross_block_assertion_changed(self):
+        candidate = (HERE / 'ColorTargetLayout.cpp').read_text()
+        self.assertEqual(candidate.count(ADDED), 1)
+        original = candidate.replace(ADDED, '').replace('(expected(x, y) ^ 0xa00u)', '(expected(x % 32u, y) ^ 0xa00u)')
+        self.assertEqual(original, TEST.read_text())
+
+    def test_pinned_equations_have_cross_block_x_and_y_contributions(self):
+        for mode in (21, 22):
+            self.assertEqual(equation(mode, 32, 0), 0x400)
+            self.assertEqual(equation(mode, 0, 32), 0x800)
+
+    def test_old_oracle_reproduces_two_wrong_expected_addresses(self):
+        for mode in (21, 22):
+            for x, y, right, old in ((32, 0, 0x1e00, 0x1a00), (39, 19, 0x1abc, 0x1ebc)):
+                block = (x // 32) * 4096
+                self.assertEqual(block + (equation(mode, x, y) ^ 0xa00), right)
+                self.assertEqual(block + (equation(mode, x % 32, y) ^ 0xa00), old)
+                self.assertNotEqual(right, old)
+
+    def test_global_equation_preserves_entire_fixture_range_and_distinct_texels(self):
+        for mode in (21, 22):
+            offsets = [(x // 32) * 4096 + (equation(mode, x, y) ^ 0xa00)
+                       for y in range(20) for x in range(40)]
+            self.assertEqual(len(set(offsets)), 800)
+            self.assertTrue(all(0 <= offset <= 8192 - 4 and offset % 4 == 0 for offset in offsets))
+
+    def test_pipe_bank_negative_and_actual_tile_roundtrip_are_retained(self):
+        text = (HERE / 'ColorTargetLayout.cpp').read_text()
+        for line in ('xor4Kb.Tile(source, tiled4Kb);', 'xor4Kb.Detile(tiled4Kb, back);',
+                     'Require(back == source, "4 KiB XOR color tiling round trip lost pixels");',
+                     'reject([mode] { static_cast<void>(ColorTargetLayout(40, 20, mode, 4, 0x1000)); });'):
+            self.assertIn(line, text)
+
+if __name__ == '__main__':
+    unittest.main()

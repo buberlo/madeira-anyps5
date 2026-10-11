@@ -5,7 +5,7 @@ records fixed source inputs; subsequent upstream movement needs a new review.
 
 | Path | Remote | Commit | Branch |
 | --- | --- | --- | --- |
-| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `a11c8f7f70a0ed4e71504a89de69e8cdae687817` | `main` |
+| `upstreams/AnyPS5` | https://github.com/boykopovar/AnyPS5.git | `0a8b1d32b12a6d6a3acd462787750b482bf78884` | `main` |
 | `upstreams/Madeira` | https://github.com/willfaust/Madeira.git | `48f976429c189f8396e23d251d8a82f43c705922` | `main` |
 | `upstreams/FEX` | https://github.com/FEX-Emu/FEX.git | `14c92681f4d62cf84d901460e0358de09c8847a7` | `FEX-2610` tag |
 | `upstreams/wine` | https://github.com/willfaust/wine.git | `257f271cfffed9f22f7987cac53bc00095d092fe` | `madeira-lgpl` |
@@ -44,15 +44,25 @@ source pin is updated.
 
 ## Complete main refresh, 2026-10-12
 
-AnyPS5 includes all 1,721 merged commits after `c963432d`. The merged Apple
-implementations, including #1776, #1831 and now #2015, are part of this pin.
-Eleven reconciled patches retain our iPad runtime and stricter shader/resource
-contracts. Fresh application matches 2,130 source files; reversal restores
-the complete upstream tree and file modes. The previous patch series is archived.
-Current shader requests use version 17 and disk caches use format 28; old cache
-entries are rejected. The 95 host/relinker tests and six native shader suites
-pass. The fresh 47-library Windows build and physical execution are separate
-qualification steps. [Refresh and measured boundaries](UPSTREAM-REFRESH-20261012.md).
+AnyPS5 includes all **1,735 merged commits** after `c963432d`, including
+Apple fixes #1776, #1831 and #2015. Sixteen reconciled patches retain the
+iPad runtime and strict shader/resource contracts. Fresh application and
+reversal pass all 64 commands. Both actual source checkouts match all 2,137
+files and modes; eleven dependency trees are initialized at their exact
+recorded commits and clean.
+
+Current shader requests use version 17 and disk caches use format 28; old
+cache entries are rejected. All six freshly built native shader suites and
+the full new ShaderMemory fixture pass. Complete linked-runtime, native
+Windows GPU and iPad qualification remain separate. Earlier 95 host/relinker
+passes belong to the preceding complete refresh; they are retained as
+historical evidence. [Current reconciliation and test boundaries](UPSTREAM-REFRESH-20261012.md),
+[actual source/scoped results](evidence/anyps5-0a8b-source-integration-20261012.json).
+
+Madeira `main`, official FEX `main`/FEX-2610 and Madeira's FEX `ios-port-2607`
+baseline all matched the checked heads. The FEX #6021 backport remains
+included. Unmerged Madeira experiments are not treated as required updates.
+These are fixed checked inputs; later upstream movement is a separate refresh.
 
 ## Historical targeted Apple GPU additions, 2026-10-11
 

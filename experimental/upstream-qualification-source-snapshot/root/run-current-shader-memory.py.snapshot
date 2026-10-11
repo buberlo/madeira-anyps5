@@ -1,0 +1,37 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, os, subprocess, time
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+review = base/'latest-0a8b-fifteen-patch-proposal/source-candidate-review.json'
+assert hashlib.sha256(review.read_bytes()).hexdigest() == '5bc7fc8a7de26b471ecd88d5c1df02aeb18028f6cd054406988d4a1b7f91deed'
+source = base/'qualification-source-v5'
+for name, digest in json.loads(review.read_text())['sourceFiles'].items():
+    assert hashlib.sha256((source/name).read_bytes()).hexdigest() == digest, name
+out = base/'actual-current-shader-memory'
+out.mkdir()
+winebin = root/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin'
+env = dict(os.environ, WINEPREFIX=str(base/'wine-prefix-v5'), WINEDEBUG='-all',
+           APS5_GUEST_ARENA_BASE='0x7400000000', APS5_GUEST_ARENA_SIZE='0x100000000',
+           APS5_GUEST_ARENA_LAZY='1', APS5_GUEST_ARENA_CHUNK='0x10000000')
+win = lambda p: 'Z:'+str(p).replace('/', '\\')
+path = ';'.join(win(p) for p in [root/'build/toolchains/winlibs/mingw64/bin',
+    base/'winlibs-build-v5/core/libs/libs/unpatched', base/'winlibs-build-v5/tests'])
+cmd = out/'shader-memory.cmd'
+cmd.write_bytes(('@echo off\r\nset "PATH='+path+';%PATH%"\r\n"'+win(base/'winlibs-build-v5/tests/agc_shader_memory_tests.exe')+'"\r\nexit /b %ERRORLEVEL%\r\n').encode())
+started = time.monotonic()
+code = None
+try:
+    with (out/'shader-memory.log').open('wb') as log:
+        code = subprocess.run([str(winebin/'wine'), 'cmd', '/c', win(cmd)], env=env,
+            stdout=log, stderr=subprocess.STDOUT, timeout=120).returncode
+finally:
+    joined = subprocess.run([str(winebin/'wineserver'), '-w'], env=env, timeout=45).returncode
+    (out/'receipt.json').write_text(json.dumps({'sourceReviewSha256':hashlib.sha256(review.read_bytes()).hexdigest(),
+        'arguments':[], 'exit':code, 'seconds':time.monotonic()-started, 'wineJoined':joined==0,
+        'gpuExecuted':False, 'deviceExecuted':False}, indent=2)+'\n')
+print('ShaderMemory:', code, 'Wine joined:', joined==0, flush=True)
+raise SystemExit(0 if code == 0 and joined == 0 else 1)

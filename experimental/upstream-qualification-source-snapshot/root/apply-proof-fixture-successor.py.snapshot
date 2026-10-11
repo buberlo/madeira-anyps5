@@ -1,0 +1,35 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+proposal = base/'graphics-proof-fixture-scope-proposal'
+report = proposal/'source-proposal.json'
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(report) == 'bf1b4ede8a781653e6e36c3d332884de265930e31ec77b30da02091138dc6393'
+records = json.loads(report.read_text())['changedFiles']
+selected = {'core/libs/prx/libSceAgcDriver/tests/UnusedBarycentricProof.cpp',
+            'tools/checks/native-shader/ExtendedPublicShaderCases.cpp',
+            'tools/checks/native-shader/README.md'}
+out = base/'actual-proof-fixture-source-adoption'
+out.mkdir()
+changes = []
+for rec in records:
+    if rec['path'] not in selected:
+        continue
+    destination = (root if rec['path'].startswith('tools/') else base/'qualification-source-v5')/rec['path']
+    candidate = proposal/'candidate'/rec['path']
+    assert sha(destination) == rec['beforeSha256'] and sha(candidate) == rec['afterSha256']
+    old = out/'before'/rec['path']
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_bytes(destination.read_bytes())
+    destination.write_bytes(candidate.read_bytes())
+    assert sha(destination) == rec['afterSha256']
+    changes.append({'path':rec['path'], 'before':rec['beforeSha256'], 'after':rec['afterSha256']})
+assert len(changes) == len(selected)
+(out/'receipt.json').write_text(json.dumps({'sourceProposalSha256':sha(report), 'changed':changes,
+    'canonicalAnyPS5Changed':False, 'productionChanged':False, 'testsExecuted':False}, indent=2)+'\n')
+print('Adopted and compared three fixture/documentation files; production unchanged.')

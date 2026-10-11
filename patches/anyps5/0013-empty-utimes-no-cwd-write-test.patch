@@ -1,13 +1,11 @@
-diff --git a/core/libs/tests/GuestFilesystem.cpp b/core/libs/tests/GuestFilesystem.cpp
 --- a/core/libs/tests/GuestFilesystem.cpp
 +++ b/core/libs/tests/GuestFilesystem.cpp
-@@ -295,10 +295,11 @@
+@@ -295,9 +295,11 @@
      Require(sceKernelTruncate_nid_postfix("", 0) == static_cast<int>(0x80020002u));
      const auto cwdWriteTime = std::filesystem::last_write_time(".");
      const int emptyUtimes = sceKernelUtimes_nid_postfix("", nullptr);
 -    std::error_code restoreTimeError;
 -    std::filesystem::last_write_time(".", cwdWriteTime, restoreTimeError);
--    Require(!restoreTimeError);
      Require(emptyUtimes == static_cast<int>(0x80020002u));
 +    Require(utimes_nid_postfix("", nullptr) == -1 && *__error_nid_postfix() == 2);
 +    std::error_code readTimeError;

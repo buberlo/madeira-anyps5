@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "status": "latest_47_library_build_memory_and_exception_pass_next_graphics_fixture_failed_not_complete_runtime_qualification",
+  "upstreamCommit": "4be9c255192bca142dfa349b81caf71b08ebb607",
+  "localPatchCount": 13,
+  "sourcePreparationSha256": "f1b7de96ceadbe42be63a261b367e265957ad94796e634c583e81914fa2dc708",
+  "buildHelperSha256": "de525ff3b8eaf9d1b54dc04f764954ca15e476cbc4ccfe19cb7a48b447567f1d",
+  "requiredLibraryCount": 47,
+  "localTestHost": "macOS Wine 11.0",
+  "hostArena": {
+    "APS5_GUEST_ARENA_BASE": "0x7400000000",
+    "APS5_GUEST_ARENA_LAZY": "1",
+    "APS5_GUEST_ARENA_SIZE": "0x100000000",
+    "APS5_GUEST_ARENA_CHUNK": "0x10000000"
+  },
+  "precedingDefaultTargetCountCompleted": 28,
+  "memoryTargetPassed": true,
+  "raiseExceptionTargetPassed": true,
+  "filesystemTargetPassed": true,
+  "originalWindowsExceptionTargetPassed": true,
+  "sharedWriteTrackingObservedChecks": 36,
+  "graphicsTargetExit": 1,
+  "graphicsError": "multisampled color targets require R64KB_X tiling",
+  "noRuntimeOrValidationDisabled": true,
+  "selectedAdditionalCasesNotYetExecuted": true,
+  "fullRuntimeQualified": false,
+  "iPadExecuted": false,
+  "gameplayVerified": false,
+  "logsSha256": {
+    "build.log": "d14cc5d6d743788660053a72be5db35ff75bd07940602f9771f5eacb9224f74b",
+    "test-windows_exception_tests.log": "b656e4571fc6c6c305c10f42b50d6e95d818919442c68e2a0ed9a7dacc6cbcc3",
+    "test-guest_filesystem_tests.log": "d3dbcacdcc833e47a637e6246fe0401b680a35fe8861097e1e8ff1c45de19e8b",
+    "test-guest_memory_tests.log": "b3e59385a60ef15d5a0c6cba632353c0760315b6fe6b69e6581cdf7fb7b77989",
+    "test-guest_raise_exception_tests.log": "64a7d1b123443c27002499f5af907c029c65b4c32b6dc1a7759b2aa0e97e7e44",
+    "test-agc_driver_graphics_tests.log": "df8da3e2e4459bb75e969729e3ffd8a28b40865a6cc0c3871ffb7ce3a86b8960"
+  }
+}

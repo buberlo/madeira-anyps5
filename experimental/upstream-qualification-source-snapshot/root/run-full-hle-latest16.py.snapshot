@@ -1,0 +1,82 @@
+# Archival source snapshot only. Never execute or import this module.
+raise RuntimeError("Snapshot-only module; use reviewed current tooling instead.")
+
+import hashlib, json, os, subprocess, sys, time
+from pathlib import Path
+
+root = Path('__LOCAL_PROJECT_ROOT__')
+base = root/'build/anyps5-full-main-update-20261012'
+source = base/'qualification-source-v5'
+review_path = base/'latest-0a8b-sixteen-patch-proposal/source-candidate-review.json'
+sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(review_path) == '7e6d8baa48ddbd9470f01a04ea23b9b79358498f8ab3dcc4338a92e5bfe98c97'
+review = json.loads(review_path.read_text())
+helper = root/'scripts/build-hle.py'
+assert sha(helper) == 'de525ff3b8eaf9d1b54dc04f764954ca15e476cbc4ccfe19cb7a48b447567f1d'
+arena = {'APS5_GUEST_ARENA_BASE':'0x7400000000', 'APS5_GUEST_ARENA_SIZE':'0x100000000',
+         'APS5_GUEST_ARENA_LAZY':'1', 'APS5_GUEST_ARENA_CHUNK':'0x10000000'}
+additional = ['audio_out2_port_buffers_tests', 'audio_out_ex_tests', 'compiler_once_tests',
+    'guest_pthread_key_tests', 'guest_thread_atexit_tests', 'guest_thread_callback_abi_tests',
+    'agc_shader_memory_tests']
+argv = [sys.executable, '-I', '-B', str(helper), '--source', str(source),
+    '--from-hle', str(root/'build/apple-gpu-20261011/hle-runtime.zip'),
+    '--build', str(base/'winlibs-build-v5'), '--wine',
+    str(root/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine'),
+    '--wine-prefix', str(base/'wine-prefix-v5'), '--jobs', '2',
+    '--output', str(base/'hle-latest16/hle-runtime.zip')]
+for target in additional:
+    argv += ['--additional-test', target]
+out = base/'actual-full-hle-latest16'
+out.mkdir()
+
+def verify_source():
+    assert subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD']).decode().strip() == review['upstreamCommit']
+    for name, record in review['sourceTree'].items():
+        p = source/name
+        assert p.is_file() and not p.is_symlink() and sha(p) == record['sha256'], name
+        assert ('100755' if p.stat().st_mode & 0o111 else '100644') == record['mode'], name
+    for name, digest in review['patches'].items():
+        assert sha(root/'patches/anyps5'/name) == digest, name
+    vendors = {}
+    for line in review['thirdPartyGitlinks']:
+        declaration, name = line.split('\t')
+        p = source/name
+        commit = subprocess.check_output(['git','-C',str(p),'rev-parse','HEAD']).decode().strip()
+        assert commit == declaration.split()[2] and not subprocess.check_output(['git','-C',str(p),'status','--porcelain']), name
+        vendors[name] = commit
+    return vendors
+
+vendors = verify_source()
+preparation_path = base/'qualification-source-latest16-actual-preparation.json'
+assert not preparation_path.exists()
+prospective = json.loads((base/'qualification-source-v11-preparation.json').read_text())
+preparation = dict(prospective, source=str(source), sourceOnly=False,
+    status='actual_promoted_latest16_source_verified_before_full_hle_run',
+    canonicalAndBuildSourcesEdited=True, thirdPartyDependencyTreesInitialized=True,
+    allThirdPartyTreesCleanAtExactGitlinks=True, actualInitializedDependencies=vendors,
+    rootCommandArgv=argv, rootScriptSha256=sha(Path(__file__)),
+    actualRuntimeTestsExecutedForThisSource=False, fullHleQualified=False,
+    actualPromotionReceiptSha256=sha(base/'promotion16-AnyPS5-retry1/completion-after-SDL-fixture-restoration.json'),
+    requiredHostTestArena=arena)
+preparation_path.write_text(json.dumps(preparation, indent=2)+'\n')
+started = time.monotonic()
+code = None
+joined = None
+post_matches = False
+try:
+    with (out/'full-hle.log').open('wb') as log:
+        code = subprocess.run(argv, env=dict(os.environ, **arena, PYTHONUNBUFFERED='1'),
+            stdout=log, stderr=subprocess.STDOUT, timeout=7200).returncode
+finally:
+    wine_server = root/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wineserver'
+    joined = subprocess.run([str(wine_server),'-w'], env=dict(os.environ,
+        WINEPREFIX=str(base/'wine-prefix-v5'),WINEDEBUG='-all',**arena),timeout=45).returncode
+    post_matches = verify_source() == vendors
+    (out/'receipt.json').write_text(json.dumps({'sourceReviewSha256':sha(review_path),
+        'actualPreparationSha256':sha(preparation_path), 'rootScriptSha256':sha(Path(__file__)),
+        'upstreamCommit':review['upstreamCommit'], 'exit':code, 'seconds':time.monotonic()-started,
+        'wineJoined':joined==0, 'sourceAndDependenciesUnchangedAfterRun':post_matches,
+        'requiredDefaultTargetCount':42, 'requiredAdditionalTargetCount':7,
+        'hostTestArena':arena, 'deviceExecuted':False, 'gameplayVerified':False},indent=2)+'\n')
+print('Complete HLE run:',code,'Wine joined:',joined==0,'source unchanged:',post_matches,flush=True)
+raise SystemExit(0 if code == 0 and joined == 0 and post_matches else 1)

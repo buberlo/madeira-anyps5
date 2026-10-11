@@ -14,6 +14,14 @@ request/cache identity, the canonical 355 interpolation cases, the extended
 538 ordered public cases and 24 LDS spill compiler profiles. The 538 cases
 include the canonical 355, plus SCC, mandatory DAG and optional-group proofs.
 Their expected ordered names are retained in `expected-public-case-names.json`.
+These are mixed proof and compiler checks. Every original case, encoding,
+expected decision and ordered name remains. Encoded fixed-function negative
+profiles call the original-instruction guard directly and require its typed
+rejection. Forged metadata and isolated nonstandard raw-register sets retain
+their direct proof controls. Admitted valid profiles still execute production
+Prepare/Capture/Materialize and Recompile, including SPIR-V/binding equality.
+A proof rejection does not imply that exact barycentric emulation must fail;
+that fallback has separate full Graphics tests and capability validation.
 Assertions remain enabled. The LDS fixture reuses the
 upstream shader and compiler helpers; its GPU entrypoint is never called.
 It checks emitted SPIR-V barriers, atomic locks, bounds and workgroup slices.

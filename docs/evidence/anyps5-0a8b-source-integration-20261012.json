@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "kind": "actual_latest_anyps5_source_integration_and_scoped_tests",
+  "localDate": "2026-10-12",
+  "upstreamCommit": "0a8b1d32b12a6d6a3acd462787750b482bf78884",
+  "mergedCommitsAfterC963432d": 1735,
+  "patchCount": 16,
+  "patches": {
+    "0001-ipad-runtime-compatibility.patch": "873deb0d52374eb066fad6538e8f3766f72353585e5c448d6f2ddcbcd874f79e",
+    "0002-bounded-exception-and-context-bridge.patch": "4f05c6f29b37ed46228ce91f7eaa1c5cd34cf2e604616188a0d1951ebe29e51a",
+    "0003-shader-image-policy-request17-cache28.patch": "f649f9b5ef6e6f9811638c49312c02883133ba8c0ae480117bde271b51f038c2",
+    "0004-qualified-interpolation-proofs.patch": "d0cf14afd0b2000c94a8a62a670f371a227fbdaad112fca86df0d0b24bf07e86",
+    "0005-bounded-audioout-trace-and-frame-pacing.patch": "d4cddf858ce2a9ccc83fc5d11d232df77b5c3dae76f4ff6cf662f4c72d946b44",
+    "0006-grouped-color-samples-and-transfers.patch": "cb390fd6ff9a4ddd7608b7bcb9e8c86cbbb06e78e50347f68a13270eee112037",
+    "0007-grouped-depth-stencil-contracts.patch": "1df9e9dcd21ad8a4e8b1c8970f48acf4c58383ba1f682d8c2741971e94cc40fa",
+    "0008-descriptor-snapshots-and-resource-lifetime.patch": "8308b53d0badb1095732ca9c04dfe5b6582ec57639a138c9f48b9936c13de498",
+    "0009-device-profile-pipeline-and-typed-images.patch": "d1cc2523df8798161bca31e73c7034892d4d5a3f8c0cf9261748b7c2e4fe6094",
+    "0010-guarded-guest-module-lifecycle-and-relinker.patch": "2047feb188a30181933d3c6f3a8856be106317fc34c87c1e2c13c75766f84f2c",
+    "0011-integration-and-regression-tests.patch": "9fce0b6c2873dec73ac394317ca9e5872d3fcf2e88095e06e6e9aaaf3f33a184",
+    "0012-native-compiler-once.patch": "fc05fdb0af1ff22119f1c7709d52647f31a98578277720c42fee871d788d4820",
+    "0013-empty-utimes-no-cwd-write-test.patch": "94f7873970b8e1dd359f2f66e4b8a1cd4b9c3167429c980093579e87b2162c69",
+    "0014-valid-stencil-and-reserved-color-fixtures.patch": "9c1e1a84ce00d8201a631a3677b2a6652727e3533d9581c80bcb6c46657b826a",
+    "0015-exact-barycentric-proof-fallback-and-fixtures.patch": "ccb29be6121fca9a3cb71d7b87f482fe18ffbba86fa23826654f8246e2db1628",
+    "0016-color-xor-global-coordinate-fixture.patch": "03dfd7caefbd07c9a3e81d44dabe097275f0a083ee131dd7426624c5dc89abb1"
+  },
+  "sourceReviewSha256": "7e6d8baa48ddbd9470f01a04ea23b9b79358498f8ab3dcc4338a92e5bfe98c97",
+  "sourceEntryCount": 2137,
+  "sourceHashesAndModesComparedInCanonicalAndBuildTrees": true,
+  "initializedCleanNestedDependencies": 11,
+  "applyCheckReverseCommandsPassed": 64,
+  "baseRestoredSourceEntryCount": 2055,
+  "actualPromotionReceiptSha256": "b4d107fc700570a41db63b258772e4c7180088339c94d2561b0339c17290b44e",
+  "promotionFirstAttemptPassed": false,
+  "restoredFourDeletedUpstreamSdlFixtureFilesBeforeSuccessfulReadback": true,
+  "actualPreparationSha256": "5ef9478c853f3cac633a135081f7256eb5ca2f8253ad87086fed2baf11a7add8",
+  "currentMadeiraHead": "48f976429c189f8396e23d251d8a82f43c705922",
+  "currentOfficialFexHead": "14c92681f4d62cf84d901460e0358de09c8847a7",
+  "currentFexRelease": "FEX-2610",
+  "currentFexIosPortBaseline": "3bec2ac498bf78156ab47c0c194b0e8cb2849756",
+  "fex6021BackportRetained": true,
+  "appleMergedFixesIncluded": [
+    1776,
+    1831,
+    2015
+  ],
+  "nativeShaderSuites": {
+    "passed": 6,
+    "receiptSha256": "fdac15d5f3d9c60822ebd7c58607717fbd740ebacd822d567eb640e2ed4166c6",
+    "junitSha256": "add1b4507b1314e35db13decbb405a08900a7ed172af825e43120fdfea8785c4",
+    "completeLastTestLogSha256": "6125fc868d1ab16b0fb4c2448813e627e65ac358612daa1c6c1c83d299d2107d",
+    "orderedTotals": [
+      355,
+      538
+    ],
+    "scope": "mixed direct original-instruction proof checks and admitted full compiler profiles; not all negative cases compile",
+    "testInputShadersMatchFinal16": true
+  },
+  "shaderMemoryNoArguments": {
+    "passed": true,
+    "receiptSha256": "f83c2ded82f736071f0eb27f8f0ebca3e31eec0531a70ab66a04540b094ab5d3",
+    "completeLogSha256": "214264c52e3f3bba46ee556c36cb9f4f4ad46fe0f88ec2b23a43e7fc2d1d0878",
+    "newSrgbChecksIncluded": true,
+    "actualGpuWorkQualified": false
+  },
+  "full47LibraryRuntimeQualified": false,
+  "freshGamePackagePreparedForThisSource": false,
+  "nativeWindowsGpuQualified": false,
+  "ipadCpuQualified": false,
+  "ipadGpuQualified": false,
+  "gameplayVerified": false,
+  "githubActionsUsed": false,
+  "rawGameDataIncluded": false
+}
