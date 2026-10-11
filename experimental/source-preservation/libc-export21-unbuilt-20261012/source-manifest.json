@@ -1,0 +1,131 @@
+{
+  "excludedClasses": [
+    "raw PE/PRX/provider binaries",
+    "objects/build products/toolchains",
+    "game data",
+    "private source maps",
+    "runtime logs",
+    "credentials/device/pairing data"
+  ],
+  "guardPrefix": "# Archival source only; never execute or import.\nraise RuntimeError(\"Snapshot only; use reviewed current tooling.\")\n\n",
+  "kind": "guarded_inert_authored_source_archive",
+  "originalSourceFilesUnchanged": true,
+  "patches": {
+    "patches/0021-new-upstream-libc-literal-exports.patch": "3ab16362f8068afc18c90acc414764932a5ed6026184f5ae125e5fa7a923c1f4"
+  },
+  "portablePreservationChecks": {
+    "caseCount": 7,
+    "compilerWineDeviceExecuted": false,
+    "path": "test_preservation.py",
+    "sha256": "5086777ec903ef5cdecedd8eb52261b6b2865c2cd69229205163d8f047ff583c",
+    "syntheticParserFunctionsOnly": true
+  },
+  "provenanceSha256": "1ba6293d52619df5514d9b55f81a8289642baddc661f89c06aecc5bd356dcacb",
+  "runtimeQualified": false,
+  "schema": 1,
+  "sourceFiles": {
+    "snapshots/check_libc_exports.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "d078a67b250e12894b1f03781a1f30379927aecb2e9069464adda317bbb56ca1",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/libc-export21-successor/check_libc_exports.py",
+      "originalSha256": "d078a67b250e12894b1f03781a1f30379927aecb2e9069464adda317bbb56ca1",
+      "redactions": [
+        {
+          "occurrences": 0,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "70a1ae73728cc19ed35bcaafcfee83ba53f3027dc59a3f074b473fa87bf87cbc"
+    },
+    "snapshots/prepare_export21.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "1b12e8c0f714c4fa5081f43792e39ce501750c4b5c8d5fec01cf4f9fa4018ed3",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/libc-export21-successor/prepare.py",
+      "originalSha256": "75139cf49bd5fa87a8f8d80ddf046e38fb842b0fa0c7466eef7d64effd1c02c7",
+      "redactions": [
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "6e0fc744563faed4b77571f743e2bbc0d15d4aaab4a71ac509e52348be6e87fb"
+    },
+    "snapshots/prepare_twojob.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "e0671494d711b82182893104b736327547b05d882b46ecfb63ffb5b0712842f2",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/prepare-twojob.py",
+      "originalSha256": "24455d902c2e1a826359f86d9cf7f164e08f8ef06ef0582450acf519d398ae9e",
+      "redactions": [
+        {
+          "occurrences": 2,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "7d741ddf71f6f0dd0825fc9ef66ab5f960a877fe502075ed61381b8c31a8564b"
+    },
+    "snapshots/run_remaining_cpu_contracts.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "c7d7a1db30551887ec6fd5d3151c3787b70ab86eb5da48b6a55ddae7578212c4",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/runtime-twojob-route/run_remaining_cpu_contracts.py",
+      "originalSha256": "3424376670c58a5f0f36a1c47d2d10237af4ec0c90d0068b9ea1391e71945b3f",
+      "redactions": [
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "4897369ea12d35bded8930ef3a5ab69532c2f6a6c5696204517db90ab42425ae"
+    },
+    "snapshots/save_source_preservation.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "0fb25f27e4b3007368d992bd63ff2906d62a01a04c55031a9eaca71770a80f5c",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/libc-export21-successor/save_source_preservation.py",
+      "originalSha256": "e397142efa6249634462fc1a99c07bc3d3eecb40870e0e65e1acd2280914323c",
+      "redactions": [
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "49947714add6b56566e446612f3086fd5ca397d2188702c89a98b316f14dad64"
+    },
+    "snapshots/stop_owned_onejob.py.snapshot": {
+      "guardPrefixBytes": 117,
+      "normalizedSha256": "1de09396f932fc0724408498be0554c6843283a2ad91c8cbcbdb849631f8f204",
+      "originalRelativePath": "build/anyps5-latest43bc-source-proposal-20261012/stop-owned-onejob.py",
+      "originalSha256": "f4d73b37a457360f53b7045b4e6868cd3786875b0651ca61a1766e46e8b0b51c",
+      "redactions": [
+        {
+          "occurrences": 1,
+          "replacement": "__LOCAL_PROJECT_ROOT__"
+        },
+        {
+          "occurrences": 0,
+          "replacement": "__LOCAL_HOME__"
+        }
+      ],
+      "snapshotSha256": "c0df85c0e7aa26cdfba58fdc4e57a79e2b76c40a5ed591e63a3639ed7c814713"
+    }
+  },
+  "sourceSnapshotsExecuted": false
+}

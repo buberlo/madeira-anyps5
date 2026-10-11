@@ -1,0 +1,56 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Verify exact literal/ordinal libc PE export contract without executing the PRX."""
+from pathlib import Path
+import argparse,json,hashlib,re,struct
+FORBIDDEN={'pthread_once','__imp_pthread_once','APS5CompilerOnceBridge','APS5CompilerOnceResolvedTarget'}
+def declarations(path):
+ result={}
+ for line in Path(path).read_text().splitlines():
+  if line in ('LIBRARY libc.prx','EXPORTS') or not line.strip():continue
+  match=re.fullmatch(r'\s*(?:"([^"]+)"|(\S+))\s+@(\d+)(?:\s+DATA)?\s*',line)
+  if not match:raise ValueError('Unsupported DEF export declaration')
+  name=match[1] or match[2];ordinal=int(match[3])
+  if name in result or ordinal in result.values():raise ValueError('Duplicate DEF name or ordinal')
+  result[name]=ordinal
+ return result
+
+def exports(path):
+ data=Path(path).read_bytes()
+ def u16(at):return struct.unpack_from('<H',data,at)[0]
+ def u32(at):return struct.unpack_from('<I',data,at)[0]
+ if data[:2]!=b'MZ':raise ValueError('Not a PE file')
+ pe=u32(0x3c)
+ if data[pe:pe+4]!=b'PE\0\0':raise ValueError('Wrong PE signature')
+ opt=pe+24
+ if u16(opt)!=0x20b:raise ValueError('Expected PE32+ libc')
+ sections=[]
+ for i in range(u16(pe+6)):
+  at=opt+u16(pe+20)+i*40;virtualSize=u32(at+8);address=u32(at+12);rawSize=u32(at+16);offset=u32(at+20);sections.append((address,virtualSize,rawSize,offset))
+ def offset(rva,n=1):
+  for address,virtualSize,rawSize,fileAt in sections:
+   if address<=rva<address+max(virtualSize,rawSize):
+    off=rva-address
+    if off+n>rawSize or fileAt+off+n>len(data):raise ValueError('Export RVA outside initialized section data')
+    return fileAt+off
+  raise ValueError('Export RVA outside sections')
+ directory=u32(opt+112);size=u32(opt+116)
+ if not directory or not size:raise ValueError('Missing export directory')
+ at=offset(directory,40);base=u32(at+16);functions=u32(at+20);names=u32(at+24)
+ if not names or names>65535 or functions>65535:raise ValueError('Invalid export counts')
+ fn=offset(u32(at+28),functions*4);nm=offset(u32(at+32),names*4);ordinals=offset(u32(at+36),names*2);result={}
+ for i in range(names):
+  pos=offset(u32(nm+i*4));end=data.find(b'\0',pos,min(pos+4096,len(data)))
+  if end<0:raise ValueError('Unterminated export name')
+  name=data[pos:end].decode('ascii');index=u16(ordinals+i*2)
+  if index>=functions or not u32(fn+index*4):raise ValueError('Missing exported function/data RVA')
+  if name in result:raise ValueError('Duplicate exported name')
+  result[name]=base+index
+ return result
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--pe',required=True,type=Path);p.add_argument('--def-file',required=True,type=Path);p.add_argument('--receipt',required=True,type=Path);args=p.parse_args();expected=declarations(args.def_file);actual=exports(args.pe)
+ missing=sorted(expected.keys()-actual.keys());extra=sorted(actual.keys()-expected.keys());changed={n:{'expected':o,'actual':actual[n]} for n,o in expected.items() if n in actual and actual[n]!=o};forbidden=sorted(actual.keys()&FORBIDDEN)
+ result={'kind':'actual_raw_libc_pe_export_contract','peSha256':hashlib.sha256(args.pe.read_bytes()).hexdigest(),'defSha256':hashlib.sha256(args.def_file.read_bytes()).hexdigest(),'expectedExportCount':len(expected),'actualExportCount':len(actual),'missingExports':missing,'extraExports':extra,'changedOrdinals':changed,'forbiddenProviderExports':forbidden,'expectedOriginalPublicOrdinalsRetained':all(o==actual.get(n) for n,o in expected.items() if o<=1061),'ownedPrivateProviderOrdinal1062Retained':actual.get('APS5NativeCompilerOnce_nid_no_patch')==1062,'passed':not(missing or extra or changed or forbidden),'runtimeExecuted':False,'fullHleQualified':False};args.receipt.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n');print(json.dumps({k:v for k,v in result.items() if k not in ['changedOrdinals']},indent=2));raise SystemExit(0 if result['passed'] else 1)
+if __name__=='__main__':main()

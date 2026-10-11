@@ -1,0 +1,18 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import subprocess,os,signal,json,hashlib,shutil
+root=Path('__LOCAL_PROJECT_ROOT__');out=root/'build/anyps5-latest43bc-source-proposal-20261012';actual=out/'actual-incremental-run';build=root/'build/anyps5-full-main-update-20261012/winlibs-build-latest17';prefix=root/'build/anyps5-full-main-update-20261012/wine-prefix-final43bc-patch20';wine=root/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine'
+rows=subprocess.check_output(['ps','-axo','pid=,args='],text=True).splitlines();owned=[]
+for row in rows:
+ if 'anyps5-latest43bc-source-proposal-20261012/incremental-route/run_incremental.py --execute' in row and 'python3.12' in row:
+  owned.append(int(row.strip().split(None,1)[0]))
+assert len(owned)==1,owned
+for name in ['build.log','build.cmd','configure.log','configure.cmd','compiler-version.log']:
+ p=build/name
+ if p.exists():shutil.copy2(p,actual/('onejob-preserved-'+name))
+os.kill(owned[0],signal.SIGINT)
+r=subprocess.run([str(wine.parent/'wineserver'),'-k'],env=dict(os.environ,WINEPREFIX=str(prefix),WINEDEBUG='-all'),timeout=15)
+(actual/'onejob-stop-request.json').write_text(json.dumps({'kind':'root_authorized_owned_onejob_producer_stop_for_twojob_successor','signalledOwnedRootPid':owned[0],'signal':'SIGINT','ownedWinePrefix':str(prefix),'ownedWineserverKillExit':r.returncode,'sourceMutation':False,'canonicalMutation':False,'nextRuntimeJobs':2},indent=2)+'\n')
+print(json.dumps({'ownedPid':owned[0],'ownPrefixKillExit':r.returncode}))

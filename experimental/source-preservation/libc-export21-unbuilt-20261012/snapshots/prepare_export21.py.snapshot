@@ -1,0 +1,41 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import subprocess,shutil,json,runpy,difflib
+OUT=Path(__file__).resolve().parent;PARENT=OUT.parent;ROOT=Path('__LOCAL_PROJECT_ROOT__');u=runpy.run_path(str(PARENT/'source_utils.py'));sha=u['sha'];dump=u['dump'];source_map=u['source_map'];file_entries=u['file_entries'];git=u['git'];BASE=u['BASE']
+assert sha(PARENT/'source-candidate-review.json')=='3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398'
+rel='core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def';before=(PARENT/'source'/rel).read_bytes();names=json.loads((OUT/'new-upstream-libc-literal-names.json').read_text());added=sorted(set(names)-{'ResolvePathError_nid_no_patch'});assert len(added)==12
+checker=runpy.run_path(str(OUT/'check_libc_exports.py'));declarations=checker['declarations'];old=declarations(PARENT/'source'/rel);assert len(old)==1062 and old['APS5NativeCompilerOnce_nid_no_patch']==1062
+assert all(n not in old for n in added)
+after=before+''.join(f'  "{name}" @{1063+i}\n' for i,name in enumerate(added)).encode()
+(OUT/'before.def').write_bytes(before);(OUT/'candidate.def').write_bytes(after);new=declarations(OUT/'candidate.def');assert len(new)==1074 and all(new[n]==o for n,o in old.items())
+shutil.copytree(PARENT/'patches',OUT/'patches');patch=OUT/'patches/0021-new-upstream-libc-literal-exports.patch';patch.write_text(''.join(difflib.unified_diff(before.decode().splitlines(True),after.decode().splitlines(True),fromfile='a/'+rel,tofile='b/'+rel)))
+SRC=OUT/'source';subprocess.run(['git','clone','--quiet','--no-hardlinks','--no-recurse-submodules','--no-checkout',str(PARENT/'source'),str(SRC)],check=True);subprocess.run(['git','-C',str(SRC),'checkout','--quiet','--detach',BASE],check=True)
+patches=sorted((OUT/'patches').glob('*.patch'));assert len(patches)==21
+for p in patches:
+ subprocess.run(['git','-C',str(SRC),'apply','--check',str(p)],check=True);subprocess.run(['git','-C',str(SRC),'apply',str(p)],check=True)
+expected=source_map(SRC);oldmap=json.loads((PARENT/'candidate-source-map.json').read_text());changed=[k for k,v in expected.items() if oldmap.get(k)!=v];assert changed==[rel] and set(expected)==set(oldmap)
+assert (SRC/rel).read_bytes().startswith(before)
+# Exact failed baseline binary is held separately; the contract checker will report its real missing twelve.
+shutil.copy2(ROOT/'build/anyps5-full-main-update-20261012/winlibs-build-latest17/core/libs/libs/unpatched/libc.prx',OUT/'libc-before21.prx')
+rc=subprocess.run([str(Path('__LOCAL_HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12')),'-I','-B',str(OUT/'check_libc_exports.py'),'--pe',str(OUT/'libc-before21.prx'),'--def-file',str(OUT/'candidate.def'),'--receipt',str(OUT/'actual-export-baseline20.json')],stdout=subprocess.PIPE,stderr=subprocess.STDOUT);assert rc.returncode==1,rc.stdout.decode();baseline=json.loads((OUT/'actual-export-baseline20.json').read_text());assert baseline['missingExports']==added and not baseline['extraExports'] and not baseline['changedOrdinals'] and not baseline['forbiddenProviderExports'];assert baseline['actualExportCount']==1062
+(OUT/'baseline20-contract.log').write_bytes(rc.stdout)
+def intent():
+ ns=[n.decode() for n in git(SRC,'ls-files','--others','--exclude-standard','-z').split(b'\0') if n]
+ if ns:subprocess.run(['git','-C',str(SRC),'add','--intent-to-add','--',*ns],check=True)
+intent();combined=OUT/'candidate21-combined.patch';combined.write_bytes(git(SRC,'diff','--binary',BASE,'--'));commands=[]
+for p in reversed(patches):
+ for opts in [('--reverse','--check'),('--reverse',)]:subprocess.run(['git','-C',str(SRC),'apply',*opts,str(p)],check=True);commands.append({'patch':p.name,'args':list(opts),'exit':0})
+subprocess.run(['git','-C',str(SRC),'read-tree',BASE],check=True);pristine=source_map(SRC);assert not git(SRC,'diff','--name-only')
+for p in patches:
+ for opts in [('--check',),()]:subprocess.run(['git','-C',str(SRC),'apply',*opts,str(p)],check=True);commands.append({'patch':p.name,'args':list(opts),'exit':0})
+assert source_map(SRC)==expected
+for opts in [('--reverse','--check'),('--reverse',)]:subprocess.run(['git','-C',str(SRC),'apply',*opts,str(combined)],check=True)
+assert source_map(SRC)==pristine
+for opts in [('--check',),()]:subprocess.run(['git','-C',str(SRC),'apply',*opts,str(combined)],check=True)
+assert source_map(SRC)==expected;intent();subprocess.run(['git','-C',str(SRC),'diff','--check'],check=True)
+mapsha=dump(OUT/'candidate-source-map.json',expected);roundsha=dump(OUT/'roundtrip21.json',{'seriesCommands':commands,'seriesCommandsPassed':84,'combinedCommandsPassed':4,'allFinalHashesModesMatched':True})
+review={'schema':1,'kind':'frozen_final43bc_plus21_exact_literal_libc_exports_source_successor','upstreamCommit':BASE,'patchCount':21,'patches':{p.name:sha(p) for p in patches},'sourceEntryCount':2199,'sourceFullMapPath':str(OUT/'candidate-source-map.json'),'sourceFullMapSha256':mapsha,'sourceTree':file_entries(expected),'thirdPartyGitlinks':{k:v['gitlink'] for k,v in expected.items() if v['mode']=='160000'},'previous20SourceReviewSha256':sha(PARENT/'source-candidate-review.json'),'changedSourcePaths':[rel],'originalDef1062RowsPrefixByteExact':True,'originalPublic1061NamesOrdinalsAnd149DataAttributesRetained':True,'ownedProviderOrdinal1062Retained':True,'newImplementedOutOfLineCExports':{n:new[n] for n in added},'inlineCppHelperExplicitlyExcluded':'ResolvePathError_nid_no_patch','sourceDefinitionAndConsumerAuditIndependent':True,'expectedRawLibcExportCount':1074,'actualBaseline20MissingTwelveObservedReceiptSha256':sha(OUT/'actual-export-baseline20.json'),'baselineRawPeSha256':sha(OUT/'libc-before21.prx'),'exportContractCheckerSha256':sha(OUT/'check_libc_exports.py'),'combinedPatchSha256':sha(combined),'roundtripSha256':roundsha,'seriesCheckApplyReverseCommandsPassed':84,'combinedCheckApplyReverseCommandsPassed':4,'requestVersion':17,'cacheFormatVersion':28,'allExistingProductionGuardsAndTestsUnchanged':True,'knownMsaaPolicyBoundaryRetained':True,'canonicalOrPrivateV5SourceMutatedByProposal':False,'windowsPostbuildExportAndImportClosureValidationPending':True,'fullHleQualified':False,'deviceExecuted':False,'gameplayVerified':False}
+reviewsha=dump(OUT/'source-candidate-review.json',review)
+print(json.dumps({'reviewSha256':reviewsha,'mapSha256':mapsha,'patch21Sha256':sha(patch),'newExports':review['newImplementedOutOfLineCExports'],'roundtripCommandsPassed':88,'actualBaselineMissingNames':baseline['missingExports']},indent=2))

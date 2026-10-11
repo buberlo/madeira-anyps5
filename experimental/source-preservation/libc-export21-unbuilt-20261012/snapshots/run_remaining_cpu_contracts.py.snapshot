@@ -1,0 +1,48 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Run only unexecuted selected CPU contracts after a fully compiled producer fails; no source/build edits."""
+from pathlib import Path
+import runpy,json,subprocess,os,re,time,sys,xml.etree.ElementTree as ET
+OUT=Path(__file__).resolve().parent.parent;ROOT=Path('__LOCAL_PROJECT_ROOT__');BASE=ROOT/'build/anyps5-full-main-update-20261012';SOURCE=BASE/'qualification-source-v5';BUILD=BASE/'winlibs-build-latest17';ACTUAL=OUT/'actual-twojob-run'
+u=runpy.run_path(str(OUT/'source_utils.py'));sha=u['sha'];dump=u['dump'];source_map=u['source_map'];verify_vendors=u['verify_vendors'];HELPER=OUT/'incremental-route/build-hle-final43bc.py';h=runpy.run_path(str(HELPER))
+REVIEW='3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398';WINE=ROOT/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine';TOOLCHAIN=ROOT/'build/toolchains/winlibs/mingw64';PREFIX=BASE/'wine-prefix-final43bc-patch20-twojob';ARENA={'APS5_GUEST_ARENA_BASE':'0x7400000000','APS5_GUEST_ARENA_SIZE':'0x100000000','APS5_GUEST_ARENA_LAZY':'1','APS5_GUEST_ARENA_CHUNK':'0x10000000'}
+def main():
+ assert sha(HELPER)=='f1973446d099eed367bc5146639cd8a9d1692689c92b9893e0714c73ddd9e565' and sha(OUT/'source-candidate-review.json')==REVIEW
+ producer=json.loads((ACTUAL/'receipt.json').read_text());assert producer['wineJoined'] and producer['sourceModesHashesMtimesAndElevenDependenciesUnchanged']
+ log=(ACTUAL/'full-hle.log').read_text();started=re.findall(r'^test-([A-Za-z0-9_]+_tests):',log,re.M);assert started,'Producer never completed compilation; CPU follow-up is prohibited'
+ assert all((BUILD/'tests'/(t+'.exe')).is_file() for t in h['TESTS'])
+ expected=json.loads((OUT/'candidate-source-map.json').read_text());assert source_map(SOURCE)==expected;vendors=verify_vendors(SOURCE,expected)
+ times={k:(SOURCE/k).stat().st_mtime_ns for k,v in expected.items() if v['mode']!='160000'}
+ inputs=h['runtime_input_hashes'](BUILD,TOOLCHAIN);actual=OUT/'actual-remaining-cpu-contracts';actual.mkdir(exist_ok=False);dump(actual/'runtime-inputs-before.json',inputs)
+ win=lambda p:'Z:'+str(Path(p).resolve()).replace('/','\\');env=dict(os.environ,WINEPREFIX=str(PREFIX),WINEDEBUG='-all',WINEDLLOVERRIDES='winemenubuilder.exe=d',APS5_SOURCE_COMMIT='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b',**ARENA);results=[]
+ def run(name,argv,timeout=60):
+  batch=actual/(name+'.cmd');paths=[TOOLCHAIN/'bin',BUILD/'core/libs/libs/unpatched',BUILD/'tests'];body='@echo off\r\nset "PATH='+';'.join(win(p) for p in paths)+';%PATH%"\r\n'+' '.join(h['quote'](x) for x in argv)+'\r\nexit /b %ERRORLEVEL%\r\n';batch.write_bytes(body.encode());startedAt=time.monotonic()
+  with (actual/(name+'.log')).open('wb') as f:r=subprocess.run([str(WINE),'cmd','/c',win(batch)],cwd=BUILD,env=env,stdout=f,stderr=subprocess.STDOUT,timeout=timeout)
+  result={'name':name,'argv':argv,'exit':r.returncode,'seconds':time.monotonic()-startedAt,'logSha256':sha(actual/(name+'.log'))};results.append(result);return r.returncode
+ # Default producer contracts and their original expectations remain unchanged; retain its failure.
+ error=None;remaining=[];inventory={};report=actual/'test-selected-cpu.xml'
+ try:
+  remaining=[t for t in h['TESTS'] if t not in started]
+  for target in remaining:
+   code=run(target,h['host_test_command'](target,BUILD,win),110 if target=='savedata_memory_growth_tests' else 60)
+   if target in h['CTEST_CONTRACTS'] and code==0:h['ctest_case_results'](target,BUILD/('test-'+target+'.xml'))
+  code=run('inventory',['ctest','--test-dir',win(BUILD),'--show-only=json-v1'],45);assert code==0
+  inventory=h['additional_ctest_inventory'](json.loads((OUT/'incremental-route/plan.json').read_text())['totalAdditionalTargets'],(actual/'inventory.log').read_text());assert len(inventory)==43
+  cases=json.loads((actual/'inventory.log').read_text())['tests'];descriptor=[t for t in cases if t['name']=='agc_compute_descriptor_layout_flags'];assert len(descriptor)==1 and Path(descriptor[0]['command'][0].replace('\\','/')).name=='agc_driver_graphics_tests.exe' and descriptor[0]['command'][1:]==['--descriptor-layout-flags']
+  selection=actual/'selected-additional-and-descriptor-cases.txt';selection.write_text('\n'.join([*inventory,'agc_compute_descriptor_layout_flags'])+'\n');report=actual/'test-selected-cpu.xml'
+  run('selected-cpu',['ctest','--test-dir',win(BUILD),'--tests-from-file',win(selection),'--no-tests=error','--output-on-failure','--parallel','1','--timeout','60','--output-junit',win(report)],60*44+45)
+ except BaseException as exc:
+  error=repr(exc)
+  subprocess.run([str(WINE.parent/'wineserver'),'-k'],env=env,timeout=15)
+ joined=subprocess.run([str(WINE.parent/'wineserver'),'-w'],env=env,timeout=45).returncode==0
+ after=h['runtime_input_hashes'](BUILD,TOOLCHAIN);dump(actual/'runtime-inputs-after.json',after);matched=source_map(SOURCE)==expected and verify_vendors(SOURCE,expected)==vendors and all((SOURCE/k).stat().st_mtime_ns==v for k,v in times.items())
+ caseResults={}
+ if report.exists():
+  for case in ET.parse(report).getroot().findall('.//testcase'):
+   caseResults[case.get('name')]='skipped' if case.find('skipped') is not None else 'failed' if any(case.find(tag) is not None for tag in ('error','failure')) else 'passed' if case.get('status','run')=='run' else 'not_run'
+ expectedCases=set(inventory)|{'agc_compute_descriptor_layout_flags'}
+ selectedPass=len(caseResults)==44 and set(caseResults)==expectedCases and all(v=='passed' for v in caseResults.values())
+ summary={'kind':'actual_remaining_selected_cpu_contracts_after_unqualified_full_producer','sourceReviewSha256':REVIEW,'producerReceiptSha256':sha(ACTUAL/'receipt.json'),'producerRemainsUnqualified':not producer['fullHleProducerPassed'],'remainingDefaultTargets':remaining,'selectedAdditionalExecutableTargets':32,'selectedAdditionalCases':43,'newDescriptorLayoutFlagsCaseSelected':True,'selectedCpuCaseCount':44,'commands':results,'junitSha256':sha(report) if report.exists() else None,'selectedCpuCaseResults':caseResults,'selectedCpuCasesPassed':selectedPass,'error':error,'runtimeInputsUnchanged':inputs==after,'sourceModesHashesMtimesAndElevenDependenciesUnchanged':matched,'wineJoined':joined,'fullHleQualified':False,'nativeWindowsGpuQualified':False,'deviceExecuted':False,'gameplayVerified':False,'sourceOrBuildCompilerExecuted':False};dump(actual/'receipt.json',summary)
+ print(json.dumps({'receipt':str(actual/'receipt.json'),'wineJoined':joined,'sourceMatched':matched,'allFollowupCommandExits':{r['name']:r['exit'] for r in results}},indent=2));raise SystemExit(0 if error is None and selectedPass and matched and joined and inputs==after and all(r['exit']==0 for r in results) else 1)
+if __name__=='__main__':main()

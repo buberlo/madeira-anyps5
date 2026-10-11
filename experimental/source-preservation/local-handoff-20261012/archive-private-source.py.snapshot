@@ -1,0 +1,51 @@
+raise RuntimeError("Inert source preservation: do not execute this historical handoff snapshot")
+#!/usr/bin/env python3
+"""Deduplicate local helper source, configurations, diagnostics and saves into private handoff."""
+import hashlib,io,json,os,tarfile,time
+from pathlib import Path
+OLD=Path('<OLD_CHECKOUT>')
+DST=Path('<NATIVE_CHECKOUT>/private/madeira-handoff-20261012')
+EXTS={'.py','.sh','.ps1','.command','.c','.cc','.cpp','.h','.hpp','.inl','.mm','.m','.swift','.asm','.S','.cmake','.patch','.def','.md','.yaml','.yml','.toml','.ini','.reg','.plist','.entitlements','.txt'}
+PRUNE={'.git','DerivedData','3rdparty','External','node_modules','__pycache__','ModuleCache.noindex','Index.noindex','CMakeFiles'}
+def digest(data):return hashlib.sha256(data).hexdigest()
+def select(p,st):
+ parts={x.lower() for x in p.parts}
+ state=bool(parts & {'_sd','saves','savedata','saved games','pairing','pairing-files'})
+ bounded_json=p.suffix in {'.json','.jsonl','.xml','.csv'} and st.st_size<=1024*1024
+ private_shader=p.suffix in {'.req','.spv','.spvasm'}
+ source=(p.suffix in EXTS or p.name in {'CMakeLists.txt','Makefile','.gitmodules','.gitignore'}) and st.st_size<=16*1024*1024
+ return state or bounded_json or private_shader or source
+
+def main():
+ assert DST.is_dir()
+ target=DST/'private-helper-source-config-saves.tar.gz';assert not target.exists()
+ records={};objects={};before=time.monotonic();counter=0
+ with tarfile.open(target,'w:gz',compresslevel=3) as tar:
+  for dp,dns,fs in os.walk(OLD/'build',followlinks=False):
+   rel=Path(dp).relative_to(OLD)
+   if str(rel).startswith(('build/toolchains','build/device-tools-venv','build/madeira-retained-20261012/source-save-worktree')):dns[:]=[];continue
+   dns[:]=[d for d in dns if d not in PRUNE]
+   for n in fs:
+    p=Path(dp)/n
+    if p.is_symlink():continue
+    st=p.stat()
+    if not select(p,st):continue
+    data=p.read_bytes();assert p.stat().st_mtime_ns==st.st_mtime_ns
+    h=digest(data);key=str(p.relative_to(OLD))
+    records[key]={'sha256':h,'bytes':len(data),'mode':st.st_mode&0o777,'mtimeNs':st.st_mtime_ns}
+    if h not in objects:
+     obj=tarfile.TarInfo('objects/'+h);obj.size=len(data);obj.mode=0o600;tar.addfile(obj,io.BytesIO(data));objects[h]=len(data)
+    counter+=1
+    if counter%10000==0: print('Archived private source/config entries',counter,flush=True)
+  payload=json.dumps({'schema':1,'status':'private_recovery_only','records':records,'sourceRootLabel':'madeira-anyps5','restore':'Match each records path to objects/SHA256. Never run legacy helpers without updating paths and reviewing their scope.'},sort_keys=True).encode()
+  obj=tarfile.TarInfo('manifest.json');obj.size=len(payload);obj.mode=0o600;tar.addfile(obj,io.BytesIO(payload))
+ verified={}
+ with tarfile.open(target,'r:gz') as tar:
+  for member in tar:
+   if member.name=='manifest.json':assert tar.extractfile(member).read()==payload;continue
+   data=tar.extractfile(member).read();h=member.name.split('/')[1];assert digest(data)==h;verified[h]=len(data)
+ assert verified==objects
+ receipt={'status':'all_unique_objects_independently_read_and_hashed','archiveBytes':target.stat().st_size,'fileReferences':len(records),'uniqueObjects':len(objects),'logicalReferencedBytes':sum(v['bytes'] for v in records.values()),'uniqueObjectBytes':sum(objects.values()),'elapsedSeconds':time.monotonic()-before,'private':True,'githubPublished':False}
+ (DST/'private-source-archive-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+ print(json.dumps(receipt),flush=True)
+if __name__=='__main__':main()

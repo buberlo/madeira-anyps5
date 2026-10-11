@@ -1,0 +1,53 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+from pathlib import Path
+import json,hashlib,ast,shutil
+OUT=Path(__file__).resolve().parent;ROOT=Path('__LOCAL_PROJECT_ROOT__');ROUTE=OUT/'runtime-twojob-route';ROUTE.mkdir();sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+old=OUT/'actual-incremental-run';build=ROOT/'build/anyps5-full-main-update-20261012/winlibs-build-latest17'
+for n in ['build.log','build.cmd','configure.log','configure.cmd']:shutil.copy2(build/n,old/('onejob-final-'+n))
+receipt=json.loads((old/'receipt.json').read_text());assert receipt['error']=='KeyboardInterrupt()' and receipt['wineJoined'] and receipt['sourceAndDependenciesUnchangedAfterRun'] and not receipt['fullHleProducerPassed']
+plan=json.loads((OUT/'incremental-route/plan.json').read_text());plan['compilerJobs']=2;plan['newWinePrefix']=str(ROOT/'build/anyps5-full-main-update-20261012/wine-prefix-final43bc-patch20-twojob');plan['output']=str(ROOT/'build/anyps5-full-main-update-20261012/hle-final43bc-patch20-twojob/hle-runtime.zip');plan['kind']='runtime_only_final43bc_plus20_twojob_successor_same_source_and_build';plan['priorInterruptedOneJobReceiptSha256']=sha(old/'receipt.json');(ROUTE/'plan.json').write_text(json.dumps(plan,indent=2,sort_keys=True)+'\n')
+s='''"""Root-authorized runtime-only two-job HLE successor; no source adoption/writes."""
+from pathlib import Path
+import runpy,subprocess,os,json,time,sys,argparse
+OUT=Path(__file__).resolve().parent.parent;ROUTE=OUT/'runtime-twojob-route';ROOT=Path('__LOCAL_PROJECT_ROOT__')
+u=runpy.run_path(str(OUT/'source_utils.py'));sha=u['sha'];dump=u['dump'];source_map=u['source_map'];verify_vendors=u['verify_vendors']
+REVIEW_SHA='3ff6e9bf286ec915480f835351d41209516cabb0aa9f03f2fa91338f85d05398';HELPER_SHA='f1973446d099eed367bc5146639cd8a9d1692689c92b9893e0714c73ddd9e565';BASE='43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b';PREVIOUS_SHA='@PREVIOUS@'
+BASE_DIR=ROOT/'build/anyps5-full-main-update-20261012';SOURCE=BASE_DIR/'qualification-source-v5';BUILD=BASE_DIR/'winlibs-build-latest17';PREVIOUS=OUT/'actual-incremental-run';NATIVE=BASE_DIR/'native-host-tools-final43bc-patch20';PYTHON=Path('__LOCAL_HOME__/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12');HELPER=OUT/'incremental-route/build-hle-final43bc.py';WINE=ROOT/'build/toolchains/wine-local/Wine Stable.app/Contents/Resources/wine/bin/wine';ARENA={'APS5_GUEST_ARENA_BASE':'0x7400000000','APS5_GUEST_ARENA_SIZE':'0x100000000','APS5_GUEST_ARENA_LAZY':'1','APS5_GUEST_ARENA_CHUNK':'0x10000000'}
+def main():
+ ap=argparse.ArgumentParser();ap.add_argument('--execute',action='store_true');args=ap.parse_args();plan=json.loads((ROUTE/'plan.json').read_text());expected=json.loads((OUT/'candidate-source-map.json').read_text())
+ assert sha(OUT/'source-candidate-review.json')==REVIEW_SHA and sha(HELPER)==HELPER_SHA
+ assert sha(PYTHON)=='4158f03e1bae2b759f25a1ba1fbdab8bfb7161eba4caf22e28f0915986625bbc'
+ assert sha(PREVIOUS/'receipt.json')==PREVIOUS_SHA
+ previous=json.loads((PREVIOUS/'receipt.json').read_text());assert previous['wineJoined'] and previous['error']=='KeyboardInterrupt()' and not previous['fullHleProducerPassed']
+ assert sha(PREVIOUS/'source-adoption-receipt.json')=='07b1910c7b807ae5835303fa4ace01299a4e03f55122ec73a93a479cb1b7b45c'
+ assert sha(NATIVE/'receipt.json')=='700e023fe25df5c4310a63bec08e3ad77500a4384cb2cbadfc8e609e6dd4d85e'
+ native=json.loads((NATIVE/'receipt.json').read_text());assert native['qualified'] and native['sourceBeforeAfterUnchanged'] and native['passedCTestCaseCount']==120 and native['maxBuildJobs']==1
+ assert source_map(SOURCE)==expected and source_map(OUT/'source')==expected
+ vendors=verify_vendors(SOURCE,expected);assert len(vendors)==11
+ sourceTimes={k:(SOURCE/k).stat().st_mtime_ns for k,v in expected.items() if v['mode']!='160000'}
+ assert subprocess.check_output(['git','-C',str(SOURCE),'rev-parse','HEAD'],text=True).strip()==BASE
+ prefix=Path(plan['newWinePrefix']);output=Path(plan['output']);argv=[str(PYTHON),'-I','-B',str(HELPER),'--source',str(SOURCE),'--from-hle',str(ROOT/'build/apple-gpu-20261011/hle-runtime.zip'),'--build',str(BUILD),'--wine',str(WINE),'--wine-prefix',str(prefix),'--jobs','2','--output',str(output)]
+ for target in plan['totalAdditionalTargets']:argv+=['--additional-test',target]
+ preflight={'kind':'runtime_only_twojob_preflight','sourceReviewSha256':REVIEW_SHA,'sourceMapSha256':sha(OUT/'candidate-source-map.json'),'sourceEntryCount':2199,'patchCount':20,'sourceMutation':False,'priorInterruptedOneJobReceiptSha256':PREVIOUS_SHA,'helperSha256':HELPER_SHA,'runnerSha256':sha(Path(__file__)),'argv':argv,'jobs':2,'native120AlreadyJoinedReceiptSha256':sha(NATIVE/'receipt.json'),'requiredExecutableTargets':74,'selectedPrxTargets':47,'elevenVendors':vendors,'knownMsaaPolicyBoundary':True}
+ if not args.execute:dump(ROUTE/'preflight.json',preflight);print(json.dumps({'preflight':'passed, not executed','jobs':2,'sourceMutation':False,'requiredExecutables':74,'selectedPrx':47},indent=2));return
+ actual=OUT/'actual-twojob-run';actual.mkdir(exist_ok=False);dump(actual/'preflight.json',preflight);output.parent.mkdir(parents=True,exist_ok=True)
+ oldprep=BASE_DIR/'qualification-source-final43bc-patch20-actual-preparation.json';prep=json.loads(oldprep.read_text());prep.update(kind='actual_runtime_only_final43bc_plus20_twojob_successor',previousActualOneJobPreparationSha256=sha(oldprep),priorInterruptedOneJobReceiptSha256=PREVIOUS_SHA,rootCommandArgv=argv,rootScriptSha256=sha(Path(__file__)),compilerJobs=2,sourceReadopted=False)
+ prepfile=BASE_DIR/'qualification-source-final43bc-patch20-twojob-actual-preparation.json';assert not prepfile.exists();dump(prepfile,prep)
+ started=time.monotonic();code=None;joined=None;error=None
+ try:
+  with (actual/'full-hle.log').open('wb') as log:code=subprocess.run(argv,env=dict(os.environ,**ARENA,PYTHONUNBUFFERED='1'),stdout=log,stderr=subprocess.STDOUT,timeout=7200).returncode
+ except BaseException as exc:error=repr(exc)
+ finally:
+  try:joined=subprocess.run([str(WINE.parent/'wineserver'),'-w'],env=dict(os.environ,WINEPREFIX=str(prefix),WINEDEBUG='-all',**ARENA),timeout=45).returncode
+  except BaseException as exc:error=(error or '')+' Wine join '+repr(exc)
+  matched=source_map(SOURCE)==expected and verify_vendors(SOURCE,expected)==vendors and all((SOURCE/k).stat().st_mtime_ns==v for k,v in sourceTimes.items())
+  result={'kind':'actual_runtime_only_final43bc_plus20_twojob_full_hle_run','sourceReviewSha256':REVIEW_SHA,'sourceMapSha256':sha(OUT/'candidate-source-map.json'),'actualPreparationSha256':sha(prepfile),'upstreamCommit':BASE,'sourceEntryCount':2199,'patchCount':20,'helperSha256':HELPER_SHA,'runnerSha256':sha(Path(__file__)),'argv':argv,'exit':code,'error':error,'seconds':time.monotonic()-started,'wineJoined':joined==0,'sourceModesHashesMtimesAndElevenDependenciesUnchanged':matched,'requiredDefaultTargetCount':42,'requiredAdditionalTargetCount':32,'requiredExecutableTargetCount':74,'selectedPrxTargetCount':47,'jobs':2,'hostTestArena':ARENA,'fullHleProducerPassed':code==0 and joined==0 and matched,'sourceReadoptedOrMutated':False,'canonicalMutationByRunner':False,'nativeWindowsGpuQualified':False,'deviceExecuted':False,'gameplayVerified':False,'priorInterruptedOneJobReceiptSha256':PREVIOUS_SHA}
+  dump(actual/'receipt.json',result)
+ print(json.dumps({'fullHleExit':code,'wineJoined':joined==0,'sourceMatched':matched,'receipt':str(actual/'receipt.json')},indent=2),flush=True)
+ raise SystemExit(0 if code==0 and joined==0 and matched else 1)
+if __name__=='__main__':main()
+'''.replace('@PREVIOUS@',sha(old/'receipt.json'))
+(ROUTE/'run_runtime_only.py').write_text(s);ast.parse(s)
+print(json.dumps({'runnerSha256':sha(ROUTE/'run_runtime_only.py'),'planSha256':sha(ROUTE/'plan.json'),'priorOnejobReceiptSha256':sha(old/'receipt.json')},indent=2))

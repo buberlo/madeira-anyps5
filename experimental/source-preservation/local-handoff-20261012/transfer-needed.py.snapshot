@@ -1,0 +1,65 @@
+raise RuntimeError("Inert source preservation: do not execute this historical handoff snapshot")
+#!/usr/bin/env python3
+"""Preserve the selected local handoff and verify every copied byte; never deletes."""
+import hashlib, json, os, shutil, subprocess, tarfile, time
+from pathlib import Path
+OLD=Path('<OLD_CHECKOUT>')
+NEW=Path('<NATIVE_CHECKOUT>')
+DST=NEW/'private/madeira-handoff-20261012'
+
+def sha(p):
+ h=hashlib.sha256()
+ with p.open('rb') as f:
+  for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
+ return h.hexdigest()
+
+def transfer_tree(src,dst):
+ assert src.exists() and not dst.exists(), (src,dst)
+ before={}
+ for dp,dns,fs in os.walk(src,followlinks=False):
+  for n in fs:
+   p=Path(dp)/n
+   if p.is_symlink(): before[str(p.relative_to(src))]={'link':os.readlink(p)}
+   else: before[str(p.relative_to(src))]={'sha256':sha(p),'bytes':p.stat().st_size}
+ shutil.copytree(src,dst,symlinks=True)
+ for n,v in before.items():
+  q=dst/n
+  if 'link' in v: assert q.is_symlink() and os.readlink(q)==v['link']
+  else: assert q.stat().st_size==v['bytes'] and sha(q)==v['sha256'], q
+ return before
+
+def main():
+ assert OLD.is_dir() and NEW.is_dir() and OLD!=NEW
+ DST.mkdir(parents=True,exist_ok=False)
+ r={'status':'in_progress','atUtc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'trees':{}}
+ audit=json.loads((OLD/'build/madeira-retained-20261012/minigolf-original-recovery-audit.json').read_text())
+ original=json.loads((OLD/'build/private-ppsa03647/input-inventory.json').read_text())
+ mg=DST/'game-inputs/minigolf/PPSA03647';mg.mkdir(parents=True)
+ recovered={}
+ for n,v in audit['wanted'].items():
+  choices=audit['foundBySha256'].get(v['sha256'],[])
+  if not choices:continue
+  src=OLD/choices[0];assert sha(src)==v['sha256']
+  dst=mg/n;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
+  assert dst.stat().st_size==v['bytes'] and sha(dst)==v['sha256']
+  recovered[n]=v
+ assert len(recovered)==115
+ for v in original['selected_inputs'].values():
+  q=mg/v['dump_path'];assert sha(q)==v['sha256'] and q.open('rb').read(4)==b'\x7fELF'
+ (DST/'minigolf-recovery.json').write_text(json.dumps({'recovered':recovered,'missingOriginalSelfFiles':audit['missing'],'allTwelveSelectedDecryptedElfsVerified':True,'original127Complete':False,'originalSourceInventory':original},indent=2)+'\n')
+ r['minigolfRecoveredFiles']=len(recovered);r['minigolfRecoveredBytes']=sum(v['bytes'] for v in recovered.values());r['selectedDecryptedElfsVerified']=12
+ tree_specs=[
+  ('PPSA02929-app0','game-inputs/dreaming-sarah/PPSA02929-app0'),
+  ('build/private-ppsa15706/extracted','game-inputs/solitaire/original-extraction'),
+  ('build/native-ec-continuation-native60-build-20261012/DerivedData/Build/Products/Debug-iphoneos/Madeira.app','rollback/Native60/Madeira.app'),
+  ('build/native-ec-continuation-native60-build-20261012/signature-verification-attempt2','rollback/Native60/signature-receipts'),
+  ('build/toolchains/cargo','toolchains/cargo'),('build/toolchains/rustup','toolchains/rustup'),('build/toolchains/rea-local','toolchains/rea-local')]
+ for src,rel in tree_specs:
+  print('Preserving',rel,flush=True);r['trees'][rel]=transfer_tree(OLD/src,DST/rel)
+ cp=subprocess.run(['codesign','--verify','--deep','--strict',str(DST/'rollback/Native60/Madeira.app')],capture_output=True,text=True)
+ assert cp.returncode==0,cp.stderr
+ r['rollbackCodesignVerified']=True
+ (DST/'transfer-receipt.json').write_text(json.dumps(r,indent=2)+'\n')
+ print('Core transfer verified',json.dumps({k:v for k,v in r.items() if k!='trees'}),flush=True)
+
+if __name__=='__main__':main()

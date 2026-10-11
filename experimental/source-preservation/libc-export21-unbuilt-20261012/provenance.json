@@ -1,0 +1,61 @@
+{
+  "deviceExecuted": false,
+  "expectedRepairedExportCount": 1074,
+  "fullHleQualified": false,
+  "gameplayVerified": false,
+  "heldSource21FullMapSha256": "8bb8da619a40a05b109a818d3cb23b41b7008de73e93447f10b7bf9b290f12b8",
+  "heldSource21ReviewSha256": "c74797e5bde0d4058fc571ef9cba3fd76af0c9a24f5db9ff9eafc67671bdcc48",
+  "inlineCppHelperExcluded": "ResolvePathError_nid_no_patch",
+  "kind": "unbuilt_unapplied_source_preservation",
+  "knownMsaaPolicyBoundaryNotResolved": true,
+  "newImplementedPublicCExports": {
+    "ExchangeCreationMask_nid_no_patch": 1063,
+    "GetCreationMask_nid_no_patch": 1064,
+    "GuestArenaHighestFree_nid_no_patch": 1065,
+    "SignalCondition_nid_no_patch": 1066,
+    "__powisf2_nid_postfix": 1067,
+    "drand48_nid_postfix": 1068,
+    "ftrylockfile_nid_postfix": 1069,
+    "lrand48_nid_postfix": 1070,
+    "mrand48_nid_postfix": 1071,
+    "setlogmask_nid_postfix": 1072,
+    "srand48_nid_postfix": 1073,
+    "wcstok_nid_postfix": 1074
+  },
+  "original149DataRowsRetained": true,
+  "originalDef1062RowsPrefixByteExact": true,
+  "ownedProviderOrdinal1062Retained": true,
+  "parentSourceCheckpoint": "fafa18d",
+  "patch21AppliedToCanonicalOrPrivate20": false,
+  "patch21Compiled": false,
+  "patch21OriginalSha256": "3ab16362f8068afc18c90acc414764932a5ed6026184f5ae125e5fa7a923c1f4",
+  "patch21PostbuildExportOrNidClosureQualified": false,
+  "patchSourceScope": [
+    "core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def"
+  ],
+  "rawBaseline20ContractObservationBeforeStop": {
+    "actualExportCount": 1062,
+    "missingTwelveNames": [
+      "ExchangeCreationMask_nid_no_patch",
+      "GetCreationMask_nid_no_patch",
+      "GuestArenaHighestFree_nid_no_patch",
+      "SignalCondition_nid_no_patch",
+      "__powisf2_nid_postfix",
+      "drand48_nid_postfix",
+      "ftrylockfile_nid_postfix",
+      "lrand48_nid_postfix",
+      "mrand48_nid_postfix",
+      "setlogmask_nid_postfix",
+      "srand48_nid_postfix",
+      "wcstok_nid_postfix"
+    ],
+    "oldOrdinalsUnchanged": true,
+    "rawPeIncluded": false,
+    "receiptSha256": "2c03f7b1592205d9dc6791b443f9f8f2f28686aea655c36b182c035561f4a84d",
+    "unexpectedProviderExportNamesAbsent": true
+  },
+  "schema": 1,
+  "sourcePreservationDoesNotAuthorizeResume": true,
+  "sourceRoundtripCommandsPassedBeforeStop": 88,
+  "upstreamCommit": "43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b"
+}

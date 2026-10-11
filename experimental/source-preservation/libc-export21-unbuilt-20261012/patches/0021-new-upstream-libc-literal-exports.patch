@@ -1,0 +1,18 @@
+--- a/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def
++++ b/core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def
+@@ -1062,3 +1062,15 @@
+   "wmemset_nid_postfix" @1060
+   "wprintf_nid_postfix" @1061
+   APS5NativeCompilerOnce_nid_no_patch @1062
++  "ExchangeCreationMask_nid_no_patch" @1063
++  "GetCreationMask_nid_no_patch" @1064
++  "GuestArenaHighestFree_nid_no_patch" @1065
++  "SignalCondition_nid_no_patch" @1066
++  "__powisf2_nid_postfix" @1067
++  "drand48_nid_postfix" @1068
++  "ftrylockfile_nid_postfix" @1069
++  "lrand48_nid_postfix" @1070
++  "mrand48_nid_postfix" @1071
++  "setlogmask_nid_postfix" @1072
++  "srand48_nid_postfix" @1073
++  "wcstok_nid_postfix" @1074

@@ -1,0 +1,34 @@
+# Archival source only; never execute or import.
+raise RuntimeError("Snapshot only; use reviewed current tooling.")
+
+"""Preserve authored source as inert archival text; no build, adoption, or Git writes."""
+from pathlib import Path
+import hashlib,json,ast,shutil
+ROOT=Path('__LOCAL_PROJECT_ROOT__');OUT=ROOT/'build/anyps5-latest43bc-source-proposal-20261012';HELD=OUT/'libc-export21-successor';WT=ROOT/'build/madeira-retained-20261012/source-save-worktree';DEST=WT/'experimental/source-preservation/libc-export21-unbuilt-20261012';DEST.mkdir(parents=True,exist_ok=False)
+GUARD='# Archival source only; never execute or import.\nraise RuntimeError("Snapshot only; use reviewed current tooling.")\n\n'
+sha=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
+FILES={'snapshots/check_libc_exports.py.snapshot':HELD/'check_libc_exports.py','snapshots/prepare_export21.py.snapshot':HELD/'prepare.py','snapshots/prepare_twojob.py.snapshot':OUT/'prepare-twojob.py','snapshots/stop_owned_onejob.py.snapshot':OUT/'stop-owned-onejob.py','snapshots/run_remaining_cpu_contracts.py.snapshot':OUT/'runtime-twojob-route/run_remaining_cpu_contracts.py','snapshots/save_source_preservation.py.snapshot':Path(__file__).resolve()}
+records={}
+for rel,original in FILES.items():
+ data=original.read_text();originalSha=sha(original);redactions=[]
+ for needle,replacement in [(str(ROOT),'__LOCAL_PROJECT_ROOT__'),('__LOCAL_HOME__','__LOCAL_HOME__')]:
+  count=data.count(needle);data=data.replace(needle,replacement);redactions.append({'replacement':replacement,'occurrences':count})
+ ast.parse(data);target=DEST/rel;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(GUARD+data);target.chmod(0o644);ast.parse(target.read_text());assert sha(original)==originalSha
+ records[rel]={'originalRelativePath':str(original.relative_to(ROOT)),'originalSha256':originalSha,'normalizedSha256':hashlib.sha256(data.encode()).hexdigest(),'snapshotSha256':sha(target),'guardPrefixBytes':len(GUARD.encode()),'redactions':redactions}
+patch=HELD/'patches/0021-new-upstream-libc-literal-exports.patch';target=DEST/'patches'/patch.name;target.parent.mkdir();shutil.copyfile(patch,target);target.chmod(0o644);assert sha(target)==sha(patch)=='3ab16362f8068afc18c90acc414764932a5ed6026184f5ae125e5fa7a923c1f4'
+review=json.loads((HELD/'source-candidate-review.json').read_text());baseline=json.loads((HELD/'actual-export-baseline20.json').read_text())
+provenance={'schema':1,'kind':'unbuilt_unapplied_source_preservation','upstreamCommit':'43bc17f7edfc32c38428fd8e4e6d8cc94c8cb31b','parentSourceCheckpoint':'fafa18d','heldSource21ReviewSha256':sha(HELD/'source-candidate-review.json'),'heldSource21FullMapSha256':sha(HELD/'candidate-source-map.json'),'patch21OriginalSha256':sha(patch),'patchSourceScope':['core/libs/prx/libc/src/specifics/windows/compiler_once_exports.def'],'originalDef1062RowsPrefixByteExact':True,'original149DataRowsRetained':True,'ownedProviderOrdinal1062Retained':True,'newImplementedPublicCExports':review['newImplementedOutOfLineCExports'],'expectedRepairedExportCount':1074,'inlineCppHelperExcluded':'ResolvePathError_nid_no_patch','sourceRoundtripCommandsPassedBeforeStop':88,'rawBaseline20ContractObservationBeforeStop':{'actualExportCount':1062,'missingTwelveNames':baseline['missingExports'],'oldOrdinalsUnchanged':not baseline['changedOrdinals'],'unexpectedProviderExportNamesAbsent':not baseline['forbiddenProviderExports'],'receiptSha256':sha(HELD/'actual-export-baseline20.json'),'rawPeIncluded':False},'patch21AppliedToCanonicalOrPrivate20':False,'patch21Compiled':False,'patch21PostbuildExportOrNidClosureQualified':False,'fullHleQualified':False,'deviceExecuted':False,'gameplayVerified':False,'knownMsaaPolicyBoundaryNotResolved':True,'sourcePreservationDoesNotAuthorizeResume':True}
+(DEST/'provenance.json').write_text(json.dumps(provenance,indent=2,sort_keys=True)+'\n')
+manifest={'schema':1,'kind':'guarded_inert_authored_source_archive','guardPrefix':GUARD,'sourceFiles':records,'patches':{str(target.relative_to(DEST)):sha(target)},'excludedClasses':['raw PE/PRX/provider binaries','objects/build products/toolchains','game data','private source maps','runtime logs','credentials/device/pairing data'],'originalSourceFilesUnchanged':True,'sourceSnapshotsExecuted':False,'runtimeQualified':False}
+(DEST/'source-manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n')
+(DEST/'README.md').write_text('''# Unbuilt libc export repair source preservation
+
+This archive preserves authored patch 21 and the corrected portable PE export checker after development was stopped for storage cleanup. Patch 21 has not been applied to the canonical or private 20-patch source and has not been compiled. It is held here for review, outside the active patch series.
+
+The patch appends twelve implemented upstream C exports at ordinals 1063–1074. It retains all original 1062 export rows, ordinals, 149 `DATA` entries, and the compiler-once provider. The inline C++ path helper is excluded. Its source-only 21-patch replay passed 88 check/apply/reverse operations before the stop; the prior raw binary had exactly the original 1062 exports and lacked those twelve names. A repaired binary, import/NID closure, and runtime acceptance remain unverified. The known MSAA policy conflict remains unresolved.
+
+All Python snapshots raise before imports or original logic. They preserve the preparation, job-change closure, remaining CPU contract recipe, checker, and archive saver as data. The manifest records exact original hashes and declares local path redactions. Three supplemental helpers predate the source checkpoint but were not in its archive. No binary, raw provider payload, game data, runtime log, private source map, device data, or credential is included.
+
+Run the portable preservation checks only: `python3 -I -B -m unittest discover -s experimental/source-preservation/libc-export21-unbuilt-20261012 -p test_preservation.py`. These validate source, ordinal preservation, and synthetic PE parsing without compilers, Wine, devices, or development/adoption actions. Preservation does not authorize resuming work. No GitHub Actions.
+''')
+print(json.dumps({'archive':str(DEST),'snapshotCount':len(records),'patchSha256':sha(target),'manifestSha256':sha(DEST/'source-manifest.json'),'provenanceSha256':sha(DEST/'provenance.json')},indent=2))

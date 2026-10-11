@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "file": "transfer-needed.py.snapshot",
+      "originalSha256": "f223e7ae3098838df21eb97e3f39ad8d3be2ffacb25f1affb597c2a7c03a001d",
+      "normalizedSha256": "14fe92f9c338cc657edcff02e705bc4ecf8d0bc123215eff8262972a2e61bd5e",
+      "snapshotSha256": "365f8ca4533ab24b35f812a75ee80ebabd67346e97a42c1e1b8dd7fd1cd9b62d",
+      "originalBytes": 3542,
+      "privatePathsRedacted": true,
+      "inert": true
+    },
+    {
+      "file": "archive-private-source.py.snapshot",
+      "originalSha256": "4926e8626314a84b0758c374c93dfaf3329275ca0667e46c0a89d9c6cd898331",
+      "normalizedSha256": "f4af59a4d2430d6be0a0eab18a5b0917e14a21da23fc6c6a7ae2c36d1d99c3ba",
+      "snapshotSha256": "efe59abf31e797a1a6b7f774b49e414f533114ccff47f0d9e2966eae6c89221f",
+      "originalBytes": 3501,
+      "privatePathsRedacted": true,
+      "inert": true
+    }
+  ],
+  "privatePayloadIncluded": false,
+  "redactions": {
+    "oldCheckout": "<OLD_CHECKOUT>",
+    "nativeCheckout": "<NATIVE_CHECKOUT>"
+  },
+  "boundary": "Data-only recovery of completed local storage helpers. No automatic execution or new runtime qualification."
+}
