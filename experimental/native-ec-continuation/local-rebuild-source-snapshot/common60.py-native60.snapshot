@@ -1,0 +1,129 @@
+"""Root-use Native60 packaging helpers. Import performs no I/O or actions."""
+from pathlib import Path
+import hashlib, json, os, plistlib, re, shutil, signal, stat, struct, subprocess, time
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+BASE = ROOT / 'build/native-rpm-critical-owner-diagnostic59-build-20261012-attempt2'
+CANDIDATE = ROOT / 'build/minigolf-native-critical-suspend-candidate-20261011'
+FEX = ROOT / 'build/fex-native-critical-suspend-full-link-20261011'
+NATIVE_FEX = ROOT / 'build/fex-native-critical-native-archives-proposal-20261011'
+DEFAULT_OUT = ROOT / 'build/native-ec-continuation-native60-build-20261012'
+TEAM, BUNDLE = 'K5TW9AU245', 'com.buberlo.anyps5ipad'
+MIN_FREE, RESERVE = 6 << 30, 2 << 30
+TC = Path('/explicit/retained/llvm-mingw/bin')
+PE_NAMES = ('ntdll.dll', 'xtajit64.dll', 'winevulkan.dll', 'vulkan-1.dll')
+GEN_HEADERS = {
+    'build-ios/generated/git_version.h',
+    'build-ios/include/FEXCore/Config/ConfigOptions.inl',
+    'build-ios/include/FEXCore/Config/ConfigValues.inl',
+    'build-ios/include/FEXCore/IR/IRDefines.inc',
+    'build-ios/include/FEXCore/IR/IRDefines_Dispatch.inc',
+}
+
+def need(v, reason):
+    if not v: raise ValueError(reason)
+
+def sha(p):
+    h = hashlib.sha256()
+    with Path(p).open('rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''): h.update(b)
+    return h.hexdigest()
+
+def read(p): return json.loads(Path(p).read_text())
+
+def put(p, value):
+    p = Path(p); p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open('x') as f: json.dump(value, f, indent=2, sort_keys=True); f.write('\n')
+
+def regular(p):
+    p = Path(p); need(stat.S_ISREG(p.lstat().st_mode), 'Exact regular provider: ' + str(p)); return p
+
+def merge(dst, values):
+    for p, h in values.items():
+        need(re.fullmatch('[0-9a-f]{64}', h) and (p not in dst or dst[p] == h), 'Conflicting provider: ' + p)
+        dst[p] = h
+
+def replay(values):
+    for p, h in values.items(): need(sha(p) == h, 'Provider drift: ' + p)
+
+def inventory(root):
+    root = Path(root); result = {}
+    for parent, dirs, files in os.walk(root, followlinks=False, onerror=lambda e: (_ for _ in ()).throw(e)):
+        need(not any((Path(parent)/d).is_symlink() for d in dirs), 'Directory symlink in materialized inventory')
+        for n in files:
+            p = regular(Path(parent)/n); result[str(p.relative_to(root))] = sha(p)
+    return result
+
+def output_path(p):
+    p = Path(p).absolute()
+    need(p.parent == ROOT/'build' and p.name.startswith('native-ec-continuation-native60-build-'), 'Dedicated Native60 output')
+    return p
+
+def space(): need(shutil.disk_usage(ROOT).free >= RESERVE, '2GiB live packaging reserve')
+
+def recipe_inputs():
+    return {str(p): sha(p) for p in [HERE/n for n in ('common60.py','prepare60.py','run60.py','finish60.py')]}
+
+
+def planned_argv(out):
+    return ['xcodebuild','-jobs','2','-project',str(out/'layout/Madeira/app/Madeira.xcodeproj'),
+        '-scheme','Madeira','-destination','generic/platform=iOS','-configuration','Debug',
+        '-derivedDataPath',str(out/'DerivedData'),'MADEIRA_BUNDLE_IDENTIFIER='+BUNDLE,
+        'DEVELOPMENT_TEAM='+TEAM,'CURRENT_PROJECT_VERSION=60','CODE_SIGNING_ALLOWED=YES',
+        'CODE_SIGNING_REQUIRED=YES','GCC_OPTIMIZATION_LEVEL=2','SWIFT_OPTIMIZATION_LEVEL=-O',
+        'DEBUG_INFORMATION_FORMAT=dwarf-with-dsym','OTHER_SWIFT_FLAGS=$(inherited) -j2 -driver-batch-count 2','build']
+
+def command(out, name, argv, timeout=90):
+    space(); stdout, stderr = out/(name+'.stdout'), out/(name+'.stderr')
+    env = {k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','CCACHE_')) and
+        k not in {'CC','CXX','CFLAGS','CXXFLAGS','CPPFLAGS','LDFLAGS','CPATH','LIBRARY_PATH','SDKROOT'}}
+    env.update(DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer', PATH=str(TC)+':/usr/bin:/bin:/usr/sbin:/sbin')
+    record = {'argv':list(map(str,argv)),'cwd':str(ROOT),'timeoutSeconds':timeout,
+        'environment':{'DEVELOPER_DIR':env['DEVELOPER_DIR'],'PATH':env['PATH']},'deviceOperations':False}
+    child = None; start = time.monotonic()
+    try:
+        with stdout.open('xb') as a, stderr.open('xb') as b:
+            child = subprocess.Popen(record['argv'], cwd=ROOT, env=env, stdout=a, stderr=b, start_new_session=True)
+            record['pid'] = child.pid
+            while child.poll() is None:
+                need(time.monotonic()-start < timeout, 'Bounded command deadline')
+                need(stdout.stat().st_size + stderr.stat().st_size <= 128 << 20, '128MiB command log cap')
+                space(); time.sleep(.2)
+            record['exitCode'] = child.returncode
+    except BaseException as e:
+        record['error'] = type(e).__name__+': '+str(e)
+        if child is not None and child.poll() is None:
+            try:
+                need(os.getpgid(child.pid)==child.pid, 'Owned compiler/signature group')
+                os.killpg(child.pid,signal.SIGKILL)
+            except ProcessLookupError: pass
+            child.wait(timeout=10)
+        raise
+    finally:
+        record['ownedChildReaped'] = child is not None and child.poll() is not None
+        record['elapsedSeconds'] = time.monotonic()-start
+        record['outputs'] = {str(p):sha(p) for p in (stdout,stderr) if p.exists()}
+        put(out/(name+'-command.json'),record)
+    need(record['exitCode']==0 and record['ownedChildReaped'], 'Actual command failed: '+name)
+    need(stdout.stat().st_size + stderr.stat().st_size <= 128 << 20, 'Final command log cap')
+    return stdout.read_bytes(),stderr.read_bytes()
+
+def pe_component(out, name, p):
+    p = Path(p); data = p.read_bytes(); need(data[:2]==b'MZ' and len(data)>=64, 'PE bytes')
+    at = struct.unpack_from('<I',data,0x3c)[0]; need(data[at:at+4]==b'PE\0\0', 'PE signature')
+    machine = struct.unpack_from('<H',data,at+4)[0]; need(machine in (0x8664,0xa641,0xa64e), 'PE machine')
+    text = command(out,name,[TC/'llvm-readobj','--coff-load-config',p])[0].decode()
+    m = re.search(r'CodeMap\s*\[(.*?)\]',text,re.S)
+    need(m and re.search(r'\bARM64EC\b',m.group(1)), 'Actual ARM64EC code range')
+    return {'sha256':sha(p),'bytes':len(data),'machine':hex(machine),'arm64ec_code_map':True}
+
+
+def verify_inputs(out, expected):
+    p=out/'inputs.json'; need(re.fullmatch('[0-9a-f]{64}',expected or '') and sha(p)==expected, 'Exact prepared Native60 manifest')
+    r=read(p); need(r['status']=='isolated_native60_inputs_verified' and r['buildVersion']==60 and r['team']==TEAM and r['bundleIdentifier']==BUNDLE, 'Native60 input identity')
+    review = HERE/'source-review-freeze.json'
+    need(sha(review)==r['packagingSourceReviewSha256'], 'Exact packaging source review')
+    replay(read(review)['inputHashes']); replay(r['providerInputs']); replay(r['recipeInputs'])
+    need(inventory(out/'layout')==r['sourceFiles'], 'Materialized source closure')
+    return r

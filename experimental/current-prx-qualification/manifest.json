@@ -1,0 +1,23 @@
+{
+  "controls": {
+    "boundedProcess": 8,
+    "pureAndInjectedExecutor": 20
+  },
+  "deviceOrTransportIdentityIncluded": false,
+  "files": {
+    "README.md": "69cc6ecd1614eabe53c3fe8d8f66caa423b1ee5ba345b8832701437992123aee",
+    "run.py": "c01e824c4a4479c131c9fa1da494bb096830e57f18ff1d1e97813b4de394fa66",
+    "test_runner.py": "7bd673bacaee61106a1eed896fbe4a88ef301a59ea3c46c7ce701fec150fe9d3"
+  },
+  "originSourceReviewSha256": "4bc0138073934b66132dc02a00d84a5d32a04d019ce0aef8f991f291d5e41cd4",
+  "privateInventoryIncluded": false,
+  "privateRequestDataIncluded": false,
+  "publicDependencies": [
+    "tools/checks/bounded_local_process.py",
+    "tools/checks/test_bounded_local_process.py"
+  ],
+  "runtimeOrGpuQualified": false,
+  "schema": 1,
+  "snapshotByteEquality": true,
+  "status": "reviewed_local_recipe_dependent_source_snapshot_not_executed"
+}

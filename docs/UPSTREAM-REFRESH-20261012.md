@@ -67,7 +67,14 @@ test executables. The raw-log fixture passes twelve cases; the next fixture,
 `windows_exception_tests`, terminates with an unhandled `through runtime frames`
 exception from `std::call_once`. The supplied compiler runtime DLLs carry native
 SEH tables while our custom unwinder reads DWARF metadata; a bounded diagnostic
-will identify the first missing frame before a bridge is accepted. The fixture
+now identifies the first missing frame in `libwinpthread`'s `pthread_once`, at
+RVA `0x851d`. Its native unwind entry has no handler flags, but the implementation
+still holds a mutex and a stack cleanup-list node across the callback. Merely
+walking past that frame would lose required cleanup. The isolated diagnostic
+compiles and links, preserves the original providers, captures exit 3 and joins
+its Wine prefix; it does not repair the failure.
+[First missing-frame observation](evidence/windows-compiler-once-first-miss-20261012.json).
+The fixture
 and cleanup assertions remain enabled. Full linked-runtime qualification, the
 new prepared game package, Windows GPU run and iPad game run remain separate
 steps. The earlier 54-case runtime and 538-case
@@ -102,3 +109,13 @@ stop/failure predicate stay intact. The HLE helper resolves the Wine executable
 before changing directories for tests; five executable-path controls cover that
 repair. [Experimental EC continuation snapshot](../experimental/native-ec-continuation/README.md) preserves the narrower FEX candidate and its
 local controls; it remains outside the default patch series.
+
+The experimental FEX continuation candidate now also completes the production
+build: 187 ARM64EC objects, 50 fresh native objects and nine retained FEXCore
+members. All 104 native continuation commands join successfully; the old frame
+size/offsets, 30 exports, 12-DLL import symbols and native public symbol contract
+remain unchanged. The original failed import postcondition and terminal capture
+are retained separately. These artifacts still require a fresh app consumer,
+signing and the actual iPad continuation test; they do not establish the cause
+of Native59's fault or repair MiniGolf's startup.
+[Actual native build](evidence/native-ec-continuation-native-build-20261012.json).

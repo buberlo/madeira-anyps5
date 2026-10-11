@@ -1,0 +1,138 @@
+from pathlib import Path
+import ast
+import copy
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+import common60 as c
+import prepare60 as p
+import finish60 as f
+
+class Native60(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.q = c.read(p.RESUME_ROOT/'final-receipt.json')
+        cls.plan = c.read(p.RESUME_ROOT/'resume-source-freeze.json')
+        cls.old = c.read(c.BASE/'inputs.json')
+
+    def test_actual_completed_producer_and_exact_identity(self):
+        self.assertEqual(c.sha(p.RESUME_ROOT/'final-receipt.json'), p.RESUME_RECEIPT)
+        self.assertEqual(c.sha(p.RESUME_ROOT/'resume-source-freeze.json'), p.RESUME_FREEZE)
+        p.producer_contract(self.q, self.plan)
+
+    def test_exact_five_replacements_not_Wine_helpers(self):
+        rows = p.selected_replacements(self.old, self.q)
+        self.assertEqual(len(rows), 5)
+        self.assertFalse(any('libntdll' in name or 'libwineserver' in name for name in rows))
+        self.assertEqual({name.removeprefix('Madeira/FEX/') for name in rows
+                          if name.endswith(('.cpp','.h'))}, p.SOURCES)
+
+    def test_partial_or_runtime_claimed_producer_refuses(self):
+        for key, value in [('freshNativeObjectCount',49),('freshNativeArchiveCount',2),
+                           ('reusedNativeArchiveCount',5),('freshArm64ecObjectCount',186),
+                           ('exportsExact',False),('requiredRtlIsEcCodePresent',False),
+                           ('peRecompiled',True),('runtimeAccepted',True)]:
+            q = copy.deepcopy(self.q); q[key] = value
+            with self.assertRaises(ValueError): p.producer_contract(q, self.plan)
+
+    def test_wrong_source_or_review_refuses(self):
+        for key, value in [('sourceReviewSha256','0'*64),('sourceRoute',str(c.ROOT/'upstreams/FEX')),
+                           ('artifact',str(c.BASE/'layout/Madeira/app/Madeira/arm64ec-windows/xtajit64.dll'))]:
+            q = copy.deepcopy(self.q); q[key] = value
+            with self.assertRaises(ValueError): p.producer_contract(q, self.plan)
+
+    def test_frame_size_or_records_drift_refuses(self):
+        for i, j in [(0,0),(1,4),(1,6)]:
+            q = copy.deepcopy(self.q); q['frameOffsetRecords'][i][j] += 8
+            with self.assertRaises(ValueError): p.producer_contract(q, self.plan)
+
+    def test_missing_complete_input_or_archive_refuses(self):
+        q = copy.deepcopy(self.q); del q['inputHashes'][next(iter(q['inputHashes']))]
+        with self.assertRaises(ValueError): p.producer_contract(q, self.plan)
+        q = copy.deepcopy(self.q); del q['archives'][next(iter(q['archives']))]
+        with self.assertRaises(ValueError): p.producer_contract(q, self.plan)
+
+    def test_non_Core_archive_change_refuses(self):
+        q = copy.deepcopy(self.q)
+        name = next(name for name in q['archives'] if Path(name).name == 'libfmt.a')
+        q['archives'][name] = '0'*64
+        with self.assertRaises(ValueError): p.selected_replacements(self.old, q)
+
+    def test_fourth_source_or_generated_header_change_refuses(self):
+        q = copy.deepcopy(self.q); q['sourceFiles']['.clang-format'] = '0'*64
+        with self.assertRaises(ValueError): p.selected_replacements(self.old, q)
+        q = copy.deepcopy(self.q); q['nativeGeneratedHeaders']['build-ios/generated/git_version.h'] = '0'*64
+        with self.assertRaises(ValueError): p.selected_replacements(self.old, q)
+
+    def test_actual59_prior_app_dependency_scope(self):
+        path = c.BASE/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/Madeira.build/Objects-normal/arm64/FEXBridge.d'
+        names = f.dep_names(path.read_text())
+        self.assertIn(c.BASE/'layout/Madeira/FEX/FEXCore/include/FEXCore/Core/CoreState.h', names)
+
+    def fake_headers(self, root):
+        layout = root/'layout'; old = root/'old/layout'
+        core = layout/'Madeira/FEX/FEXCore/include/FEXCore/Core/CoreState.h'
+        helper = layout/'Madeira/FEX/FEXCore/include/FEXCore/Core/CPUState.h'
+        files = {}
+        for path in (core,helper):
+            path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b'candidate header')
+            files[str(path.relative_to(layout))] = c.sha(path)
+        before = 'dependencies: '+ ' '.join(str(old/path.relative_to(layout)) for path in (core,helper))
+        now = 'dependencies: '+ ' '.join(map(str,(core,helper)))
+        return layout,old,core,helper,files,before,now
+
+    def test_fresh_header_route_and_byte_readback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            layout,old,core,helper,files,before,now = self.fake_headers(Path(directory).resolve())
+            rows = f.core_dependencies(now,before,layout,old,files)
+            self.assertEqual(rows[str(core)], files[str(core.relative_to(layout))])
+            helper.write_bytes(b'changed')
+            with self.assertRaises(ValueError): f.core_dependencies(now,before,layout,old,files)
+
+    def test_live_or_old_header_route_refuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            layout,old,core,helper,files,before,now = self.fake_headers(Path(directory).resolve())
+            for wrong in [str(old/core.relative_to(layout)),str(c.ROOT/'upstreams/FEX/FEXCore/include/FEXCore/Core/CoreState.h')]:
+                with self.assertRaises(ValueError):
+                    f.core_dependencies(now.replace(str(core),wrong),before,layout,old,files)
+
+    def test_dependency_membership_omission_refuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            layout,old,core,helper,files,before,now = self.fake_headers(Path(directory).resolve())
+            with self.assertRaises(ValueError): f.core_dependencies(now.replace(str(helper),''),before,layout,old,files)
+
+    def test_missing_fresh_app_consumer_refuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory).resolve(); prior = out/'prior.d'; prior.write_text('dependencies: /x/CoreState.h')
+            with self.assertRaises(ValueError):
+                f.app_core_state_readback(out, {'appCoreStateBaselineDependencyFile':str(prior),
+                    'appCoreStateConsumersRequired':['FEXBridge'],'sourceFiles':{}})
+
+    def test_unchanged_mature_process_and_link_helpers(self):
+        old = c.ROOT/'build/native-rpm-critical-owner-diagnostic59-packaging-proposal-20261012'
+        for filename, current, names in [('common59.py',c.HERE/'common60.py',
+                                        ['command','inventory','sha','pe_component']),
+                                        ('finish59.py',c.HERE/'finish60.py',
+                                         ['link_inputs','macho_signed','profile_contract'])]:
+            a = {node.name:ast.dump(node,include_attributes=False) for node in ast.parse((old/filename).read_text()).body if isinstance(node,ast.FunctionDef)}
+            b = {node.name:ast.dump(node,include_attributes=False) for node in ast.parse(current.read_text()).body if isinstance(node,ast.FunctionDef)}
+            for name in names: self.assertEqual(a[name],b[name],name)
+
+    def test_distinct_version_and_output(self):
+        self.assertIn('CURRENT_PROJECT_VERSION=60', c.planned_argv(c.DEFAULT_OUT))
+        self.assertEqual(c.planned_argv(c.DEFAULT_OUT)[1:3], ['-jobs','2'])
+        c.output_path(c.DEFAULT_OUT)
+        with self.assertRaises(ValueError): c.output_path(c.BASE)
+        for name in ('../escape','/absolute'):
+            with self.assertRaises(ValueError): p.relative(name)
+
+    def test_explicit_isolated_CLI_loaders_inert_help(self):
+        for name in ('prepare60.py','run60.py','finish60.py'):
+            result = subprocess.run([sys.executable,'-I','-B',str(c.HERE/name),'--help'],
+                                    capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr.decode())
+            self.assertIn(b'usage:',result.stdout)
+
+if __name__ == '__main__': unittest.main()

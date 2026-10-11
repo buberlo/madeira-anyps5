@@ -1,0 +1,58 @@
+"""Seal small source/actual producer records; never stage, build or sign Native60."""
+from pathlib import Path
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+s = importlib.util.spec_from_file_location('native60_review_prepare', HERE/'prepare60.py')
+p = importlib.util.module_from_spec(s); s.loader.exec_module(p)
+c = p.c
+
+def stamp(path):
+    z = Path(path).lstat()
+    return [z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns]
+
+def make():
+    output = HERE/'source-review-freeze.json'
+    if output.exists(): raise FileExistsError(output)
+    q = c.read(p.RESUME_ROOT/'final-receipt.json'); plan = c.read(p.RESUME_ROOT/'resume-source-freeze.json')
+    c.need(c.sha(p.RESUME_ROOT/'final-receipt.json') == p.RESUME_RECEIPT and
+           c.sha(p.RESUME_ROOT/'resume-source-freeze.json') == p.RESUME_FREEZE,
+           'Exact actual completed native producer')
+    p.producer_contract(q,plan)
+    old = c.read(c.BASE/'inputs.json'); changes = p.selected_replacements(old,q)
+    run = subprocess.run([sys.executable,'-I','-B','-m','unittest','discover','-s',str(HERE),
+                          '-p','test_native60.py','-v'],capture_output=True,timeout=30)
+    (HERE/'offline-tests.log').write_bytes(run.stdout+run.stderr)
+    c.need(run.returncode == 0 and b'Ran 16 tests' in run.stderr, 'Native60 source/temp controls')
+    paths = list(HERE.glob('*')) + [c.BASE/name for name in ('inputs.json','signed-build-receipt.json','app-file-hashes.json')]
+    paths += [p.RESUME_ROOT/'final-receipt.json',p.RESUME_ROOT/'resume-source-freeze.json']
+    paths += list((p.RESUME_ROOT/'commands').glob('*-command.json'))
+    paths += [c.BASE/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/Madeira.build/Objects-normal/arm64/FEXBridge.d']
+    prior = c.ROOT/'build/native-rpm-critical-owner-diagnostic59-packaging-proposal-20261012'
+    paths += [prior/name for name in ('common59.py','prepare59.py','run59.py','finish59.py')]
+    paths = [path for path in paths if path.is_file() and path != output]
+    stamps = {str(path):stamp(path) for path in paths}
+    inputs = {str(path):c.sha(path) for path in paths}
+    c.need(all(stamp(name) == stamps[name] for name in inputs), 'Stable reviewed source records')
+    c.need(len(list((p.RESUME_ROOT/'commands').glob('*-command.json'))) == 104, 'Actual104 native commands')
+    for path in (p.RESUME_ROOT/'commands').glob('*-command.json'):
+        row = c.read(path)
+        c.need(row.get('actualExitCode') == 0 and row.get('ownedChildReaped') is True and 'error' not in row,
+               'Actual native command closure')
+    result = {'status':'native60_packaging_source_only_actual_native_resume_required',
+        'inputHashes':inputs,'inputFingerprints':stamps,'pureControlsPassed':16,
+        'actualNativeProducerReceiptSha256':p.RESUME_RECEIPT,
+        'actualNativeProducerFreezeSha256':p.RESUME_FREEZE,'actualJoinedNativeCommands':104,
+        'physicalSigned59SourceMembers':7480,'layoutChanges':sorted(changes),
+        'requiredFreshAppCoreStateConsumers':['FEXBridge'],
+        'native59RuntimeHelpersPreserved':True,'updatedAnyPS5HlePackaged':False,
+        'layoutPrepared':False,'xcodeExecuted':False,'signed':False,'installed':False,
+        'deviceActions':False,'cpuAccepted':False,'runtimeAccepted':False}
+    output.write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps({'path':str(output),'sha256':c.sha(output),'inputs':len(inputs)}))
+
+if __name__ == '__main__': make()

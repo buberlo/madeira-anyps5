@@ -1,0 +1,18 @@
+  native=out/'native';native.mkdir();deps={};fresh={}
+  nativefreeze=json.loads((NATIVE/'source-freeze.json').read_text());group=nativefreeze['groups'][0]
+  for i,row in enumerate(recipe['nativeCommands']):
+   obj=Path(row['compile'][row['compile'].index('-o')+1]);obj.parent.mkdir(parents=True,exist_ok=True)
+   pp=command('native'+str(i)+'-pp',row['preprocess']);need('fex_ios_native_critical_enter' not in pp and 'ios_fex_critical_request' not in pp,'Native Windows bridge inactive')
+   command('native'+str(i)+'-compile',row['compile']);fresh[obj.name]=obj
+   for name in n.dep_paths(str(obj)+'.d',ROOT):
+    path=Path(name);classified=n.lexical(path)
+    h={**f['sourceFiles'],**f['generatedHeaders']}.get(str(classified.relative_to(source))) if classified.is_relative_to(source) else f['inputHashes'].get(name)
+    need(h is not None and p.sha(path)==h,'Actual native dependency '+name);deps[name]=h
+  for row in recipe['retainedFexCoreMembers']:
+   dst=Path(row['destination']);dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(row['provider'],dst);need(p.sha(dst)==row['sha256'],'Current retained member');fresh[dst.name]=dst
+  ordered=[native/'objects'/f'{i}-{r["name"]}' for i,r in enumerate(group['objects'])];need(len(fresh)==59 and all(x in fresh.values() for x in ordered),'Ordered59 members')
+  archive=native/'libFEXCore.a';command('native-ar',[group['ar'],'qc',archive,*ordered]);command('native-ranlib',[group['ranlib'],archive])
+  need(n.members(archive)==[{'name':x.name,'sha256':p.sha(x)} for x in ordered],'Actual ordered member bytes')
+  current=next(Path(x) for x in recipe['selectedCurrentArchives'] if Path(x).name=='libFEXCore.a')
+  need(n.symbols(command('old-native-nm',[nativefreeze['nm'],'-g',current]))==n.symbols(command('new-native-nm',[nativefreeze['nm'],'-g',archive])),'Native global symbol contract')
+  selected={name:h for name,h in recipe['selectedCurrentArchives'].items() if Path(name).name!='libFEXCore.a'};need(len(selected)==6,'Six current archive routes');selected[str(archive)]=p.sha(archive)

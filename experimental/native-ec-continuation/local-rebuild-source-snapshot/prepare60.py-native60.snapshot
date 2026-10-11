@@ -1,0 +1,184 @@
+"""Root-use isolated Native60 layout; actual completed native resume is mandatory."""
+import argparse
+import datetime
+import json
+import shutil
+from pathlib import Path, PurePosixPath
+import importlib.util
+_common = importlib.util.spec_from_file_location('native60_packaging_common', Path(__file__).resolve().parent/'common60.py')
+c = importlib.util.module_from_spec(_common)
+_common.loader.exec_module(c)
+
+BASE_INPUT = 'bf4b7ca13c6bea2b3e7a709e263b701434c33f04aa6e3c01e09ef78b3fbac278'
+BASE_SIGNED = '63776e4f3ba7a0ec2d0b796e75603d5243f6db318d0e7d794877b737bdb62f37'
+BASE_FILES = 'a4ec222f93b4aacf24108270001b2f7efff3b27f338b2da3e171586e8c2927e8'
+RESUME_REVIEW = '351e4aad9abedced35d31f85be32cdee9db21f614e0ce12637ff8e52a39f8dc8'
+RESUME_RECEIPT = 'fdbd160c776a110172ecd9dfddc3a50be4c7e65e22bf71b9ded70567ed2e0ae2'
+RESUME_FREEZE = '57156d21da90f6db968c1f41945738d457746e4e559645e4aca2e044c37428bf'
+RESUME_ROOT = c.ROOT/'build/fex-native-ec-link-preservation-native-resume-20261012-attempt2'
+SOURCE_ROOT = c.ROOT/'build/fex-native-ec-link-preservation-full-link-20261012-attempt2/source'
+SOURCES = {'FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp',
+           'FEXCore/include/FEXCore/Core/CoreState.h', 'Source/Windows/ARM64EC/Module.cpp'}
+ARCHIVES = {'libFEXCore.a', 'libFEXCore_Base.a', 'libJemallocLibs.a',
+            'libsoftfloat_3e.a', 'libcephes_128bit.a', 'libfmt.a', 'libxxhash.a'}
+
+def relative(name):
+    p = PurePosixPath(name)
+    c.need(name and not p.is_absolute() and '..' not in p.parts and '.' not in p.parts,
+           'Bounded layout member')
+    return Path(name)
+
+def source_review(expected):
+    path = c.HERE/'source-review-freeze.json'
+    c.need(c.re.fullmatch('[0-9a-f]{64}', expected or '') and c.sha(path) == expected,
+           'Exact Native60 source review before staging')
+    value = c.read(path)
+    c.need(value['status'] == 'native60_packaging_source_only_actual_native_resume_required',
+           'Typed Native60 source review')
+    c.replay(value['inputHashes'])
+    return path
+
+def producer_contract(q, plan):
+    c.need(q['status'] == 'fresh_ec_native_link_snapshot_DLL_and_native_archives_built_not_runtime_qualified' and
+           q['freshArm64ecObjectCount'] == 187 and q['peRecompiled'] is False and
+           q['freshNativeObjectCount'] == 50 and q['freshNativeArchiveCount'] == 1 and
+           q['reusedNativeArchiveCount'] == 6 and q['exportsExact'] is True and
+           q['requiredRtlIsEcCodePresent'] is True and q['frameSizeUnchanged'] is True and
+           q['runtimeAccepted'] is False and q['deviceActions'] is False,
+           'Actual completed187/native50/one-plus-six producer')
+    c.need(q['sourceReviewSha256'] == plan['sourceReviewSha256'] == RESUME_REVIEW and
+           q['sourceRoute'] == str(SOURCE_ROOT) and
+           q['artifact'] == str(SOURCE_ROOT.parent/'arm64ec/build/Bin/libarm64ecfex.dll') and
+           q['objects'] == plan['completedObjects'] and len(q['objects']) == 187,
+           'Exact resume origin/source/completed PE route')
+    old, new = q['frameOffsetRecords']
+    c.need(len(old) == 4 and len(new) == 7 and old == new[:4] and
+           new[4:] == [new[3]+8, new[3]+16, new[3]+24] and new[-1] <= 32760,
+           'Actual target frame ABI remains equal')
+    c.need(q['frameOffsetRecords'] == plan['frameOffsetRecords'] and
+           q['importContractMode'] == plan['importMode'] == 'exact_existing_RtlIsEcCode',
+           'Actual unchanged import/frame contract')
+    c.need(q['sourceFiles'] == plan['compiledSourceFreeze']['sourceFiles'] and
+           len(q['sourceFiles']) == 6973 and
+           q['nativeGeneratedHeaders'] == plan['compiledSourceFreeze']['generatedHeaders'] and
+           set(q['nativeGeneratedHeaders']) == c.GEN_HEADERS,
+           'Exact physical6973/five header producer route')
+    c.need(len(q['archives']) == 7 and
+           {Path(name).name for name in q['archives']} == ARCHIVES and
+           str(RESUME_ROOT/'native/libFEXCore.a') in q['archives'],
+           'Exactly one fresh Core archive and six current archives')
+    c.need(q['inputHashes'] == plan['inputHashes'], 'Complete resume input closure')
+
+def selected_replacements(old, q):
+    result = {}
+    for name, digest in q['sourceFiles'].items():
+        target = 'Madeira/FEX/'+name
+        c.need(target in old['sourceFiles'], 'Existing physical FEX layout member')
+        if old['sourceFiles'][target] != digest: result[target] = (SOURCE_ROOT/name, digest)
+    c.need({name.removeprefix('Madeira/FEX/') for name in result} == SOURCES,
+           'Exactly three candidate source changes')
+    for name, digest in q['nativeGeneratedHeaders'].items():
+        c.need(old['sourceFiles']['Madeira/FEX/'+name] == digest,
+               'All five generated headers byte-equal')
+    core = str(RESUME_ROOT/'native/libFEXCore.a')
+    result['Madeira/FEX/build-ios/FEXCore/Source/libFEXCore.a'] = (Path(core), q['archives'][core])
+    result['Madeira/app/Madeira/arm64ec-windows/xtajit64.dll'] = (Path(q['artifact']), q['newDLLSha256'])
+    for name, digest in old['externalFexArchives'].items():
+        if Path(name).name != 'libFEXCore.a':
+            actual = [h for p, h in q['archives'].items() if Path(p).name == Path(name).name]
+            c.need(actual == [digest], 'Six reused archives remain exact Native59 bytes')
+    return result
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--prepare', action='store_true', required=True)
+    ap.add_argument('--native-receipt', type=Path, required=True)
+    ap.add_argument('--native-receipt-sha256', required=True)
+    ap.add_argument('--expected-source-review-sha256', required=True)
+    ap.add_argument('--output', type=Path, default=c.DEFAULT_OUT)
+    a = ap.parse_args()
+    out = c.output_path(a.output)
+    review = source_review(a.expected_source_review_sha256)
+    c.need(not out.exists(), 'Fresh exclusive Native60 layout')
+    c.need(shutil.disk_usage(c.ROOT).free >= c.MIN_FREE, '6GiB initial staging reserve')
+    receipt = a.native_receipt.absolute()
+    c.need(receipt == RESUME_ROOT/'final-receipt.json' and a.native_receipt_sha256 == RESUME_RECEIPT,
+           'Exact actual native-resume receipt route/hash')
+    pins = {str(c.BASE/'inputs.json'):BASE_INPUT, str(c.BASE/'signed-build-receipt.json'):BASE_SIGNED,
+            str(c.BASE/'app-file-hashes.json'):BASE_FILES, str(receipt):a.native_receipt_sha256,
+            str(review):a.expected_source_review_sha256}
+    c.replay(pins)
+    old = c.read(c.BASE/'inputs.json'); signed = c.read(c.BASE/'signed-build-receipt.json')
+    c.need(old['buildVersion'] == 59 and signed['appBuild'] == '59' and
+           signed['schemaVersion'] == 3 and signed['status'] == 'built_signed_verified_not_installed' and
+           signed['bundleID'] == c.BUNDLE and signed['team'] == c.TEAM and
+           signed['deepStrictCodesignVerified'] is True and signed['dsymUuidMatches'] is True,
+           'Exact signed59 rollback baseline')
+    c.need(c.inventory(Path(signed['app'])) == c.read(c.BASE/'app-file-hashes.json'),
+           'Full signed59 rollback unchanged')
+    c.need(c.inventory(c.BASE/'layout') == old['sourceFiles'] and len(old['sourceFiles']) == 7480,
+           'Full physical prepared59 source layout')
+    q = c.read(receipt); frozen = RESUME_ROOT/'resume-source-freeze.json'
+    c.need(c.sha(frozen) == q['sourceFreezeSha256'] == RESUME_FREEZE, 'Exact actual resume freeze')
+    plan = c.read(frozen); producer_contract(q, plan)
+    c.merge(pins, {str(frozen):q['sourceFreezeSha256']})
+    c.merge(pins, q['inputHashes']); c.merge(pins, q['outputHashes'])
+    c.merge(pins, q['actualNativeDependencies'])
+    for path in (RESUME_ROOT/'commands').glob('*-command.json'):
+        row = c.read(path)
+        c.need(row.get('ownedChildReaped') is True and row.get('actualExitCode') == 0 and
+               'error' not in row and str(path) in q['outputHashes'], 'Actual native command joined')
+    c.need(len(list((RESUME_ROOT/'commands').glob('*-command.json'))) == 104,
+           'All native100 compile/preprocess plus four archive/symbol commands')
+    replacements = selected_replacements(old, q)
+    c.merge(pins, {str(path):digest for path, digest in replacements.values()})
+    for name in ('host-entitlements.stdout','helper-entitlements.stdout','host-profile.stdout','helper-profile.stdout'):
+        c.merge(pins, {str(c.BASE/name):c.sha(c.BASE/name)})
+    beforedeps = c.BASE/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/Madeira.build/Objects-normal/arm64/FEXBridge.d'
+    c.merge(pins, {str(beforedeps):c.sha(beforedeps)})
+    c.replay(pins)
+    out.mkdir(); result = {'status':'failed_native60_preparation', 'deviceActions':False}
+    try:
+        c.command(out, 'rollback-codesign-verify', ['/usr/bin/codesign','--verify','--deep','--strict',signed['app']])
+        layout = out/'layout'
+        for name, digest in old['sourceFiles'].items():
+            c.space(); dst = layout/relative(name); dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(c.BASE/'layout'/name, dst); c.need(c.sha(dst) == digest, 'Exact copied59 member')
+        for name, (path, digest) in replacements.items():
+            shutil.copy2(path, layout/name); c.need(c.sha(layout/name) == digest, 'Exact candidate replacement')
+        files = c.inventory(layout)
+        c.need(set(files) == set(old['sourceFiles']) and
+               {name for name in files if files[name] != old['sourceFiles'][name]} == set(replacements),
+               'Only three sources/Core archive/EC DLL changed')
+        embedded = dict(old['embeddedPEComponents'])
+        embedded['xtajit64.dll'] = c.pe_component(out, 'prepared-new-ec', layout/'Madeira/app/Madeira/arm64ec-windows/xtajit64.dll')
+        copied = dict(old)
+        copied.update(status='isolated_native60_inputs_verified', buildVersion=60,
+            atUtc=datetime.datetime.now(datetime.timezone.utc).isoformat(), source=str(layout), sourceFiles=files,
+            physicalFexSourceRoute=str(layout/'Madeira/FEX'), providerInputs=pins, recipeInputs=c.recipe_inputs(),
+            packagingSourceReviewSha256=a.expected_source_review_sha256, changedBaselineLayoutFiles=sorted(replacements),
+            native59RollbackSigningReceiptSha256=BASE_SIGNED, native59RollbackApp=signed['app'],
+            native59RollbackAppClosureSha256=BASE_FILES, nativeECContinuationReceiptSha256=a.native_receipt_sha256,
+            nativeECContinuationSourceFreezeSha256=q['sourceFreezeSha256'],
+            predecessorNativeFexDecisionReceiptSha256=old['nativeFexDecisionReceiptSha256'],
+            predecessorJitProducerReceiptSha256=old['jitProducerReceiptSha256'],
+            nativeFexDecisionReceiptSha256=a.native_receipt_sha256,
+            jitProducerReceiptSha256=a.native_receipt_sha256,
+            actualFrameOffsetRecords=q['frameOffsetRecords'], sourceVersion=q['sourceVersion'],
+            retainedNativeVersionMetadata=q['retainedNativeVersionMetadata'],
+            freshNativeFexObjectCount=50, freshNativeFexArchiveCount=1, reusedNativeFexArchiveCount=6,
+            embeddedPEComponents=embedded, freshNativeWineObjectCount=0, reusedNativeWineArchiveCount=2,
+            reusedPEComponentNames=[name for name in old['reusedPEComponentNames'] if name != 'xtajit64.dll'],
+            changedPEComponentNames=['xtajit64.dll'],
+            appCoreStateBaselineDependencyFile=str(beforedeps), appCoreStateConsumersRequired=['FEXBridge'],
+            externalFexArchives={str(layout/Path(path).relative_to(c.BASE/'layout')):
+                files[str(Path(path).relative_to(c.BASE/'layout'))] for path in old['externalFexArchives']},
+            diagnosticOnly=False, optionalOwnershipSamplerRetained=True, installed=False, runtimeAccepted=False)
+        c.replay(pins); c.put(out/'inputs.json', copied)
+        result.update(status='native60_prepared_not_built_signed_or_installed',
+                      inputReceiptSha256=c.sha(out/'inputs.json'), layoutMaterialized=True)
+    except BaseException as error: result['error'] = type(error).__name__+': '+str(error); raise
+    finally: c.put(out/'preparation-receipt.json', result)
+    print(json.dumps(result, indent=2))
+
+if __name__ == '__main__': main()

@@ -38,10 +38,11 @@ Actual native CoreState size was 3904 before and after the candidate; the new
 does not establish the Windows target layout. The production rebuild's first
 attempt failed the unchanged CPUID version-length assertion; the separately
 reviewed attempt uses a shorter identity with the same exact patch hash.
-Production ARM64EC offsets, 187 fresh PE objects, 50 native CoreState consumers,
-the nine retained current members, imports/exports and fresh app consumers remain
-gates. Production build, device execution and CPU acceptance are pending at this
-checkpoint. A production build alone would still not establish runtime success.
+At that historical checkpoint, ARM64EC offsets, 187 fresh PE objects, 50 native
+CoreState consumers, nine retained current members and imports/exports remained
+gates. The subsequent local production results are recorded below. Fresh app
+consumers, signing/device execution and CPU acceptance remain pending; local
+producer success does not establish runtime success.
 
 Run the small portable source-preservation controls from the repository root:
 
@@ -99,3 +100,37 @@ postcondition requiring an extra import stopped that attempt; its failure is
 retained while a reviewed resume qualifies the unchanged imports and the
 native-archive tail. This is not a signed or device-executed runtime.
 [Build observation](../../docs/evidence/native-ec-continuation-build-checkpoint-20261012.json).
+
+The additive resume snapshots preserve the exact import-contract correction and
+unchanged native50+9 tail. A later narrow successor records only the known
+terminal parent's stdout capture after the parent writer exited: the producer
+recorded that log before its final output flushed. It retains the immutable
+failed receipt/output map and rejects every other provider drift. The terminal
+record, captured bytes and local filesystem identities are deliberately absent
+from this public checkpoint. This does not retroactively seal the producer log.
+That source-only resume observation is historical; the subsequent native
+continuation result is recorded below. Application packaging remains pending.
+
+The actual native continuation subsequently passed: 104 owned compiler/archive
+commands joined; 50 fresh native CoreState consumers and nine byte-verified
+current members produced the ordered Core archive, with six other archives
+retained. Complete provider/freeze replay and global symbol contracts passed.
+The combined local result therefore supplies the actual 187-object EC DLL,
+target ABI probes and matching native Core archive. Its actual frame size is
+3904 on both old/new target probes; all old offsets remain equal. This is local
+producer qualification only. Application packaging/signing, installation,
+Original50/full803/eight phases, causal attribution and gameplay remain pending.
+[Native producer observation](../../docs/evidence/native-ec-continuation-native-build-20261012.json).
+
+The additive `*-native60.snapshot` files preserve the isolated prepare/run/finish
+packaging implementation and its 16 source/temp controls. `common60` replaces
+only the local user's literal toolchain location with an explicit placeholder;
+the manifest binds the original source digest. Other snapshots are exact copies.
+The root subsequently prepared the complete physical signed59 layout with only
+the three candidate FEX sources, Core archive and EC DLL changed. A fresh native
+application build is still pending at this checkpoint; no signed, installed or
+CPU-pass claim follows from these snapshots. The final packaging gate requires
+the actual new FEXBridge object/dependencies and complete header byte route, all
+nine archive resolutions, retained PE helpers/profiles and Native59 rollback.
+No source-review maps, Apple profile inventory, device state or private data is
+published. These remain preservation snapshots, not fresh-clone build commands.

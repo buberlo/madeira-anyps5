@@ -1,0 +1,167 @@
+diff --git a/core/libs/prx/libc/src/exception/Unwind.cpp b/core/libs/prx/libc/src/exception/Unwind.cpp
+index b958b18..cb98020 100644
+--- a/core/libs/prx/libc/src/exception/Unwind.cpp
++++ b/core/libs/prx/libc/src/exception/Unwind.cpp
+@@ -4,8 +4,10 @@
+ 
+ #ifdef _WIN32
+ #include <windows.h>
++#include "RawLogOutput.hpp"
+ #include <algorithm>
+ #include <array>
++#include <atomic>
+ #include <map>
+ #include <mutex>
+ #include <utility>
+@@ -188,6 +190,89 @@ const FrameIndex& IndexFrames(const ImageKey& key, const Byte* begin, const Byte
+     std::sort(index.begin(), index.end());
+     return index;
+ }
++
++// Diagnostic only: bounded raw output, with no CRT stream, allocation or unwind.
++// Preserve the normal failure and LastError; no native frame is admitted here.
++void NoteDecodeFrameMiss(Word pc, void* image, const char* reason,
++                         const IMAGE_NT_HEADERS64* nt = nullptr) noexcept {
++    const DWORD savedError = GetLastError();
++    char enabled[2] {};
++    if (GetEnvironmentVariableA("APS5_UNWIND_MISS_TRACE", enabled, sizeof(enabled)) != 1 || enabled[0] != '1') {
++        SetLastError(savedError);
++        return;
++    }
++    static std::atomic<unsigned> records {0};
++    unsigned record = records.load(std::memory_order_relaxed);
++    do {
++        if (record >= 8) {
++            SetLastError(savedError);
++            return;
++        }
++    } while (!records.compare_exchange_weak(record, record + 1, std::memory_order_relaxed));
++
++    char output[1024] {};
++    std::size_t used = 0;
++    const auto character = [&](char value) {
++        if (used < sizeof(output)) output[used++] = value;
++    };
++    const auto text = [&](const char* value) {
++        while (*value && used < sizeof(output)) character(*value++);
++    };
++    const auto hex = [&](Word value, unsigned digits) {
++        constexpr char alphabet[] = "0123456789abcdef";
++        for (unsigned n = digits; n; --n) character(alphabet[(value >> ((n - 1) * 4)) & 15]);
++    };
++    char module[384] {};
++    DWORD moduleSize = image ? GetModuleFileNameA(static_cast<HMODULE>(image), module, sizeof(module)) : 0;
++    if (moduleSize >= sizeof(module)) moduleSize = sizeof(module) - 1;
++    bool ehfram = false, ehmeta = false, pdata = false, xdata = false;
++    if (nt) {
++        const auto* base = static_cast<const Byte*>(image);
++        const auto* sections = IMAGE_FIRST_SECTION(nt);
++        const Word sectionOffset = reinterpret_cast<const Byte*>(sections) - base;
++        const unsigned count = nt->FileHeader.NumberOfSections;
++        if (count <= 96 && sectionOffset <= nt->OptionalHeader.SizeOfImage &&
++            count <= (nt->OptionalHeader.SizeOfImage - sectionOffset) / sizeof(*sections)) {
++            for (unsigned n = 0; n < count; ++n) {
++                ehfram |= std::memcmp(sections[n].Name, ".ehfram", 8) == 0;
++                ehmeta |= std::memcmp(sections[n].Name, ".ehmeta", 8) == 0;
++                pdata |= std::memcmp(sections[n].Name, ".pdata", 7) == 0;
++                xdata |= std::memcmp(sections[n].Name, ".xdata", 7) == 0;
++            }
++        }
++    }
++    DWORD64 nativeBase = 0;
++    const auto* native = RtlLookupFunctionEntry(pc, &nativeBase, nullptr);
++    unsigned nativeVersion = 0xff, nativeFlags = 0xff;
++    if (native && nt && nativeBase == reinterpret_cast<Word>(image) &&
++        native->UnwindData < nt->OptionalHeader.SizeOfImage) {
++        const Byte first = static_cast<const Byte*>(image)[native->UnwindData];
++        nativeVersion = first & 7;
++        nativeFlags = first >> 3;
++    }
++    text("[libc-unwind-miss] pc="); hex(pc, 16);
++    text(" image="); hex(reinterpret_cast<Word>(image), 16);
++    text(" module=\"");
++    for (DWORD n = 0; n < moduleSize; ++n) {
++        const unsigned char value = module[n];
++        character(value < 32 || value == 127 || value == '"' ? '?' : static_cast<char>(value));
++    }
++    text("\" reason="); text(reason);
++    text(" ehfram="); character(ehfram ? '1' : '0');
++    text(" ehmeta="); character(ehmeta ? '1' : '0');
++    text(" pdata="); character(pdata ? '1' : '0');
++    text(" xdata="); character(xdata ? '1' : '0');
++    text(" native_base="); hex(nativeBase, 16);
++    text(" native_begin="); hex(native ? native->BeginAddress : 0, 8);
++    text(" native_end="); hex(native ? native->EndAddress : 0, 8);
++    text(" native_unwind="); hex(native ? native->UnwindData : 0, 8);
++    text(" native_version="); hex(nativeVersion, 2);
++    text(" native_flags="); hex(nativeFlags, 2);
++    character('\n');
++    LibcException::RawLogOutput::StderrWriter write;
++    (void)write(output, used); // One best-effort raw write, at most eight records.
++    SetLastError(savedError);
++}
+ #endif
+ 
+ bool DecodeFrame(_Unwind_Context& context, Frame& frame) {
+@@ -221,19 +306,31 @@ bool DecodeFrame(_Unwind_Context& context, Frame& frame) {
+     return DecodeCandidate(context, frame, query);
+ #else
+     void* image = nullptr;
+-    if (!RtlPcToFileHeader(reinterpret_cast<void*>(query.pc), &image) || !image) return false;
++    if (!RtlPcToFileHeader(reinterpret_cast<void*>(query.pc), &image) || !image) {
++        NoteDecodeFrameMiss(query.pc, nullptr, "no-image");
++        return false;
++    }
+     const auto* base = static_cast<const Byte*>(image);
+     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) return false;
++    if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
++        NoteDecodeFrameMiss(query.pc, image, "invalid-dos");
++        return false;
++    }
+     const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+-    if (nt->Signature != IMAGE_NT_SIGNATURE) return false;
++    if (nt->Signature != IMAGE_NT_SIGNATURE) {
++        NoteDecodeFrameMiss(query.pc, image, "invalid-nt");
++        return false;
++    }
+     const auto* sections = IMAGE_FIRST_SECTION(nt);
+     for (unsigned i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
+         const auto& section = sections[i];
+         if (std::memcmp(section.Name, ".ehmeta", 8) == 0) {
+             const Byte* metadata = base + section.VirtualAddress;
+             const Byte* header = base + Read<std::uint32_t>(metadata);
+-            if (header[0] != 1 || header[3] == 255) return false;
++            if (header[0] != 1 || header[3] == 255) {
++                NoteDecodeFrameMiss(query.pc, image, "invalid-ehmeta", nt);
++                return false;
++            }
+             const Byte* p = header + 4;
+             Encoded(p, header[1], Word(header));
+             const Word count = Encoded(p, header[2]);
+@@ -246,10 +343,15 @@ bool DecodeFrame(_Unwind_Context& context, Frame& frame) {
+                 if (Encoded(p, header[3], Word(header)) <= query.pc) lo = mid + 1;
+                 else hi = mid;
+             }
+-            if (!lo) return false;
++            if (!lo) {
++                NoteDecodeFrameMiss(query.pc, image, "ehmeta-no-candidate", nt);
++                return false;
++            }
+             p = table + (lo - 1) * width * 2 + width;
+             query.fde = reinterpret_cast<const Byte*>(Encoded(p, header[3], Word(header)));
+-            return DecodeCandidate(context, frame, query);
++            const bool decoded = DecodeCandidate(context, frame, query);
++            if (!decoded) NoteDecodeFrameMiss(query.pc, image, "ehmeta-rejected", nt);
++            return decoded;
+         }
+         if (std::memcmp(section.Name, ".ehfram", 8) != 0) continue;
+         const Byte* frames = base + section.VirtualAddress;
+@@ -261,6 +363,7 @@ bool DecodeFrame(_Unwind_Context& context, Frame& frame) {
+         frame = {};
+         if (DecodeCandidate(context, frame, query)) return true;
+     }
++    NoteDecodeFrameMiss(query.pc, image, "no-dwarf-fde", nt);
+     return false;
+ #endif
+ }

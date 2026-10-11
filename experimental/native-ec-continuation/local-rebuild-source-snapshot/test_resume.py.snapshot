@@ -1,0 +1,78 @@
+from pathlib import Path
+import copy
+import hashlib
+import importlib.util
+import json
+import tempfile
+import unittest
+
+HERE=Path(__file__).resolve().parent
+s=importlib.util.spec_from_file_location('resume_gates',HERE/'resume.py');r=importlib.util.module_from_spec(s);s.loader.exec_module(r)
+
+def imports(existing=False):
+    return 'Import {\n Name: ntdll.dll\n Symbol: A (1)\n'+(' Symbol: RtlIsEcCode (2)\n' if existing else '')+'}\n'+''.join('Import {\n Name: d%d.dll\n Symbol: A (1)\n}\n'%i for i in range(11))
+
+class Resume(unittest.TestCase):
+    def test_actual_completed_producer_contract(self):
+        q,f=r.exact_failed();objects,frames,mode=r.completed_pe(q,f)
+        self.assertEqual(len(objects),187);self.assertEqual(frames[0],frames[1][:4])
+        self.assertEqual(mode,'exact_existing_RtlIsEcCode')
+
+    def test_existing_ec_exact_equality(self):
+        old=imports(True);self.assertEqual(r.import_contract(old,old),'exact_existing_RtlIsEcCode')
+
+    def test_only_missing_required_ec_added(self):
+        old=imports();self.assertEqual(r.import_contract(old,imports(True)),'only_required_RtlIsEcCode_added')
+
+    def test_no_required_ec_without_addition_refuses(self):
+        with self.assertRaises(ValueError):r.import_contract(imports(),imports())
+
+    def test_existing_ec_deleted_refuses(self):
+        with self.assertRaises(ValueError):r.import_contract(imports(True),imports())
+
+    def test_other_new_symbol_refuses(self):
+        with self.assertRaises(ValueError):r.import_contract(imports(),imports(True).replace('Symbol: A (1)','Symbol: A (1)\n Symbol: Other (3)',1))
+
+    def test_existing_ec_hint_or_other_dll_change_refuses(self):
+        old=imports(True)
+        for new in [old.replace('RtlIsEcCode (2)','RtlIsEcCode (3)'),old.replace('d10.dll','unexpected.dll')]:
+            with self.assertRaises(ValueError):r.import_contract(old,new)
+
+    def test_missing_object_and_wrong_origin_refuse(self):
+        q,f=r.exact_failed();changed=copy.deepcopy(q)
+        key=next(k for k in changed['outputHashes'] if '/arm64ec/build/' in k and k.endswith('.obj'))
+        del changed['outputHashes'][key]
+        with self.assertRaisesRegex(ValueError,'187'):r.completed_pe(changed,f)
+        f=copy.deepcopy(f);f['sourceReviewSha256']='0'*64
+        with self.assertRaisesRegex(ValueError,'origin'):r.completed_pe(q,f)
+
+    def test_failed_or_unjoined_command_refuses(self):
+        for row in [{'ownedChildReaped':False,'actualExitCode':0},{'ownedChildReaped':True,'actualExitCode':1},{'ownedChildReaped':True,'actualExitCode':0,'error':'late'}]:
+            with self.assertRaises(ValueError):r.joined(row)
+
+    def test_fd_hash_and_fingerprint_drift_refuse(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/'provider';p.write_bytes(b'exact');name=str(p);stamps={name:r.p.stamp(p)}
+            r.replay({name:hashlib.sha256(b'exact').hexdigest()},stamps)
+            with self.assertRaises(ValueError):r.replay({name:'0'*64},stamps)
+            p.write_bytes(b'changed')
+            with self.assertRaises(ValueError):r.replay({name:hashlib.sha256(b'exact').hexdigest()},stamps)
+
+    def test_complete_closure_and_recipe_omission_refuse(self):
+        inputs={'source':'a','object':'b'};f={'sourceFiles':{'one':'c'}};recipe={'nativeCommands':[1]}
+        plan={'inputHashes':inputs.copy(),'inputFingerprints':{k:{} for k in inputs},'compiledSourceFreeze':f,'recipe':recipe,
+              'failedReceiptSha256':r.FAILED_SHA,'failedFreezeSha256':r.FREEZE_SHA}
+        r.validate_plan_closure(plan,{},f,inputs,recipe)
+        for field in ['inputHashes','inputFingerprints','recipe']:
+            changed=copy.deepcopy(plan);changed[field]={}
+            with self.assertRaises(ValueError):r.validate_plan_closure(changed,{},f,inputs,recipe)
+
+    def test_exact_native_tail_and_no_pe_recompile(self):
+        old=(r.OLD/'build_production.py').read_text();first=old.index("  native=out/'native';native.mkdir();deps={};fresh={}");last=old.index("  replay();need(all(json.loads",first)
+        self.assertEqual((HERE/'native_tail.py.inc').read_text(),old[first:last])
+        recipe=r.native_recipe();self.assertEqual(len(recipe['nativeCommands']),50);self.assertEqual(len(recipe['retainedFexCoreMembers']),9)
+        self.assertTrue(all(str(r.OUT/'native') in ' '.join(row['compile']) for row in recipe['nativeCommands']))
+        for row in recipe['nativeCommands']:self.assertIn(str(r.FAILED/'source'), ' '.join(row['compile']))
+        self.assertNotIn("command('full187'",(HERE/'resume.py').read_text())
+
+if __name__=='__main__':unittest.main()

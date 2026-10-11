@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Explicit root-only Xcode build; no execution on import/default."""
+import argparse, json
+from pathlib import Path
+import importlib.util
+_common = importlib.util.spec_from_file_location('native60_packaging_common', Path(__file__).resolve().parent/'common60.py')
+c = importlib.util.module_from_spec(_common)
+_common.loader.exec_module(c)
+
+def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--build',action='store_true',required=True)
+    ap.add_argument('--output',type=Path,default=c.DEFAULT_OUT);ap.add_argument('--expected-input-sha256',required=True);a=ap.parse_args()
+    out=c.output_path(a.output); c.need(not (out/'DerivedData').exists() and not (out/'xcodebuild-result.json').exists(),'Fresh derived build')
+    c.need(c.shutil.disk_usage(c.ROOT).free>=c.MIN_FREE,'6GiB initial build reserve')
+    inputs=c.verify_inputs(out,a.expected_input_sha256)
+    record={'status':'failed_native60_build_not_signed_accepted','inputReceiptSha256':a.expected_input_sha256,'installed':False,'deviceActions':False}
+    try:
+        c.command(out,'xcodebuild',c.planned_argv(out),timeout=1800)
+        cmd=c.read(out/'xcodebuild-command.json');text=(out/'xcodebuild.stdout').read_text(errors='replace')+(out/'xcodebuild.stderr').read_text(errors='replace')
+        c.need('** BUILD SUCCEEDED **' in text and cmd['exitCode']==0,'Actual Xcode success')
+        c.verify_inputs(out,a.expected_input_sha256)
+        record.update(status='native60_xcodebuild_pass_pending_signature_verification',exitCode=0,commandSha256=c.sha(out/'xcodebuild-command.json'),outputHashes=cmd['outputs'])
+    except BaseException as e:record['error']=type(e).__name__+': '+str(e);raise
+    finally:c.put(out/'xcodebuild-result.json',record)
+    print(json.dumps(record,indent=2))
+
+if __name__=='__main__':main()

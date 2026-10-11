@@ -1,0 +1,69 @@
+{
+  "capturedLogsIncluded": false,
+  "files": {
+    "README.md": {
+      "bytes": 4178,
+      "sha256": "442364edf4f7f1db980902570503448c099897a89240bd589067604cad2e1391"
+    },
+    "snapshot/attempt2/bounded_local_process.py": {
+      "bytes": 7486,
+      "sha256": "ccc02bafc5e57b55df3208905d849b34427211aca5b21938a7cf8e07b64a33f6"
+    },
+    "snapshot/attempt2/prepare.py": {
+      "bytes": 4174,
+      "sha256": "632e11f9793dde2b0bd9d65d19ba1129be5781ff16224664196790a3d9c55ebc"
+    },
+    "snapshot/attempt2/run.py": {
+      "bytes": 12141,
+      "sha256": "717fb9edf65a428eb70dd78cb2bd10d0a78148819de104d769cfe5ae6a1ed410"
+    },
+    "snapshot/attempt2/test_bounded_local_process.py": {
+      "bytes": 5654,
+      "sha256": "fcd4aa3e9cec0459f0afc1405c7a277081f2618b542f9142089533b167969399"
+    },
+    "snapshot/attempt2/test_runner.py": {
+      "bytes": 8824,
+      "sha256": "12fa006a29d00eabd4622331e100cd5ec6b9392daa407da1665e6a52c7681973"
+    },
+    "snapshot/make-recipe.py": {
+      "bytes": 9241,
+      "sha256": "b401cf8562da054b6b0bb88056e173626a5c84c2475c0e61a3bd26d3bada1c32"
+    },
+    "snapshot/prepare.py": {
+      "bytes": 3392,
+      "sha256": "1e1a41b76de00903cfda5dc06b666ebedb3248370bca325710b776412d0907ea"
+    },
+    "snapshot/run.py": {
+      "bytes": 11348,
+      "sha256": "be9a2abf3812f1db0c06848034bbe379d91a9187ee1bcd4aecf00e488a3268ca"
+    },
+    "snapshot/test_runner.py": {
+      "bytes": 6574,
+      "sha256": "3c266bd1533ec33ac44cce71ae3e2c58dec8927e5fcb69863292ab7c8de6ecd6"
+    },
+    "source/RawLogOutput.hpp": {
+      "bytes": 3030,
+      "sha256": "84ce75f75564af42c0735e6d0cee3d73f0f22523bd8622be4568a0af84ce01ac"
+    },
+    "source/Unwind.before.cpp": {
+      "bytes": 27846,
+      "sha256": "9b04e81399cbb2dc74271df69663cc9bc22dc726740c61b48f10f790912e6852"
+    },
+    "source/Unwind.cpp": {
+      "bytes": 32556,
+      "sha256": "f06af55ef2c58b24ebfa7cdbc19cf3ba26c7ca3e1c7dbd461d6154fec4b19d6c"
+    },
+    "test_checkpoint.py": {
+      "bytes": 2240,
+      "sha256": "32321376151c50ed29fea88202f0fdf7dc98f23ce04b285cd43df8b909225b52"
+    },
+    "trace.patch": {
+      "bytes": 7795,
+      "sha256": "a899b1090498daf8d6bbd610a1a98e593c519c041abc4c144616bf4c233755b5"
+    }
+  },
+  "hardwareExecuted": false,
+  "privateInputInventoriesIncluded": false,
+  "schema": 1,
+  "status": "experimental_source_preservation_only_no_runtime_repair"
+}

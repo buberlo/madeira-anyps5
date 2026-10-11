@@ -1,0 +1,59 @@
+"""Source-only terminal-capture seal; never freeze or execute the native build."""
+from pathlib import Path
+import importlib.util
+import json
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+PREVIOUS = HERE.parent/'native-ec-loop-top-continuation-resume-native-proposal-20261012'
+PREVIOUS_SHA = '05dfd4c185b222e8b101377b401952b3593c42e76f91a97e5b5709fa88ee8a2c'
+s = importlib.util.spec_from_file_location('terminal_source_review', HERE/'resume.py')
+r = importlib.util.module_from_spec(s)
+s.loader.exec_module(r)
+
+def make():
+    output = HERE/'source-review-freeze.json'
+    if output.exists(): raise FileExistsError(output)
+    previous = PREVIOUS/'source-review-freeze.json'
+    r.need(r.p.sha(previous) == PREVIOUS_SHA, 'Exact historical resume source review')
+    q, f = r.exact_failed()
+    objects, frames, mode = r.completed_pe(q, f)
+    adopted = r.terminal.adopt(q, r.FAILED)
+    terminal_name = str(r.FAILED/'root-execution.log')
+    r.need({name for name in adopted if adopted[name] != q['outputHashes'][name]} == {terminal_name},
+           'Exactly one terminal-parent capture row')
+    run = subprocess.run([sys.executable, '-I', '-B', '-m', 'unittest', 'discover',
+                          '-s', str(HERE), '-p', 'test_*.py', '-v'],
+                         capture_output=True, timeout=30)
+    (HERE/'offline-tests.log').write_bytes(run.stdout + run.stderr)
+    r.need(run.returncode == 0 and b'Ran 16 tests' in run.stderr,
+           'All retained and terminal-capture controls passed')
+    inputs = dict(json.loads(previous.read_text())['inputHashes'])
+    r.p.merge(inputs, {str(previous): PREVIOUS_SHA, terminal_name: adopted[terminal_name]})
+    for path in HERE.rglob('*'):
+        if path.is_file() and path != output:
+            r.p.merge(inputs, {str(path): r.p.sha(path)})
+    stamps = {name: r.p.stamp(name) for name in inputs}
+    r.replay(inputs, stamps)
+    r.need(r.terminal.adopt(q, r.FAILED) == adopted, 'Final exact terminal-parent capture')
+    r.need((HERE/'native_tail.py.inc').read_bytes() == (PREVIOUS/'native_tail.py.inc').read_bytes(),
+           'Native tail byte-identical')
+    result = {
+        'status': 'source_only_exact_terminal_parent_capture_completed187_PE_native_resume_not_executed',
+        'inputHashes': inputs, 'inputFingerprints': stamps, 'pureControlsPassed': 16,
+        'historicalResumeReviewSha256': PREVIOUS_SHA,
+        'failedReceiptSha256': r.FAILED_SHA, 'failedFreezeSha256': r.FREEZE_SHA,
+        'completedArm64ecObjectCount': len(objects), 'actualTargetFrameRecords': frames,
+        'actualImportMode': mode, 'terminalCaptureRecord':
+            json.loads((HERE/'terminal-parent-log-capture.json').read_text()),
+        'producerMapModified': False, 'terminalCaptureIsProducerSealedOutput': False,
+        'onlyNamedTerminalCaptureException': True, 'nativeTailByteIdentical': True,
+        'peRecompilePlanned': False, 'native50Plus9Pending': True,
+        'productionContinuationExecuted': False, 'deviceExecuted': False,
+        'runtimeAccepted': False,
+    }
+    output.write_text(json.dumps(result, indent=2)+'\n')
+    print(json.dumps({'path': str(output), 'sha256': r.p.sha(output), 'inputs': len(inputs)}))
+
+if __name__ == '__main__': make()

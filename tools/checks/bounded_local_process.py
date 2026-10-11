@@ -46,7 +46,8 @@ async def _run(argv, *, cwd, env, stdout, stderr, timeout, stream_maximum,
     started = time.monotonic()
     try:
         guard()
-        handles = [p.open('xb') for p in streams]
+        for path in streams:
+            handles.append(path.open('xb'))
         child = await asyncio.create_subprocess_exec(*map(str, argv), cwd=cwd, env=env,
                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                     start_new_session=True)
@@ -118,7 +119,10 @@ async def _run(argv, *, cwd, env, stdout, stderr, timeout, stream_maximum,
             if not result['groupAbsent']:
                 result['cleanupErrors'].append('owned process group still exists')
         for handle in handles:
-            handle.close()
+            try:
+                handle.close()
+            except OSError as caught:
+                result['cleanupErrors'].append('capture close: ' + repr(caught))
         result['elapsedSeconds'] = time.monotonic() - started
         result['captureComplete'] = bool(error is None and result['directChildJoined']
             and result['groupAbsent'] and result['streamsJoined']

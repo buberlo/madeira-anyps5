@@ -1,0 +1,40 @@
+"""One named outer capture exception; all producer maps remain immutable."""
+from pathlib import Path
+import hashlib
+import json
+import os
+import stat
+
+HERE=Path(__file__).resolve().parent
+FAILED_SHA='4fbc87f261a46a48d753917b7187cbde2811ccf9b2fc0844ead02592f26689a0'
+EMPTY='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+def need(v, message):
+    if not v:raise ValueError(message)
+
+def stamp(s):return [s.st_dev,s.st_ino,s.st_mode,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns]
+
+def adopted_outputs(q, root, record):
+    path=Path(root)/'root-execution.log';name=str(path)
+    need(record['schemaVersion']==1 and record['status']=='terminal_parent_owned_outer_stdout_observed_after_reported_writer_exit_not_producer_sealed_output', 'Typed terminal parent capture')
+    need(record['failedReceiptSha256']==FAILED_SHA and record['parentWriterReportedTerminal'] is True,'Exact terminal failure origin')
+    need(record['path']==name and q['outputHashes'].get(name)==EMPTY and record['producerRecordedSha256']==EMPTY,'Only exact originally empty outer log')
+    need(name not in q['inputHashes'],'Outer capture cannot replace an input provider')
+    before=path.lstat()
+    need(path.resolve(strict=True)==path and stat.S_ISREG(before.st_mode) and before.st_nlink==1,
+         'Exact canonical single-link outer log')
+    need(stamp(before)==record['stableLocalStat'] and before.st_size==record['bytes'] and 0<before.st_size<=1<<20,
+         'Exact finite saved terminal capture identity')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    h=hashlib.sha256()
+    with os.fdopen(fd,'rb') as stream:
+        need(stamp(os.fstat(stream.fileno()))==stamp(before),'Exact opened outer log')
+        for block in iter(lambda:stream.read(1<<16),b''):h.update(block)
+        need(stamp(os.fstat(stream.fileno()))==stamp(before),'Opened outer log changed')
+    need(h.hexdigest()==record['sha256'] and stamp(path.lstat())==stamp(before),'Terminal outer log bytes/final identity')
+    result=dict(q['outputHashes']);result[name]=record['sha256']
+    need({key for key in result if result[key]!=q['outputHashes'][key]}=={name},'Exactly one named capture replacement')
+    return result
+
+def adopt(q, root):
+    return adopted_outputs(q,root,json.loads((HERE/'terminal-parent-log-capture.json').read_text()))

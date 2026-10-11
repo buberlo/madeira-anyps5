@@ -1,0 +1,53 @@
+from pathlib import Path
+import copy
+import hashlib
+import importlib.util
+import json
+import tempfile
+import unittest
+
+HERE=Path(__file__).resolve().parent
+s=importlib.util.spec_from_file_location('terminal_capture_controls',HERE/'terminal_log.py');t=importlib.util.module_from_spec(s);s.loader.exec_module(t)
+OLD=HERE.parent/'native-ec-loop-top-continuation-resume-native-proposal-20261012'
+
+class Terminal(unittest.TestCase):
+    def test_actual_terminal_capture_only_one_row(self):
+        record=json.loads((HERE/'terminal-parent-log-capture.json').read_text());root=Path(record['path']).parent
+        q=json.loads((root/'final-receipt.json').read_text());before=copy.deepcopy(q)
+        result=t.adopt(q,root)
+        self.assertEqual(q,before);self.assertEqual(len(result),7291)
+        self.assertEqual({k for k in result if result[k]!=q['outputHashes'][k]},{record['path']})
+        self.assertEqual(record['bytes'],1582)
+
+    def test_wrong_name_old_hash_or_terminal_status_refuses(self):
+        record=json.loads((HERE/'terminal-parent-log-capture.json').read_text());root=Path(record['path']).parent
+        q=json.loads((root/'final-receipt.json').read_text())
+        for key,value in [('path',str(root/'full187.stdout')),('producerRecordedSha256','0'*64),('parentWriterReportedTerminal',False)]:
+            changed=copy.deepcopy(record);changed[key]=value
+            with self.assertRaises(ValueError):t.adopted_outputs(q,root,changed)
+
+    def test_current_digest_stat_and_symlink_refuse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();path=root/'root-execution.log';path.write_bytes(b'closed parent capture')
+            q={'inputHashes':{},'outputHashes':{str(path):t.EMPTY,'unchanged':'a'}}
+            record={'schemaVersion':1,'status':'terminal_parent_owned_outer_stdout_observed_after_reported_writer_exit_not_producer_sealed_output',
+                    'failedReceiptSha256':t.FAILED_SHA,'parentWriterReportedTerminal':True,'path':str(path),
+                    'producerRecordedSha256':t.EMPTY,'stableLocalStat':t.stamp(path.lstat()),'bytes':path.stat().st_size,
+                    'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+            self.assertEqual(t.adopted_outputs(q,root,record)['unchanged'],'a')
+            bad=copy.deepcopy(record);bad['sha256']='0'*64
+            with self.assertRaises(ValueError):t.adopted_outputs(q,root,bad)
+            bad=copy.deepcopy(record);bad['stableLocalStat'][1]+=1
+            with self.assertRaises(ValueError):t.adopted_outputs(q,root,bad)
+            other=root/'other';path.rename(other);path.symlink_to(other)
+            with self.assertRaises(ValueError):t.adopted_outputs(q,root,record)
+
+    def test_only_named_adoption_and_exclusive_output_delta(self):
+        old=(OLD/'resume.py').read_text()
+        expected=old.replace("OUT = ROOT/'build/fex-native-ec-link-preservation-native-resume-20261012'", "OUT = ROOT/'build/fex-native-ec-link-preservation-native-resume-20261012-attempt2'")
+        expected=expected.replace('p, n, u = m.p, m.n, m.u', "p, n, u = m.p, m.n, m.u\nterminal = module(HERE/'terminal_log.py', 'exact_terminal_outer_capture')")
+        expected=expected.replace("inputs=dict(q['inputHashes']);p.merge(inputs,q['outputHashes'])", "inputs=dict(q['inputHashes']);p.merge(inputs,terminal.adopt(q, FAILED))")
+        self.assertEqual((HERE/'resume.py').read_text(),expected)
+        self.assertEqual((HERE/'native_tail.py.inc').read_bytes(),(OLD/'native_tail.py.inc').read_bytes())
+
+if __name__=='__main__':unittest.main()

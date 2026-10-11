@@ -1,4 +1,5 @@
 {
+  "applicationBuiltOrSigned": false,
   "baselineSources": {
     "FEXCore/Source/Interface/Core/Dispatcher/Dispatcher.cpp": "a830784558ee0d6e3ba9f3a27ba6364ec516e7ef29947516dbc883d281248328",
     "FEXCore/include/FEXCore/Core/CoreState.h": "286a1a930b395a45af776c542959fb78956cc552f04ed654e8881f1add50cf70",
@@ -44,6 +45,18 @@
       "byteIdentical": true,
       "sourceSha256": "df8c55020afd2be8125ab7cb71b097318b678ca68d87166ba5530f803307d75f"
     },
+    "local-rebuild-source-snapshot/common60.py-native60.snapshot": {
+      "byteIdentical": false,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "literal local toolchain path replaced with explicit placeholder",
+      "sourceSha256": "3dcdf2be9fb05ab438ea642404d2e66e6a5609b20ed3f8f5d429f2c1dc63d279"
+    },
+    "local-rebuild-source-snapshot/finish60.py-native60.snapshot": {
+      "byteIdentical": true,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "none",
+      "sourceSha256": "ef359ac5c0dbe2ffe354032d6f5a7d4dc5e084723960863de2c4b51e51d28e16"
+    },
     "local-rebuild-source-snapshot/make_recipe.py.snapshot": {
       "byteIdentical": true,
       "sourceSha256": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49"
@@ -52,9 +65,31 @@
       "byteIdentical": true,
       "sourceSha256": "f976613600d6a76c0208c61359d9331631c241c8dce21c61e8b1a8ab15bdaf7c"
     },
+    "local-rebuild-source-snapshot/make_review.py-native60.snapshot": {
+      "byteIdentical": true,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "none",
+      "sourceSha256": "65500abe2264775ee63bcc4bb30c124383247d018ab4666495fed6c0b06576da"
+    },
+    "local-rebuild-source-snapshot/make_review.py-terminal-capture.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "57c2b48318afd7a1a1110ee0044faeed41e50e1cbf2e10977c624dd44280b26d"
+    },
     "local-rebuild-source-snapshot/make_review.py.snapshot": {
       "byteIdentical": false,
       "sourceSha256": "cd50b9b243a227139c0dfab242543562efead82ab51b99a3f9f51d6414b22efe"
+    },
+    "local-rebuild-source-snapshot/native_tail.py.inc.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "0d6f958aefaa5cb5dacaa351a4cf04a4a3f3be2ffb80c7489ad6f80ce21ea48c"
+    },
+    "local-rebuild-source-snapshot/prepare60.py-native60.snapshot": {
+      "byteIdentical": true,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "none",
+      "sourceSha256": "536371fb80d5dd2ec575c264f029a2c6504c1d3ee00280df3f7a8f129ea72fff"
     },
     "local-rebuild-source-snapshot/prepare_production.py-attempt2.snapshot": {
       "byteIdentical": true,
@@ -63,6 +98,27 @@
     "local-rebuild-source-snapshot/prepare_production.py.snapshot": {
       "byteIdentical": true,
       "sourceSha256": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd"
+    },
+    "local-rebuild-source-snapshot/resume.py-terminal-capture.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "c5ea4f961c1845247bd289e13873d07bdf68c3898df225787ce7aa3d72811cff"
+    },
+    "local-rebuild-source-snapshot/resume.py.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "537d1384cf61b019855fe3b864836c37b10bfbb07fa5f510f833c4a37aaac544"
+    },
+    "local-rebuild-source-snapshot/run60.py-native60.snapshot": {
+      "byteIdentical": true,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "none",
+      "sourceSha256": "e3745e19272d9e226e995b40aee65d5c16ee84eecf3adce496f3b71061249891"
+    },
+    "local-rebuild-source-snapshot/terminal_log.py.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "0c64ba47db1b48a0dd93b285f75a9c391d40ea305e65e0303e7782d4dac7ebb0"
     },
     "local-rebuild-source-snapshot/test_build.py.snapshot": {
       "byteIdentical": true,
@@ -75,6 +131,22 @@
     "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": {
       "byteIdentical": true,
       "sourceSha256": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f"
+    },
+    "local-rebuild-source-snapshot/test_native60.py-native60.snapshot": {
+      "byteIdentical": true,
+      "kind": "native60_local_packaging_source_snapshot_not_runnable_without_local_proofs",
+      "sanitization": "none",
+      "sourceSha256": "e81611769a5e43c9027e0c00b48afde65f33a4939713173d8c14c413bdf065e3"
+    },
+    "local-rebuild-source-snapshot/test_resume.py.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "f3f37cb2db012ed6d847c9e9c8a3ec0c0da960dc4f63022f5d622267abead35a"
+    },
+    "local-rebuild-source-snapshot/test_terminal.py.snapshot": {
+      "byteIdentical": true,
+      "kind": "local_source_snapshot_not_runnable_without_private_proof_dependencies",
+      "sourceSha256": "d11985b99930b6fd683b73f18a2435a4bdfa6fa206468077638a010cc3c48c36"
     },
     "native-adapter.hpp": {
       "byteIdentical": true,
@@ -101,7 +173,7 @@
   "faultCauseEstablished": false,
   "fexUpstreamCommit": "14c92681f4d62cf84d901460e0358de09c8847a7",
   "files": {
-    "README.md": "5232fc0ecebcbd928dc89bb0f2d10a7454c08752c96f0f7fc81808ebaff5dbfd",
+    "README.md": "d69e569e9f0c7f7b94bd72f1f1ab0fb96fa6d6840c39b0ec73c45402de8eb7da",
     "candidate.patch": "b5c84c8a7e65785204938e10ac68c9a5e047d2fe045683dee987f4177a385be6",
     "emitter-probe.cpp": "48d0c610ff3c2d87c3443a2e6f140bcaae51ad1536e63ff5c4edd9844a6d2048",
     "extract_harness.py": "85d86b0654ddfb99effd7aad561cfdd1108492b60a0a7e45a99a3e9d86c33580",
@@ -109,14 +181,27 @@
     "frame-offsets.cpp": "a2a541ac21ccd7228dbae6a5c1d5ebe7663722bd722c2f5d00aec0c619d56e0f",
     "local-rebuild-source-snapshot/build_production.py-attempt2.snapshot": "142deac81b71e2663f34ade50efc878b60579053aeb2cdc399b42587a57ff349",
     "local-rebuild-source-snapshot/build_production.py.snapshot": "df8c55020afd2be8125ab7cb71b097318b678ca68d87166ba5530f803307d75f",
+    "local-rebuild-source-snapshot/common60.py-native60.snapshot": "045c8fd608ab882d0dabcbce5fc787a75f976a2818a387a12ae214441c220fe4",
+    "local-rebuild-source-snapshot/finish60.py-native60.snapshot": "ef359ac5c0dbe2ffe354032d6f5a7d4dc5e084723960863de2c4b51e51d28e16",
     "local-rebuild-source-snapshot/make_recipe.py.snapshot": "9aefafd627d029c9a70d7d78f35c2aa3309a38f962cd5b329dc32ab869593f49",
     "local-rebuild-source-snapshot/make_review.py-attempt2.snapshot": "f976613600d6a76c0208c61359d9331631c241c8dce21c61e8b1a8ab15bdaf7c",
+    "local-rebuild-source-snapshot/make_review.py-native60.snapshot": "65500abe2264775ee63bcc4bb30c124383247d018ab4666495fed6c0b06576da",
+    "local-rebuild-source-snapshot/make_review.py-terminal-capture.snapshot": "57c2b48318afd7a1a1110ee0044faeed41e50e1cbf2e10977c624dd44280b26d",
     "local-rebuild-source-snapshot/make_review.py.snapshot": "abc51143a415420dadd28fd2f6c7561871fa03859aafefcd739bf889db15a194",
+    "local-rebuild-source-snapshot/native_tail.py.inc.snapshot": "0d6f958aefaa5cb5dacaa351a4cf04a4a3f3be2ffb80c7489ad6f80ce21ea48c",
+    "local-rebuild-source-snapshot/prepare60.py-native60.snapshot": "536371fb80d5dd2ec575c264f029a2c6504c1d3ee00280df3f7a8f129ea72fff",
     "local-rebuild-source-snapshot/prepare_production.py-attempt2.snapshot": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd",
     "local-rebuild-source-snapshot/prepare_production.py.snapshot": "43410099acc931ed1691f2369cd5466837375ea1a424e2525da5a74202ab84fd",
+    "local-rebuild-source-snapshot/resume.py-terminal-capture.snapshot": "c5ea4f961c1845247bd289e13873d07bdf68c3898df225787ce7aa3d72811cff",
+    "local-rebuild-source-snapshot/resume.py.snapshot": "537d1384cf61b019855fe3b864836c37b10bfbb07fa5f510f833c4a37aaac544",
+    "local-rebuild-source-snapshot/run60.py-native60.snapshot": "e3745e19272d9e226e995b40aee65d5c16ee84eecf3adce496f3b71061249891",
+    "local-rebuild-source-snapshot/terminal_log.py.snapshot": "0c64ba47db1b48a0dd93b285f75a9c391d40ea305e65e0303e7782d4dac7ebb0",
     "local-rebuild-source-snapshot/test_build.py.snapshot": "3b7b0648a0bb3c61ab3c017922a2da8fbbb060a65d9266dd63dc87362b830f93",
     "local-rebuild-source-snapshot/test_extract.py.snapshot": "5cc09debe1eac73f7459fd3486bc7ca5088c624ab2be9045d04c5be082334426",
     "local-rebuild-source-snapshot/test_metadata.py-attempt2.snapshot": "57f92d45b9767d21ae42aa3d96009e156cf999bff463be78edcdc7d4e62aaa6f",
+    "local-rebuild-source-snapshot/test_native60.py-native60.snapshot": "e81611769a5e43c9027e0c00b48afde65f33a4939713173d8c14c413bdf065e3",
+    "local-rebuild-source-snapshot/test_resume.py.snapshot": "f3f37cb2db012ed6d847c9e9c8a3ec0c0da960dc4f63022f5d622267abead35a",
+    "local-rebuild-source-snapshot/test_terminal.py.snapshot": "d11985b99930b6fd683b73f18a2435a4bdfa6fa206468077638a010cc3c48c36",
     "native-adapter.hpp": "e6fed06fc8331e0ce492dad5d613912dcd197440316a9c93c62eb0653036d8ce",
     "native-cases.cpp": "c684ab93b5cdfd41af6379b402293192329f3094396e414ab0afa83915a47df7",
     "native-entry.S": "c61b82000c13ba13fb6897985e1fc32fc2a199cde79d89450f998eebaa8a9c10",
@@ -143,15 +228,54 @@
     "qualificationReceiptSha256": "b31460d5b298d9a831d35e4dcae97f02a6bc3d04c8383fac294ba5d69e3cf5ef",
     "sourceReviewSha256": "88ab7c9591f0bbdb661f1598ba1a8f9e20a8fcd5be00f4042e947846903c2ca1"
   },
+  "historicalSecondProductionAttempt": {
+    "RtlIsEcCodeAlreadyPresent": true,
+    "allImportSymbolsExact": true,
+    "exportsExact": 30,
+    "freshArm64ecObjects": 187,
+    "importDLLSetsExact": 12,
+    "nativeContinuationExecuted": false,
+    "nativeResumeReviewSha256": "05dfd4c185b222e8b101377b401952b3593c42e76f91a97e5b5709fa88ee8a2c",
+    "receiptSha256": "4fbc87f261a46a48d753917b7187cbde2811ccf9b2fc0844ead02592f26689a0",
+    "status": "completed187_and_targetCOFF_then_failed_extra_import_postcondition",
+    "targetCOFFFrameOffsetsQualified": true,
+    "terminalCaptureResumeReviewSha256": "351e4aad9abedced35d31f85be32cdee9db21f614e0ce12637ff8e52a39f8dc8"
+  },
   "localRecipeSnapshotsRunnableFromFreshClone": false,
+  "native60PackagingSourcePreservation": {
+    "actualPreparedInputsSha256": "7517c47921464bf6a41252ac7c1e5e725360b5d07c405c8cb8cfa298d20f5f46",
+    "physicalLayoutPreparedByRoot": true,
+    "runtimeAccepted": false,
+    "signedOrInstalled": false,
+    "sourceReviewSha256": "e773d385f524e81cb3b16346a2006fd562f18f215892c7d940a83141cefbd237",
+    "sourceTempControls": 16,
+    "updatedAnyPS5HlePackaged": false
+  },
+  "nativeContinuationEvidence": {
+    "freshNativeArchives": 1,
+    "freshNativeObjects": 50,
+    "joinedNativeCommands": 104,
+    "nativeContinuationExecuted": true,
+    "newCoreArchiveSha256": "9a0dc89c24c586afa635843b16f9095a18dd22a272d27d7ea710843f0826066f",
+    "newDLLSha256": "e47acaff7211fc1d2dde26b22c5fb7fb0c23f8f14a8ec945e761ef035c8630f5",
+    "orderedCoreMembers": 59,
+    "receiptSha256": "fdbd160c776a110172ecd9dfddc3a50be4c7e65e22bf71b9ded70567ed2e0ae2",
+    "retainedCurrentMembers": 9,
+    "reusedNativeArchives": 6,
+    "runtimeAccepted": false,
+    "signedOrInstalled": false,
+    "sourceFreezeSha256": "57156d21da90f6db968c1f41945738d457746e4e559645e4aca2e044c37428bf"
+  },
+  "nativeProducerBuilt": true,
   "prerequisiteExperimentalFexPatches": [
     "../native59/patches/fex/0004-ios-loop-top-register-reconstruction.patch",
     "../native59/patches/fex/0005-ios-native-critical-suspend.patch"
   ],
   "privateMapsLogsAssetsIncluded": false,
   "productionBuildAccepted": false,
+  "productionNativeBuildQualified": true,
   "publicAddressConstants": "synthetic_substitutions_not_captured_ASLR",
-  "publicFileCount": 21,
+  "publicFileCount": 34,
   "publicNativeAdaptationExecuted": false,
   "publicSourceChecks": {
     "compilerExecutedForPublicAdaptation": false,
@@ -160,8 +284,8 @@
   },
   "schemaVersion": 1,
   "sdkOrCompiledArtifactsIncluded": false,
-  "status": "experimental_source_checkpoint_native_controls_qualified_production_and_runtime_pending",
-  "targetECFrameOffsetsQualified": false,
+  "status": "experimental_source_checkpoint_local_native_producers_qualified_application_runtime_pending",
+  "targetECFrameOffsetsQualified": true,
   "wineExtractionSources": {
     "signalSha256": "665ea6fd93e7d8d81db2b57b90143e9bc60be120cd3febd71fe34aab351d80eb",
     "unwindSha256": "2af72ed56078429857c0f0928186f8439475811bc0fb2fc90ac0ce6e35f14e32"

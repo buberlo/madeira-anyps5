@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Root-only local signature/provenance checks. Import performs no actions."""
+import argparse, datetime, json, plistlib, re, shlex, struct
+from pathlib import Path
+import importlib.util
+_common = importlib.util.spec_from_file_location('native60_packaging_common', Path(__file__).resolve().parent/'common60.py')
+c = importlib.util.module_from_spec(_common)
+_common.loader.exec_module(c)
+
+def dep_names(text):
+    c.need(':' in text, 'Make dependency target')
+    rows = shlex.split(text.split(':', 1)[1].replace('\\\n', ' '))
+    c.need(rows and all(Path(name).is_absolute() for name in rows), 'Absolute compiler dependencies')
+    return {Path(c.os.path.normpath(name)) for name in rows}
+
+def core_dependencies(actual, previous, layout, old_layout, files):
+    """Compare the real compiler header route and hash every FEX header it used."""
+    root = layout/'Madeira/FEX'; old_root = old_layout/'Madeira/FEX'
+    old = dep_names(previous); now = dep_names(actual)
+    core = root/'FEXCore/include/FEXCore/Core/CoreState.h'
+    c.need({name for name in now if name.name == 'CoreState.h'} == {core},
+           'Exactly the new physical CoreState header')
+    before = {root/name.relative_to(old_root) for name in old if name.is_relative_to(old_root)}
+    after = {name for name in now if name.is_relative_to(root)}
+    c.need(before == after and core in after, 'Exact retained FEXBridge dependency membership')
+    c.need(all(name.is_relative_to(root) for name in now if '/FEXCore/' in str(name)),
+           'No other CoreState/FEXCore provider route')
+    hashes = {}
+    for name in after:
+        relative = str(name.relative_to(layout))
+        c.need(relative in files and c.sha(c.regular(name)) == files[relative],
+               'Actual FEXBridge header byte provider')
+        hashes[str(name)] = files[relative]
+    return hashes
+
+def app_core_state_readback(out, inputs):
+    objects = out/'DerivedData/Build/Intermediates.noindex/Madeira.build/Debug-iphoneos/Madeira.build/Objects-normal/arm64'
+    records = {}
+    previous = Path(inputs['appCoreStateBaselineDependencyFile']).read_text()
+    for path in objects.glob('*.d'):
+        text = path.read_text()
+        if not any(name.name == 'CoreState.h' for name in dep_names(text)): continue
+        c.need(path.stem in inputs['appCoreStateConsumersRequired'], 'Unexpected app CoreState consumer')
+        headers = core_dependencies(text, previous, out/'layout', c.BASE/'layout', inputs['sourceFiles'])
+        obj = c.regular(path.with_suffix('.o'))
+        records[path.stem] = {'dependencyFile':str(path), 'dependencySha256':c.sha(path),
+                             'object':str(obj), 'objectSha256':c.sha(obj), 'actualFexHeaders':headers}
+    c.need(set(records) == set(inputs['appCoreStateConsumersRequired']) == {'FEXBridge'},
+           'Fresh actual app CoreState consumer compiled')
+    return records
+
+def macho_signed(data):
+    c.need(len(data)>=32,'Complete Mach-O header')
+    head=struct.unpack_from('<8I',data)
+    c.need(head[0]==0xfeedfacf and head[1]==0x100000c,'Signed native arm64 Mach-O')
+    at=32; end=at+head[5]; signed=False
+    c.need(end<=len(data),'Complete Mach-O load commands')
+    for _ in range(head[4]):
+        c.need(at+8<=end,'Bounded Mach-O command')
+        cmd,size=struct.unpack_from('<II',data,at)
+        c.need(size>=8 and at+size<=end,'Exact Mach-O command extent')
+        if cmd==0x1d:
+            c.need(size==16,'Code signature command extent')
+            offset,n=struct.unpack_from('<II',data,at+8)
+            c.need(n>0 and offset+n<=len(data),'Embedded code signature extent');signed=True
+        at+=size
+    c.need(at==end and signed,'Exact signed Mach-O commands')
+
+def link_inputs(text,exe,expected):
+    """Require one actual host link and unique archive resolution, not filename hints."""
+    candidates=[]
+    for line in text.splitlines():
+        if 'clang++' not in line or ' -o ' not in line: continue
+        args=shlex.split(line)
+        if '-o' in args and args[args.index('-o')+1]==str(exe): candidates.append(args)
+    c.need(len(candidates)==1,'Exactly one actual host link command')
+    args=candidates[0]; c.need(Path(args[0]).name=='clang++' and '-target' in args and args[args.index('-target')+1]=='arm64-apple-ios17.0','Actual native host link target')
+    dirs=[]
+    for i,v in enumerate(args):
+        if v=='-L': dirs.append(Path(args[i+1]))
+        elif v.startswith('-L') and len(v)>2: dirs.append(Path(v[2:]))
+    c.need(dirs and all(p.is_absolute() for p in dirs),'Explicit absolute archive search paths')
+    rows={}
+    for p,h in expected.items():
+        path=Path(p);name=path.name
+        c.need(name.startswith('lib') and name.endswith('.a'),'Exact static library basename')
+        lib=name[3:-2];c.need(args.count('-l'+lib)==1,'One declared native library link: '+lib)
+        matches=set()
+        for directory in dirs:
+            for suffix in ('.a','.dylib','.tbd'):
+                q=directory/('lib'+lib+suffix)
+                if q.exists() or q.is_symlink(): matches.add(q)
+        c.need(matches=={path},'No alternative native library search resolution: '+lib)
+        c.regular(path);c.need(c.sha(path)==h,'Actual selected native archive bytes')
+        rows[lib]={'path':str(path),'sha256':h}
+    c.need(len(rows)==9,'Seven FEX and two Wine native libraries')
+    return {'argv':args,'archiveSearchPaths':list(map(str,dirs)),'selectedArchives':rows,'uniqueResolutionVerified':True}
+
+def profile_contract(raw,expected_hash,bundle):
+    profile=plistlib.loads(raw)
+    c.need(profile['ExpirationDate']>datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),'Unexpired provisioning profile')
+    c.need(profile['TeamIdentifier']==[c.TEAM] and profile['Entitlements']['get-task-allow'] is True,'Exact development profile team')
+    appid=profile['Entitlements']['application-identifier']
+    c.need(appid==c.TEAM+'.'+bundle or (bundle==c.BUNDLE+'.JITHelper' and appid==c.TEAM+'.*'),'Exact retained profile application identity or helper wildcard')
+    return {'sha256':expected_hash,'uuid':profile['UUID'],'name':profile['Name'],'expirationUtc':profile['ExpirationDate'].isoformat(),'deviceCount':len(profile.get('ProvisionedDevices',[]))}
+
+def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--finish',action='store_true',required=True)
+    ap.add_argument('--output',type=Path,default=c.DEFAULT_OUT);ap.add_argument('--expected-input-sha256',required=True);a=ap.parse_args()
+    out=c.output_path(a.output);c.need(not (out/'signed-build-receipt.json').exists() and not (out/'finish-receipt.json').exists(),'Fresh signature verification')
+    inputs=c.verify_inputs(out,a.expected_input_sha256)
+    result={'status':'failed_native60_signature_verification_not_installed','deviceActions':False,'installed':False}
+    try:
+        build=c.read(out/'xcodebuild-result.json');cmd=c.read(out/'xcodebuild-command.json')
+        c.need(build['status']=='native60_xcodebuild_pass_pending_signature_verification' and build['exitCode']==0 and build['inputReceiptSha256']==a.expected_input_sha256 and build['commandSha256']==c.sha(out/'xcodebuild-command.json'),'Exact actual completed build')
+        c.need(cmd['argv']==c.planned_argv(out) and cmd['exitCode']==0 and cmd['ownedChildReaped'] is True and build['outputHashes']==cmd['outputs'],'Exact build command and owned join');c.replay(cmd['outputs'])
+        text=(out/'xcodebuild.stdout').read_text(errors='replace')+(out/'xcodebuild.stderr').read_text(errors='replace');c.need('** BUILD SUCCEEDED **' in text,'Actual build success marker')
+        app=out/'DerivedData/Build/Products/Debug-iphoneos/Madeira.app';helper=app/'PlugIns/MadeiraJITHelper.appex';exe=app/'Madeira'
+        expected=dict(inputs['externalFexArchives'])
+        for n in ('libntdll_unix.a','libwineserver.a'):
+            rel='Madeira/app/Madeira/'+n;expected[str(out/'layout'/rel)]=inputs['sourceFiles'][rel]
+        link=link_inputs(text,exe,expected);c.put(out/'native-link-input-readback.json',link)
+        consumers=app_core_state_readback(out,inputs);c.put(out/'app-core-state-consumers.json',consumers)
+        c.command(out,'codesign-verify',['/usr/bin/codesign','--verify','--deep','--strict','--verbose=2',app])
+        c.command(out,'helper-codesign-verify',['/usr/bin/codesign','--verify','--strict','--verbose=2',helper])
+        identity=c.command(out,'codesign-identity',['/usr/bin/codesign','-dv','--verbose=4',app])[1].decode()
+        c.need('TeamIdentifier='+c.TEAM in identity and 'Authority=Apple Development:' in identity,'Exact host signing identity')
+        ent={}
+        for label,bundle in [('host',app),('helper',helper)]:
+            ent[label]=plistlib.loads(c.command(out,label+'-entitlements',['/usr/bin/codesign','-d','--entitlements',':-',bundle])[0])
+            c.need(ent[label]==plistlib.loads((c.BASE/(label+'-entitlements.stdout')).read_bytes()),'Exact retained Native59 entitlements')
+        for n in ['com.apple.developer.kernel.increased-memory-limit','com.apple.developer.kernel.extended-virtual-addressing','get-task-allow']:
+            c.need(ent['host'].get(n) is True,'Required host entitlement: '+n)
+        prior=c.read(c.BASE/'signed-build-receipt.json');priorprofiles={r['component']:r for r in prior['profiles']};profiles=[]
+        for label,bundle,bid in [('host',app,c.BUNDLE),('helper',helper,c.BUNDLE+'.JITHelper')]:
+            provision=bundle/'embedded.mobileprovision';h=c.sha(c.regular(provision));c.need(h==priorprofiles[label]['sha256'],'Exact retained provisioning profile')
+            raw=c.command(out,label+'-profile',['/usr/bin/security','cms','-D','-i',provision])[0]
+            c.need(plistlib.loads(raw)==plistlib.loads((c.BASE/(label+'-profile.stdout')).read_bytes()),'Exact retained decoded Native59 profile')
+            row=profile_contract(raw,h,bid);row['component']=label;profiles.append(row)
+        plist=plistlib.loads((app/'Info.plist').read_bytes());hp=plistlib.loads((helper/'Info.plist').read_bytes())
+        c.need(plist['CFBundleIdentifier']==c.BUNDLE and hp['CFBundleIdentifier']==c.BUNDLE+'.JITHelper' and plist['CFBundleVersion']==hp['CFBundleVersion']=='60','Exact Native60 app/helper identities and versions')
+        binary=c.regular(exe).read_bytes();macho_signed(binary);helperexe=c.regular(helper/hp['CFBundleExecutable']);macho_signed(helperexe.read_bytes())
+        literals=[b'return fma(l, r, T(-0.0));',b'vec<T, Cols> res = vec<T, Cols>(T(-0.0));',b'vec<T, Rows> res = vec<T, Rows>(T(-0.0));',b'vec<T, LRows> tmp(T(-0.0));']
+        c.need(all(v in binary for v in literals),'All four corrected MSL helper literals')
+        components={n:c.pe_component(out,'signed-pe-'+n.replace('.','_'),app/'arm64ec-windows'/n) for n in c.PE_NAMES}
+        c.need(components==inputs['embeddedPEComponents'],'Exact signed embedded PE bytes and ABI')
+        archive=out/'layout/Madeira/app/Madeira/libMoltenVK.a';receipt=c.ROOT/'build/moltenvk-local/ios/receipt.json'
+        c.need(c.sha(receipt)==inputs['moltenvkReceiptSha256'] and c.sha(archive)==c.read(receipt)['libraries'][0]['sha256'],'Retained MoltenVK archive and producer')
+        uuidtext=c.command(out,'app-uuid',['/usr/bin/dwarfdump','--uuid',exe])[0].decode();m=re.fullmatch(r'UUID: ([A-F0-9-]+) \(arm64\) .+\n?',uuidtext);c.need(m,'Exactly one native app UUID');uuid=m[1]
+        dsym=out/'DerivedData/Build/Products/Debug-iphoneos/Madeira.app.dSYM';dsymtext=c.command(out,'dsym-uuid',['/usr/bin/dwarfdump','--uuid',dsym])[0].decode()
+        c.need(re.fullmatch(r'UUID: '+re.escape(uuid)+r' \(arm64\) .+\n?',dsymtext),'Exact matching native dSYM UUID')
+        c.verify_inputs(out,a.expected_input_sha256)
+        c.need(c.inventory(Path(prior['app']))==c.read(c.BASE/'app-file-hashes.json'),'Complete original Native59 rollback closure')
+        files=c.inventory(app);c.put(out/'app-file-hashes.json',files)
+        record={'schemaVersion':3,'status':'built_signed_verified_not_installed','atUtc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'app':str(app),'appBuild':'60','bundleID':c.BUNDLE,'team':c.TEAM,'architecture':'arm64','appMachOBytes':len(binary),'appMachOSha256':c.sha(exe),'appInfoSha256':c.sha(app/'Info.plist'),'helperMachOSha256':c.sha(helperexe),'uuid':uuid,'dsymUuidMatches':True,'allFourCorrectedMslHelperLiteralsPresent':True,'moltenvkArchiveSha256':c.sha(archive),'moltenvkReceiptSha256':inputs['moltenvkReceiptSha256'],'embeddedPEComponents':components,'reusedPEComponentNames':inputs['reusedPEComponentNames'],'native58RollbackPreserved':True,'native57InputsSha256':inputs['native57InputsSha256'],'native57SigningReceiptSha256':inputs['native57SigningReceiptSha256'],'native57AppClosureSha256':inputs['native57AppClosureSha256'],'native57RollbackMachOSha256':inputs['native57RollbackMachOSha256'],'nativeWineBuildReceiptSha256':inputs['nativeWineBuildReceiptSha256'],'nativeFexDecisionReceiptSha256':inputs['nativeFexDecisionReceiptSha256'],'jitProducerReceiptSha256':inputs['jitProducerReceiptSha256'],'nativeFexSourceFileCount':6973,'nativeFexGeneratedHeaderCount':5,'freshNativeFexObjectCount':0,'freshNativeFexArchiveCount':0,'reusedNativeFexArchiveCount':7,'diagnosticOnly':True,'freshNativeWineObjectCount':inputs['freshNativeWineObjectCount'],'native58RollbackSigningReceiptSha256':inputs['native58RollbackSigningReceiptSha256'],'ownershipSamplerReviewSha256':inputs['ownershipSamplerReviewSha256'],'actualNativeLinkInputsVerified':True,'nativeLinkInputReadbackSha256':c.sha(out/'native-link-input-readback.json'),'signedEntitlements':ent['host'],'signedEntitlementsEqualNative58':True,'helperEntitlementsEqualNative58':True,'profiles':profiles,'profileSha256':profiles[0]['sha256'],'helperProfileSha256':profiles[1]['sha256'],'profilesEqualNative58':True,'deepStrictCodesignVerified':True,'provisioningUpdatesAllowed':False,'hostProfile':{'configuration':'Debug','cOptimization':2,'swiftOptimization':'-O','debugInformation':'dwarf-with-dsym'},'inputReceiptSha256':a.expected_input_sha256,'appFileHashesSha256':c.sha(out/'app-file-hashes.json'),'buildResultSha256':c.sha(out/'xcodebuild-result.json'),'buildLogSha256':c.sha(out/'xcodebuild.stdout'),'finishDriverInputs':c.recipe_inputs(),'installed':False,'launched':False,'deviceOperations':False,'deviceTested':False,'runtimeAccepted':False,'full803Qualified':False,'cpuEightQualified':False,'gamePlayable':False,'githubActionsUsed':False,'boundary':'Local candidate60 compile/link/sign only: narrowly modified native ownership sampler; unchanged Native58 FEX and remaining runtime components. No installation, JIT, CPU, GPU, userdata preservation or gameplay acceptance.'}
+        record.update(freshNativeFexObjectCount=50, freshNativeFexArchiveCount=1, reusedNativeFexArchiveCount=6,
+                      freshNativeWineObjectCount=0, reusedNativeWineArchiveCount=2, diagnosticOnly=False,
+                      optionalOwnershipSamplerRetained=True, native59RollbackPreserved=True,
+                      native59RollbackSigningReceiptSha256=inputs['native59RollbackSigningReceiptSha256'],
+                      native59RollbackAppClosureSha256=inputs['native59RollbackAppClosureSha256'],
+                      nativeECContinuationReceiptSha256=inputs['nativeECContinuationReceiptSha256'],
+                      nativeECContinuationSourceFreezeSha256=inputs['nativeECContinuationSourceFreezeSha256'],
+                      predecessorNativeFexDecisionReceiptSha256=inputs['predecessorNativeFexDecisionReceiptSha256'],
+                      predecessorJitProducerReceiptSha256=inputs['predecessorJitProducerReceiptSha256'],
+                      retainedNativeVersionMetadata=inputs['retainedNativeVersionMetadata'],
+                      changedPEComponentNames=inputs['changedPEComponentNames'],
+                      actualFrameOffsetRecords=inputs['actualFrameOffsetRecords'],
+                      appCoreStateConsumers=consumers, appCoreStateConsumersVerified=True,
+                      appCoreStateReadbackSha256=c.sha(out/'app-core-state-consumers.json'),
+                      freshFEXBridgeCompiled=True, sourceVersion=inputs['sourceVersion'],
+                      signedEntitlementsEqualNative59=True, helperEntitlementsEqualNative59=True,
+                      profilesEqualNative59=True,
+                      boundary='Local Native60 compile/link/sign only: three-source EC LR snapshot candidate, actual187 PE and native50+9 Core archive; six FEX/two Wine archives and optional bounded owner hooks retained. No install, CPU/GPU or gameplay acceptance.')
+        c.put(out/'signed-build-receipt.json',record);result.update(status='native60_signature_and_provenance_pass_not_installed',signedReceiptSha256=c.sha(out/'signed-build-receipt.json'))
+    except BaseException as e:result['error']=type(e).__name__+': '+str(e);raise
+    finally:c.put(out/'finish-receipt.json',result)
+    print(json.dumps(result,indent=2))
+
+if __name__=='__main__':main()

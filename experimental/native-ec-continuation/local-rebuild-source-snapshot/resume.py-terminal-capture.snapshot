@@ -1,0 +1,181 @@
+"""Continue only the native tail of an exact completed PE build. Inert by default."""
+from pathlib import Path
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import stat
+import time
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent.parent
+OLD = ROOT/'build/native-ec-loop-top-continuation-rebuild-attempt2-proposal-20261012'
+FAILED = ROOT/'build/fex-native-ec-link-preservation-full-link-20261012-attempt2'
+OUT = ROOT/'build/fex-native-ec-link-preservation-native-resume-20261012-attempt2'
+FAILED_SHA = '4fbc87f261a46a48d753917b7187cbde2811ccf9b2fc0844ead02592f26689a0'
+FREEZE_SHA = '918622beb63efe3b5ccb1ef15fc216e69f6281af52b8cc3e49ce14de92497735'
+OLD_REVIEW_SHA = 'c9b8e61c45dc35d36c298158d3cac50c0ad136df03ad0c97f3fe3b37e7056035'
+
+def module(path, name):
+    s=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+
+m = module(OLD/'build_production.py', 'exact_failed_ec_builder')
+p, n, u = m.p, m.n, m.u
+terminal = module(HERE/'terminal_log.py', 'exact_terminal_outer_capture')
+need = m.need
+
+def imported_ec(symbols):
+    return [s for s in symbols if re.fullmatch(r'RtlIsEcCode \(\d+\)', s)]
+
+def import_contract(old, new):
+    a=dict(u.import_contract(old));b=dict(u.import_contract(new))
+    need(set(a)==set(b) and len(a)==12, 'Exact retained 12 DLL import set')
+    ntdll=[name for name in a if name.lower()=='ntdll.dll']
+    need(len(ntdll)==1,'Exact ntdll import row')
+    for name, syms in a.items():
+        if name!=ntdll[0]: need(b[name]==syms,'Other import changed');continue
+        if imported_ec(syms):
+            need(len(imported_ec(syms))==1 and b[name]==syms,'Already imported EC symbol requires exact equality')
+        else:
+            extra=set(b[name])-set(syms)
+            need(set(syms).issubset(b[name]) and len(extra)==1 and len(imported_ec(extra))==1,
+                 'Only missing required RtlIsEcCode may be added')
+    return 'exact_existing_RtlIsEcCode' if imported_ec(a[ntdll[0]]) else 'only_required_RtlIsEcCode_added'
+
+def joined(row):
+    need(row.get('ownedChildReaped') is True and row.get('actualExitCode')==0 and 'error' not in row,
+         'Exact successful joined compiler command')
+
+def completed_pe(q, f):
+    need(q['status']=='failed' and q['error']=='Only exact RtlIsEcCode import added','Exact postcondition failure')
+    need(f['status']=='prepared_fresh6973_overlay3_generated5_not_compiled' and f['sourceReviewSha256']==OLD_REVIEW_SHA,
+         'Exact compiled source origin')
+    outputs=q['outputHashes'];prefix=str(FAILED/'arm64ec/build')+'/'
+    objects={name:h for name,h in outputs.items() if name.startswith(prefix) and name.endswith('.obj')}
+    need(len(objects)==187,'All 187 completed PE objects bound')
+    for name in ['reverse-patch','configure','full187','moduleS','moduleCpp','old-frame','new-frame','old-pe','new-pe']:
+        path=FAILED/'arm64ec'/(name+'-command.json');need(str(path) in outputs,'Required command bound')
+        joined(json.loads(path.read_text()))
+    old=m.frame(FAILED/'arm64ec/old-frame.obj');new=m.frame(FAILED/'arm64ec/new-frame.obj')
+    need(len(old)==4 and len(new)==7 and old==new[:4],'Actual target COFF size/offsets')
+    need(new[4:]==[new[3]+8,new[3]+16,new[3]+24] and new[-1]<=32760,'Actual target record offsets')
+    before=(FAILED/'arm64ec/old-pe.stdout').read_text();after=(FAILED/'arm64ec/new-pe.stdout').read_text()
+    need(u.export_contract(before)==u.export_contract(after) and len(u.export_contract(after))==30,'Exact 30 exports')
+    mode=import_contract(before,after)
+    cpp=(FAILED/'arm64ec/moduleCpp.stdout').read_text()
+    for name in ['RtlIsEcCode','fex_ios_native_critical_enter','fex_ios_native_critical_leave','NtQueryInformationThread']:
+        need(name in cpp,'Actual Module.cpp reference')
+    return objects,[old,new],mode
+
+def replay(inputs, stamps):
+    for name,digest in inputs.items():
+        before=p.stamp(name);need(before==stamps[name],'Initial provider identity')
+        h=hashlib.sha256()
+        with Path(name).open('rb') as stream:
+            z=os.fstat(stream.fileno());values=[z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns]
+            need(stat.S_ISREG(z.st_mode) and values==before['target'],'Exact open regular provider')
+            for block in iter(lambda:stream.read(1<<20),b''):h.update(block)
+            z=os.fstat(stream.fileno());need(values==[z.st_dev,z.st_ino,z.st_mode,z.st_nlink,z.st_size,z.st_mtime_ns,z.st_ctime_ns],'Open provider drift')
+        need(h.hexdigest()==digest and p.stamp(name)==before,'Full provider bytes/final identity')
+    need(all(p.stamp(name)==stamps[name] for name in inputs),'Final complete identity closure')
+
+def exact_failed():
+    qpath=FAILED/'final-receipt.json';fpath=FAILED/'production-source-freeze.json'
+    need(p.sha(qpath)==FAILED_SHA and p.sha(fpath)==FREEZE_SHA,'Exact failed receipt/freeze')
+    return json.loads(qpath.read_text()),json.loads(fpath.read_text())
+
+def required_inputs(q, review_sha):
+    review=HERE/'source-review-freeze.json'
+    need(p.sha(review)==review_sha,'Current exact resume review')
+    inputs=dict(q['inputHashes']);p.merge(inputs,terminal.adopt(q, FAILED))
+    p.merge(inputs,json.loads(review.read_text())['inputHashes'])
+    p.merge(inputs,{str(review):review_sha,str(FAILED/'final-receipt.json'):FAILED_SHA,
+                    str(FAILED/'production-source-freeze.json'):FREEZE_SHA})
+    return inputs
+
+def native_recipe():
+    recipe=json.loads((OLD/'production-rebuild-recipe.json').read_text())
+    for row in recipe['nativeCommands']:
+        row['compile']=[str(x).replace(str(FAILED/'native'),str(OUT/'native')) for x in row['compile']]
+    for row in recipe['retainedFexCoreMembers']:
+        row['destination']=row['destination'].replace(str(FAILED/'native'),str(OUT/'native'))
+    return recipe
+
+def validate_plan_closure(plan, q, f, inputs, recipe):
+    need(plan['inputHashes']==inputs and set(plan['inputFingerprints'])==set(inputs),'Exact complete failed input/output/source closure')
+    need(plan['compiledSourceFreeze']==f and plan['recipe']==recipe,'Exact compiled source and native command derivation')
+    need(plan['failedReceiptSha256']==FAILED_SHA and plan['failedFreezeSha256']==FREEZE_SHA,'Exact historical failed pins')
+
+def freeze(expected_review):
+    review=HERE/'source-review-freeze.json'
+    need(len(expected_review)==64 and p.sha(review)==expected_review,'Exact resume source review')
+    q,f=exact_failed();inputs=required_inputs(q,expected_review)
+    stamps={name:p.stamp(name) for name in inputs};replay(inputs,stamps)
+    objects,frames,mode=completed_pe(q,f)
+    need(not OUT.exists(),'Exclusive native continuation output')
+    recipe=native_recipe()
+    # Only native output/dependency locations move; every source/provider remains unchanged.
+    record={'status':'frozen_exact_completed187_PE_native50_plus9_continuation_not_executed',
+            'sourceReviewSha256':expected_review,'failedReceiptSha256':FAILED_SHA,'failedFreezeSha256':FREEZE_SHA,
+            'inputHashes':inputs,'inputFingerprints':stamps,'compiledSourceFreeze':f,'recipe':recipe,
+            'completedObjects':objects,'frameOffsetRecords':frames,'importMode':mode}
+    need(p.sha(review)==expected_review,'Final review marker');OUT.mkdir()
+    path=OUT/'resume-source-freeze.json';path.write_text(json.dumps(record,indent=2)+'\n');return path
+
+def native_tail(recipe, f, source, out, command):
+    # Extracted exact original native50/9 compile/member/symbol tail, source-held separately.
+    scope={'recipe':recipe,'f':f,'source':source,'out':out,'command':command,'Path':Path,'json':json,
+           'shutil':m.shutil,'need':need,'p':p,'n':n,'NATIVE':m.NATIVE,'ROOT':ROOT}
+    code=(HERE/'native_tail.py.inc').read_text()
+    original=(OLD/'build_production.py').read_text()
+    first=original.index("  native=out/'native';native.mkdir();deps={};fresh={}")
+    last=original.index("  replay();need(all(json.loads",first)
+    need(code==original[first:last],'Exact unchanged native tail')
+    exec(compile('if True:\n'+code,str(HERE/'native_tail.py.inc'),'exec'),scope)
+    return scope['selected'],scope['deps']
+
+def execute(expected):
+    frozen=OUT/'resume-source-freeze.json'
+    need(len(expected)==64 and p.sha(frozen)==expected,'Exact native continuation freeze')
+    plan=json.loads(frozen.read_text());need(plan['status']=='frozen_exact_completed187_PE_native50_plus9_continuation_not_executed','Typed continuation plan')
+    qold,fold=exact_failed()
+    validate_plan_closure(plan,qold,fold,required_inputs(qold,plan['sourceReviewSha256']),native_recipe())
+    replay(plan['inputHashes'],plan['inputFingerprints'])
+    objects,frames,mode=completed_pe(qold,fold)
+    need(objects==plan['completedObjects'] and frames==plan['frameOffsetRecords'] and mode==plan['importMode'],'Exact completed derivation')
+    stage=OUT/'commands';need(not stage.exists() and not (OUT/'native').exists(),'Fresh native execution')
+    stage.mkdir();env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','CCACHE_')) and k not in {'CC','CXX','CFLAGS','CXXFLAGS','CPPFLAGS','LDFLAGS','CPATH','LIBRARY_PATH','SDKROOT'}}
+    env['PATH']='/usr/bin:/bin'
+    def command(name,argv): return m.bounded_command(name,argv,env,stage,OUT)
+    result={'status':'failed','sourceFreezeSha256':expected,'sourceReviewSha256':plan['sourceReviewSha256'],
+            'completedPeFailedReceiptSha256':FAILED_SHA,'completedPeSourceFreezeSha256':FREEZE_SHA,
+            'canonicalChanged':False,'installed':False,'deviceActions':False,'runtimeAccepted':False,
+            'retainedNativeVersionMetadata':True,'freshArm64ecObjectCount':187,'peRecompiled':False}
+    started=time.monotonic()
+    try:
+        selected,deps=native_tail(plan['recipe'],fold,Path(plan['recipe']['sourceDestination']),OUT,command)
+        replay(plan['inputHashes'],plan['inputFingerprints']);need(p.sha(frozen)==expected,'Final immutable continuation freeze')
+        for path in stage.glob('*-command.json'): joined(json.loads(path.read_text()))
+        dll=FAILED/'arm64ec/build/Bin/libarm64ecfex.dll'
+        result.update(status='fresh_ec_native_link_snapshot_DLL_and_native_archives_built_not_runtime_qualified',
+                      artifact=str(dll),newDLLSha256=p.sha(dll),sourceFiles=fold['sourceFiles'],sourceRoute=plan['recipe']['sourceDestination'],
+                      objects=objects,frameOffsetRecords=frames,frameSizeUnchanged=True,
+                      freshNativeObjectCount=50,freshNativeArchiveCount=1,reusedNativeArchiveCount=6,
+                      archives=selected,actualNativeDependencies=deps,exportsExact=True,
+                      importContractMode=mode,requiredRtlIsEcCodePresent=True,
+                      sourceVersion='EC-link-'+plan['recipe']['exactPatchSha256'][:12],
+                      appConsumersNeedRebuild=['FEXBridge'],nativeGeneratedHeaders=fold['generatedHeaders'])
+    except BaseException as error: result['status']='failed';result['error']=str(error);raise
+    finally:
+        result['elapsedSeconds']=time.monotonic()-started;result['inputHashes']=plan['inputHashes']
+        result['outputHashes']={str(path):p.sha(path) for path in OUT.rglob('*') if path.is_file() and path!=OUT/'final-receipt.json'}
+        (OUT/'final-receipt.json').write_text(json.dumps(result,indent=2)+'\n');print(result['status'])
+
+if __name__=='__main__':
+    a=argparse.ArgumentParser();g=a.add_mutually_exclusive_group();g.add_argument('--freeze',action='store_true');g.add_argument('--execute',action='store_true')
+    a.add_argument('--expected-source-review-sha256');a.add_argument('--expected-freeze-sha256');args=a.parse_args()
+    if args.freeze: print(freeze(args.expected_source_review_sha256 or ''))
+    elif args.execute: execute(args.expected_freeze_sha256 or '')
+    else: print('inert; no compile, signing, device or output action')
